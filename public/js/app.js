@@ -1,5 +1,3 @@
-// SPA minimalista (sin framework) con ruteo por hash. Cada seccion
-// corresponde a uno o varios RF de la Formulacion del Proyecto de Titulo.
 const state = { user: null };
 
 const ROLE_LABELS = {
@@ -367,7 +365,7 @@ async function renderReportes(app) {
     </div>`;
 }
 
-// ------------------------------------------------------------- BÚSQUEDA IA --
+// ------------------------------------------------------------- BUSQUEDA - IA --
 async function renderBusqueda(app) {
   app.innerHTML = `
     <div class="card">
@@ -396,7 +394,7 @@ async function renderBusqueda(app) {
   };
 }
 
-// ------------------------------------------------------------- MIGRACIÓN --
+// ------------------------------------------------------------- MIGRACION --
 async function renderMigracion(app) {
   app.innerHTML = `
     <div class="card">

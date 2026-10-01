@@ -1,4 +1,3 @@
-// Cliente API muy simple: agrega el token JWT y lanza errores legibles.
 const Api = (() => {
   function token() { return localStorage.getItem('leica_token'); }
 
