@@ -1,0 +1,25 @@
+{% extends 'inventario/base.html' %}
+
+{% block content %}
+<div class="login-wrap card">
+  <h2>Ingresar</h2>
+  {% if form.errors %}
+    <div class="msg error">Tu email y contraseña no coinciden o la cuenta está inactiva.</div>
+  {% endif %}
+  <form method="post" action="{% url 'login' %}">
+    {% csrf_token %}
+    <div class="field">
+      <label>Correo institucional</label>
+      <input name="username" type="email" placeholder="encargado.leica@inacapmail.cl" required autofocus>
+    </div>
+    <div class="field" style="margin-top:8px">
+      <label>Contraseña</label>
+      <input name="password" type="password" required>
+    </div>
+    <button class="btn" style="margin-top:14px" type="submit">Ingresar</button>
+  </form>
+  <p class="hint">RF-05: autenticación con correo institucional (@inacapmail.cl).<br>
+  Usuarios de ejemplo, contraseña <code>Leica2026!</code>:<br>
+  encargado.leica@inacapmail.cl · docente1@inacapmail.cl · calidad@inacapmail.cl · dcarrera@inacapmail.cl · estudiante1@inacapmail.cl</p>
+</div>
+{% endblock %}

@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+{% load static %}
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LEICA · Sistema de Gestión de Inventario</title>
+  <link rel="stylesheet" href="/static/inventario/css/styles.css" />
+  <style>
+    .messages {
+      padding: 0;
+      margin-bottom: 20px;
+      list-style: none;
+    }
+
+    .messages li {
+      padding: 10px 14px;
+      border-radius: 6px;
+      margin-bottom: 8px;
+      font-size: 0.88rem;
+    }
+
+    .messages li.success {
+      background: #e3f6e3;
+      color: #216e21;
+      border: 1px solid #b5e0b5;
+    }
+
+    .messages li.error {
+      background: #fdeaea;
+      color: var(--rojo-oscuro);
+      border: 1px solid #f5b5b5;
+    }
+
+    .messages li.warning {
+      background: #fff2cc;
+      color: #8a6d00;
+      border: 1px solid #ffe699;
+    }
+
+    .messages li.info {
+      background: #e6f7ff;
+      color: #0050b3;
+      border: 1px solid #91d5ff;
+    }
+  </style>
+</head>
+
+<body>
+  <header class="topbar">
+    <div class="brand" style="display: flex; align-items: center; gap: 12px;">
+      <img src="{% static 'static/inventario/img/inacap-logo.svg' %}" alt="INACAP Logo"
+        style="height: 28px; width: auto; max-width: 120px;">
+      <span class="brand-sep" style="margin: 0; color: #ccc;">|</span> LEICA Inventario
+    </div>
+    {% if user.is_authenticated %}
+    <nav id="nav" class="nav">
+      <a href="{% url 'dashboard' %}"><button
+          class="{% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">Resumen</button></a>
+      <a href="{% url 'inventario' %}"><button
+          class="{% if request.resolver_match.url_name == 'inventario' %}active{% endif %}">Inventario</button></a>
+      <a href="{% url 'solicitudes' %}"><button
+          class="{% if request.resolver_match.url_name == 'solicitudes' %}active{% endif %}">Solicitudes</button></a>
+      {% if user.rol in 'encargado_laboratorio,control_calidad' %}
+      <a href="{% url 'mantenimiento' %}"><button
+          class="{% if request.resolver_match.url_name == 'mantenimiento' %}active{% endif %}">Mantenimiento</button></a>
+      {% endif %}
+      <a href="{% url 'reportes' %}"><button
+          class="{% if request.resolver_match.url_name == 'reportes' %}active{% endif %}">Reportes</button></a>
+      <a href="{% url 'busqueda' %}"><button
+          class="{% if request.resolver_match.url_name == 'busqueda' %}active{% endif %}">Búsqueda IA</button></a>
+      {% if user.rol in 'encargado_laboratorio,control_calidad' %}
+      <a href="{% url 'migracion' %}"><button
+          class="{% if request.resolver_match.url_name == 'migracion' %}active{% endif %}">Migración Excel</button></a>
+      {% endif %}
+      {% if user.is_staff %}
+      <a href="{% url 'admin:index' %}" target="_blank" style="margin-left: 20px;"><button
+          style="background: var(--rojo); color: white; border: none;">Admin Panel</button></a>
+      {% endif %}
+    </nav>
+    <div id="userbox" class="userbox">
+      {{ user.first_name|default:user.username }} · <strong>{{ user.get_rol_display }}</strong>
+      <form method="post" action="{% url 'logout' %}" style="display:inline">
+        {% csrf_token %}
+        <button type="submit">Salir</button>
+      </form>
+    </div>
+    {% endif %}
+  </header>
+
+  <main id="app" class="app">
+    {% if messages %}
+    <ul class="messages">
+      {% for message in messages %}
+      <li{% if message.tags %} class="{{ message.tags }}" {% endif %}>{{ message }}</li>
+        {% endfor %}
+    </ul>
+    {% endif %}
+
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="footer">Prototipo — Sistema de Gestión de Inventario y Préstamo de Equipos con IA · LEICA, INACAP
+    Valdivia</footer>
+
+  {% block scripts %}{% endblock %}
+</body>
+
+</html>

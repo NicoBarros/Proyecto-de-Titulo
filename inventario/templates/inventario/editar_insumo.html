@@ -1,0 +1,23 @@
+{% extends 'inventario/base.html' %}
+
+{% block content %}
+<div class="card" style="max-width: 600px; margin: 0 auto;">
+  <h2>Editar Insumo: {{ insumo.nombre }}</h2>
+  <form method="post">
+    {% csrf_token %}
+    <div class="field" style="margin-bottom:10px;"><label>Nombre*</label><input name="nombre" value="{{ form.nombre.value }}" required></div>
+    <div class="field" style="margin-bottom:10px;"><label>Categoría</label><input name="categoria" value="{{ form.categoria.value|default:'' }}"></div>
+    <div class="field" style="margin-bottom:10px;"><label>Tipo</label>
+      <select name="tipo">
+        <option value="perecible" {% if form.tipo.value == 'perecible' %}selected{% endif %}>Perecible</option>
+        <option value="renovable" {% if form.tipo.value == 'renovable' %}selected{% endif %}>Renovable</option>
+      </select>
+    </div>
+    <div class="field" style="margin-bottom:10px;"><label>Cantidad Total* (Cambiar solo si hiciste inventario)</label><input name="cantidad_total" type="number" value="{{ form.cantidad_total.value }}" required></div>
+    <div class="field" style="margin-bottom:15px;"><label>Umbral Mínimo</label><input name="umbral_minimo" type="number" value="{{ form.umbral_minimo.value|default:0 }}"></div>
+    
+    <button class="btn" type="submit">Guardar Cambios</button>
+    <a href="{% url 'inventario' %}?tab=insumos" class="btn secundario" style="text-decoration:none; display:inline-block;">Cancelar</a>
+  </form>
+</div>
+{% endblock %}

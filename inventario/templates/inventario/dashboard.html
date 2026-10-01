@@ -1,0 +1,16 @@
+{% extends 'inventario/base.html' %}
+
+{% block content %}
+<div class="card">
+  <h2>Resumen general (RF-13)</h2>
+  <div class="grid">
+    <div class="stat"><div class="n">{{ totales.total_equipos }}</div><div class="l">Equipos totales</div></div>
+    <div class="stat"><div class="n">{{ totales.equipos_disponibles }}</div><div class="l">Disponibles</div></div>
+    <div class="stat"><div class="n">{{ totales.equipos_prestados }}</div><div class="l">Prestados</div></div>
+    <div class="stat"><div class="n">{{ totales.equipos_mantenimiento }}</div><div class="l">En mantenimiento</div></div>
+    <div class="stat"><div class="n">{{ totales.solicitudes_pendientes }}</div><div class="l">Solicitudes pendientes</div></div>
+    <div class="stat"><div class="n">{{ totales.solicitudes_atrasadas }}</div><div class="l">Atrasadas</div></div>
+    <div class="stat"><div class="n">{{ totales.insumos_bajo_stock }}</div><div class="l">Insumos bajo stock</div></div>
+  </div>
+</div>
+{% endblock %}

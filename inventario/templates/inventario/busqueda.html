@@ -1,0 +1,56 @@
+{% extends 'inventario/base.html' %}
+
+{% block content %}
+<div class="card">
+  <h2>Búsqueda inteligente (RF-11 / RNF-06)</h2>
+  <form id="fBusqueda" class="inline" onsubmit="buscarIA(event)">
+    {% csrf_token %}
+    <div class="field" style="flex:1"><label>Describe lo que necesitas</label>
+      <input name="consulta" id="consulta" style="width:100%" placeholder="ej: necesito algo para armar una red con 3 routers para la clase de mañana" required></div>
+    <button class="btn" type="submit">Buscar con Gemini</button>
+  </form>
+  <div id="resBusqueda"></div>
+  <p class="hint">Delega la interpretación de lenguaje natural a una API externa (Google Gemini) cuando GEMINI_API_KEY está configurada en <code>.env</code>; si no, usa un respaldo por palabras clave local.</p>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function buscarIA(e) {
+  e.preventDefault();
+  const consulta = document.getElementById('consulta').value;
+  const csrf = document.querySelector('[name=csrfmiddlewaretoken]').value;
+  const res = document.getElementById('resBusqueda');
+  
+  res.innerHTML = 'Buscando con Inteligencia Artificial...';
+  
+  try {
+    const formData = new FormData();
+    formData.append('consulta', consulta);
+    
+    const resp = await fetch('{% url "busqueda" %}', {
+      method: 'POST',
+      headers: { 'X-CSRFToken': csrf },
+      body: formData
+    });
+    
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || 'Error en la búsqueda');
+    
+    let html = `<p class="hint">Fuente: ${data.fuente}</p>`;
+    if (data.resultados.length > 0) {
+      html += `<table><thead><tr><th>Equipo</th><th>Código</th><th>Estado</th></tr></thead><tbody>`;
+      data.resultados.forEach(r => {
+        html += `<tr><td>${r.nombre}</td><td>${r.codigo_inventario}</td><td><span class="badge ${r.estado.toLowerCase().replace(' ', '_')}">${r.estado}</span></td></tr>`;
+      });
+      html += `</tbody></table>`;
+    } else {
+      html += '<p>No se encontraron equipos relevantes disponibles.</p>';
+    }
+    res.innerHTML = html;
+  } catch (err) {
+    res.innerHTML = `<div class="msg error">${err.message}</div>`;
+  }
+}
+</script>
+{% endblock %}

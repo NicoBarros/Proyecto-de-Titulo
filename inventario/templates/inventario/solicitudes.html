@@ -1,0 +1,132 @@
+{% extends 'inventario/base.html' %}
+
+{% block content %}
+<div class="card">
+  <h2>Nueva solicitud (RF-06, RF-07)</h2>
+  <form method="post" action="{% url 'solicitudes' %}">
+    {% csrf_token %}
+    <div id="items-container">
+      <div class="inline item-row" style="align-items: flex-end; margin-bottom: 10px;">
+        <div class="field"><label>Ítem</label>
+          <select name="item[]">
+            <optgroup label="Equipos disponibles">
+              {% for e in equipos %}
+              <option value="equipo:{{ e.id }}">{{ e.nombre }} ({{ e.codigo_inventario }})</option>
+              {% endfor %}
+            </optgroup>
+            <optgroup label="Insumos">
+              {% for i in insumos %}
+              <option value="insumo:{{ i.id }}" {% if not i.cantidad_disponible %}disabled{% endif %}>{{ i.nombre }} —
+                disp. {{ i.cantidad_disponible }}</option>
+              {% endfor %}
+            </optgroup>
+          </select>
+        </div>
+        <div class="field"><label>Cantidad</label><input name="cantidad[]" type="number" value="1" min="1"></div>
+        <button type="button" class="btn chico secundario" onclick="removerItem(this)"
+          style="margin-bottom: 4px;">X</button>
+      </div>
+    </div>
+
+    <div style="margin-bottom: 15px;">
+      <button type="button" class="btn chico" onclick="agregarItem()">+ Añadir otro ítem al Kit</button>
+    </div>
+
+    <div class="inline" style="border-top: 1px solid #ccc; padding-top: 15px;">
+      <div class="field"><label>Lugar de uso</label>
+        <select name="lugar_uso">
+          <option value="dentro_sede">Dentro de sede</option>
+          <option value="fuera_sede">Fuera de sede</option>
+        </select>
+      </div>
+      <div class="field"><label>Inicio</label><input name="horario_inicio" type="datetime-local" required></div>
+      <div class="field"><label>Fin</label><input name="horario_fin" type="datetime-local" required></div>
+      <div class="field"><label>Justificación</label><input name="justificacion" placeholder="ej. clase práctica"></div>
+      <button class="btn" type="submit">Solicitar</button>
+    </div>
+  </form>
+</div>
+
+<div class="card">
+  <h2>Solicitudes</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Ítems</th>
+        <th>Horario</th>
+        <th>Lugar</th>
+        <th>Estado</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for s in solicitudes %}
+      <tr>
+        <td>{{ s.id }}</td>
+        <td>
+          {% for item in s.items.all %}
+          {% if item.equipo %}{{ item.equipo.nombre }}{% else %}{{ item.insumo.nombre }}{% endif %}{% if not
+          forloop.last %}, {% endif %}
+          {% endfor %}
+        </td>
+        <td>{{ s.horario_inicio|date:"d/m/Y H:i" }} → {{ s.horario_fin|date:"d/m/Y H:i" }}</td>
+        <td>{{ s.get_lugar_uso_display }}</td>
+        <td><span class="badge {{ s.estado }}">{{ s.get_estado_display }}</span></td>
+        <td>
+          {% if puede_aprobar %}
+          <form method="post" action="{% url 'solicitudes' %}" style="display:inline">
+            {% csrf_token %}
+            <input type="hidden" name="solicitud_id" value="{{ s.id }}">
+
+            {% if s.estado == 'pendiente' %}
+            <button type="submit" name="accion" value="aprobar" class="btn chico">Aprobar</button>
+            <button type="submit" name="accion" value="rechazar" class="btn chico secundario">Rechazar</button>
+            {% elif s.estado == 'aprobada' %}
+            <button type="submit" name="accion" value="entregar" class="btn chico">Entregar</button>
+            {% elif s.estado == 'entregada' %}
+            <input type="hidden" name="estado_equipo" value="bueno" id="estado_equipo_{{ s.id }}">
+            <button type="button" class="btn chico" onclick="devolver({{ s.id }}, this.form)">Registrar
+              devolución</button>
+            {% endif %}
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  function devolver(id, form) {
+    const estado = prompt('Estado del equipo al devolver (excelente/bueno/dañado/inservible):', 'bueno');
+    if (estado) {
+      document.getElementById('estado_equipo_' + id).value = estado;
+      const inputAccion = document.createElement('input');
+      inputAccion.type = 'hidden'; inputAccion.name = 'accion'; inputAccion.value = 'devolver';
+      form.appendChild(inputAccion);
+      form.submit();
+    }
+  }
+
+  function agregarItem() {
+    const container = document.getElementById('items-container');
+    const firstRow = container.querySelector('.item-row');
+    const newRow = firstRow.cloneNode(true);
+    newRow.querySelector('input[type="number"]').value = 1;
+    container.appendChild(newRow);
+  }
+
+  function removerItem(btn) {
+    const container = document.getElementById('items-container');
+    if (container.querySelectorAll('.item-row').length > 1) {
+      btn.closest('.item-row').remove();
+    } else {
+      alert("La solicitud debe tener al menos un ítem.");
+    }
+  }
+</script>
+{% endblock %}

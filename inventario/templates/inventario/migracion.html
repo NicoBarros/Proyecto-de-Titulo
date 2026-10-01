@@ -1,0 +1,35 @@
+{% extends 'inventario/base.html' %}
+
+{% block content %}
+<div class="card">
+  <h2>Migración desde Excel/SharePoint (RF-14)</h2>
+  <p>Exporta la planilla actual a CSV (Excel → Archivo → Guardar como → CSV) con columnas:<br>
+  <code>tipo,codigo_inventario,nombre,modelo,especificaciones,ubicacion,estado,valor_adquisicion,categoria,tipo_insumo,cantidad</code><br>
+  (<code>tipo</code> = <code>equipo</code> o <code>insumo</code>).</p>
+  
+  <form method="post" enctype="multipart/form-data" class="inline">
+    {% csrf_token %}
+    <input type="file" name="archivo" accept=".csv" required>
+    <button class="btn" type="submit">Importar</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2>Historial de Migraciones</h2>
+  <table>
+    <thead><tr><th>Fecha</th><th>Archivo</th><th>Importadas / Totales</th><th>Errores</th></tr></thead>
+    <tbody>
+      {% for m in migraciones %}
+      <tr>
+        <td>{{ m.fecha|date:"d/m/Y H:i" }}</td>
+        <td>{{ m.archivo_origen }}</td>
+        <td>{{ m.filas_importadas }} / {{ m.filas_totales }}</td>
+        <td class="{% if m.filas_con_error > 0 %}badge fuera_servicio{% endif %}">{{ m.filas_con_error }}</td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="4">No hay migraciones previas.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

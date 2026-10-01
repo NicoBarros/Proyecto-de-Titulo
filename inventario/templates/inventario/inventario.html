@@ -1,0 +1,121 @@
+{% extends 'inventario/base.html' %}
+
+{% block content %}
+<div class="card">
+  <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--rojo); padding-bottom: 8px; margin-top: 0; margin-bottom: 20px;">
+    <h2 style="margin: 0; border: none; padding: 0;">Inventario (RF-01 a RF-04)</h2>
+    {% if puede_escribir %}
+    <a href="{% url 'exportar_inventario' %}"><button class="btn secundario chico">Exportar Inventario CSV</button></a>
+    {% endif %}
+  </div>
+  <div class="tabs">
+    <a href="?tab=equipos"><button class="{% if tab == 'equipos' %}active{% endif %}">Equipos activos</button></a>
+    <a href="?tab=insumos"><button class="{% if tab == 'insumos' %}active{% endif %}">Insumos</button></a>
+  </div>
+  
+  {% if tab == 'equipos' %}
+    {% if puede_escribir %}
+    <form class="inline" method="post">
+      {% csrf_token %}
+      <div class="field"><label>Código*</label><input name="codigo_inventario" required></div>
+      <div class="field"><label>Nombre*</label><input name="nombre" required></div>
+      <div class="field"><label>Modelo</label><input name="modelo"></div>
+      <div class="field"><label>Ubicación</label><input name="ubicacion"></div>
+      <div class="field"><label>Valor ($)</label><input name="valor_adquisicion" type="number" step="0.01"></div>
+      <button class="btn" type="submit">Agregar (RF-01)</button>
+    </form>
+    {% endif %}
+    
+    <table>
+      <thead>
+        <tr>
+          <th>Código</th><th>Nombre</th><th>Modelo</th><th>Ubicación</th><th>Estado</th>
+          {% if puede_escribir %}<th>Acciones</th>{% endif %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for e in equipos %}
+        <tr>
+          <td>{{ e.codigo_inventario }}</td><td>{{ e.nombre }}</td><td>{{ e.modelo|default:"" }}</td><td>{{ e.ubicacion|default:"" }}</td>
+          <td><span class="badge {{ e.estado }}">{{ e.get_estado_display }}</span></td>
+          {% if puede_escribir %}
+          <td>
+            <button class="btn chico" onclick="mostrarQR('{{ e.codigo_inventario }}')">QR</button>
+            <a href="{% url 'editar_equipo' e.id %}"><button class="btn chico">Editar</button></a>
+            <form method="post" action="{% url 'eliminar_equipo' e.id %}" style="display:inline;" onsubmit="return confirm('¿Seguro que deseas eliminar este equipo?');">
+              {% csrf_token %}
+              <button class="btn chico secundario" type="submit">Eliminar</button>
+            </form>
+          </td>
+          {% endif %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <p class="hint">RF-02: cada fila tiene un número de versión interno (bloqueo optimista). Editar un equipo específico requiere ir al <a href="{% url 'admin:inventario_equipo_changelist' %}">panel de administración automático</a>.</p>
+  {% else %}
+    {% if puede_escribir %}
+    <form class="inline" method="post">
+      {% csrf_token %}
+      <div class="field"><label>Nombre*</label><input name="nombre" required></div>
+      <div class="field"><label>Categoría</label><input name="categoria"></div>
+      <div class="field"><label>Tipo</label>
+        <select name="tipo"><option value="perecible">Perecible</option><option value="renovable">Renovable</option></select>
+      </div>
+      <div class="field"><label>Cantidad*</label><input name="cantidad_total" type="number" required></div>
+      <div class="field"><label>Umbral mínimo</label><input name="umbral_minimo" type="number" value="0"></div>
+      <button class="btn" type="submit">Agregar (RF-03)</button>
+    </form>
+    {% endif %}
+    
+    <table>
+      <thead>
+        <tr>
+          <th>Nombre</th><th>Categoría</th><th>Tipo</th><th>Disponible / Total</th>
+          {% if puede_escribir %}<th>Acciones</th>{% endif %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for i in insumos %}
+        <tr>
+          <td>{{ i.nombre }}</td><td>{{ i.categoria|default:"" }}</td><td>{{ i.get_tipo_display }}</td>
+          <td class="{% if i.bajo_stock %}badge en_mantenimiento{% endif %}">{{ i.cantidad_disponible }} / {{ i.cantidad_total }}</td>
+          {% if puede_escribir %}
+          <td>
+            <a href="{% url 'editar_insumo' i.id %}"><button class="btn chico">Editar</button></a>
+            <form method="post" action="{% url 'eliminar_insumo' i.id %}" style="display:inline;" onsubmit="return confirm('¿Seguro que deseas eliminar este insumo?');">
+              {% csrf_token %}
+              <button class="btn chico secundario" type="submit">Eliminar</button>
+            </form>
+          </td>
+          {% endif %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% endif %}
+</div>
+
+<!-- Modal QR -->
+<div id="qrModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:1000; align-items:center; justify-content:center;">
+  <div class="card" style="text-align:center; min-width:300px;">
+    <h3 id="qrTitle" style="margin-top:0;">Código QR</h3>
+    <img id="qrImage" src="" alt="QR" style="margin: 20px 0; border: 1px solid #ccc; padding: 10px; border-radius: 8px;">
+    <div>
+      <button class="btn secundario" onclick="document.getElementById('qrModal').style.display='none'">Cerrar</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function mostrarQR(codigo) {
+  // Genera un QR de forma instantánea usando una API pública (ideal para el prototipo)
+  const url = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=LEICA_INVENTARIO:${codigo}`;
+  document.getElementById('qrTitle').innerText = `QR: ${codigo}`;
+  document.getElementById('qrImage').src = url;
+  document.getElementById('qrModal').style.display = 'flex';
+}
+</script>
+{% endblock %}
