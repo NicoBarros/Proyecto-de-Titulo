@@ -1,0 +1,90 @@
+:root {
+  --rojo: #E30513;
+  --rojo-oscuro: #B5040F;
+  --gris-900: #1a1a1a;
+  --gris-700: #444;
+  --gris-300: #d9d9d9;
+  --gris-100: #f5f5f5;
+  --blanco: #fff;
+  --radio: 8px;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: "Segoe UI", Arial, sans-serif;
+  color: var(--gris-900);
+  background: var(--gris-100);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.topbar {
+  background: var(--blanco);
+  border-bottom: 3px solid var(--rojo);
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 10px 24px;
+  flex-wrap: wrap;
+}
+.brand { font-weight: 700; font-size: 1.05rem; display: flex; align-items: center; gap: 6px; }
+.brand-mark { background: var(--rojo); color: #fff; padding: 2px 6px; border-radius: 4px; }
+.brand-sep { color: var(--gris-300); }
+
+.nav { display: flex; gap: 4px; flex: 1; flex-wrap: wrap; }
+.nav button {
+  background: none; border: none; padding: 8px 12px; cursor: pointer;
+  font-size: 0.9rem; border-radius: var(--radio); color: var(--gris-700);
+}
+.nav button.active, .nav button:hover { background: var(--rojo); color: #fff; }
+
+.userbox { font-size: 0.85rem; display: flex; align-items: center; gap: 10px; }
+.userbox button { background: var(--gris-900); color: #fff; border: none; padding: 6px 10px; border-radius: var(--radio); cursor: pointer; }
+
+.app { flex: 1; padding: 24px; max-width: 1100px; margin: 0 auto; width: 100%; }
+
+.card { background: #fff; border-radius: var(--radio); padding: 20px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+.card h2 { margin-top: 0; font-size: 1.1rem; border-bottom: 2px solid var(--rojo); padding-bottom: 8px; }
+
+.grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+.stat { background: var(--gris-900); color: #fff; border-radius: var(--radio); padding: 16px; text-align: center; }
+.stat .n { font-size: 1.8rem; font-weight: 700; color: #ffdede; }
+.stat .l { font-size: 0.8rem; opacity: .85; }
+
+table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+th { background: var(--rojo); color: #fff; text-align: left; padding: 8px 10px; }
+td { padding: 8px 10px; border-bottom: 1px solid var(--gris-300); vertical-align: top; }
+tr:hover td { background: #fff6f6; }
+
+form.inline { display: flex; gap: 8px; flex-wrap: wrap; align-items: end; margin-bottom: 14px; }
+.field { display: flex; flex-direction: column; gap: 4px; font-size: 0.8rem; }
+.field input, .field select, .field textarea {
+  padding: 7px 8px; border: 1px solid var(--gris-300); border-radius: 5px; font-size: 0.88rem; min-width: 120px;
+}
+.btn {
+  background: var(--rojo); color: #fff; border: none; padding: 8px 14px;
+  border-radius: 6px; cursor: pointer; font-size: 0.85rem; font-weight: 600;
+}
+.btn:hover { background: var(--rojo-oscuro); }
+.btn.secundario { background: var(--gris-900); }
+.btn.chico { padding: 4px 8px; font-size: 0.78rem; margin-right: 4px; }
+
+.badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 0.75rem; font-weight: 600; }
+.badge.disponible, .badge.devuelta, .badge.aprobada { background: #e3f6e3; color: #216e21; }
+.badge.prestado, .badge.entregada, .badge.pendiente { background: #fff2cc; color: #8a6d00; }
+.badge.fuera_servicio, .badge.atrasada, .badge.rechazada { background: #fdeaea; color: var(--rojo); }
+.badge.en_mantenimiento { background: #e6e6fa; color: #4b0082; }
+
+.msg { padding: 10px 14px; border-radius: 6px; margin-bottom: 14px; font-size: 0.88rem; }
+.msg.error { background: #fdeaea; color: var(--rojo-oscuro); border: 1px solid #f5b5b5; }
+.msg.ok { background: #e3f6e3; color: #216e21; border: 1px solid #b5e0b5; }
+
+.login-wrap { max-width: 380px; margin: 60px auto; }
+.hint { font-size: 0.78rem; color: #777; margin-top: 10px; line-height: 1.4; }
+
+.footer { text-align: center; font-size: 0.75rem; color: #999; padding: 14px; }
+.tabs { display: flex; gap: 6px; margin-bottom: 14px; }
+.tabs button { padding: 6px 12px; border: 1px solid var(--gris-300); background: #fff; border-radius: 6px; cursor: pointer; font-size: 0.85rem; }
+.tabs button.active { background: var(--gris-900); color: #fff; border-color: var(--gris-900); }
