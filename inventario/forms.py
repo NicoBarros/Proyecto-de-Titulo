@@ -1,6 +1,3 @@
-"""
-Formularios de Django para la gestion de inventario.
-"""
 from django import forms
 from .models import Equipo, Insumo, Solicitud
 

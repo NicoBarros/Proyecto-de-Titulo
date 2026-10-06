@@ -42,7 +42,6 @@ class Usuario(AbstractUser):
         return f'{self.get_full_name() or self.username} ({self.get_rol_display()})'
 
     def esta_bloqueado(self):
-        """RF-09: verifica si la cuenta esta bloqueada."""
         if self.bloqueado_hasta and self.bloqueado_hasta > timezone.now():
             return True
         return False
@@ -88,7 +87,6 @@ class Equipo(models.Model):
         return f'{self.codigo_inventario} — {self.nombre}'
 
 class Insumo(models.Model):
-    """Insumo gestionado por cantidad (no por codigo individual)."""
 
     class Tipo(models.TextChoices):
         RENOVABLE = 'renovable', 'Renovable'
@@ -124,7 +122,6 @@ class Insumo(models.Model):
         return self.cantidad_disponible <= self.umbral_minimo
 
 class Solicitud(models.Model):
-    """Solicitud de prestamo de equipos/insumos."""
 
     class EstadoSolicitud(models.TextChoices):
         PENDIENTE = 'pendiente', 'Pendiente'
@@ -174,8 +171,6 @@ class Solicitud(models.Model):
 
 
 class SolicitudItem(models.Model):
-    """Detalle de la solicitud: permite varios equipos/insumos por solicitud (kits).
-    Hallazgo entrevista #11."""
 
     solicitud = models.ForeignKey(
         Solicitud, on_delete=models.CASCADE, related_name='items',
@@ -197,7 +192,6 @@ class SolicitudItem(models.Model):
         return f'{nombre} x{self.cantidad}'
 
 class Movimiento(models.Model):
-    """Registro de entrega / devolucion para trazabilidad completa."""
 
     class TipoMovimiento(models.TextChoices):
         ENTREGA = 'entrega', 'Entrega'
@@ -223,7 +217,6 @@ class Movimiento(models.Model):
         ordering = ['fecha']
 
 class Bloqueo(models.Model):
-    """Registro de bloqueo por devolucion atrasada."""
 
     usuario = models.ForeignKey(
         Usuario, on_delete=models.CASCADE, related_name='bloqueos',
@@ -243,7 +236,6 @@ class Bloqueo(models.Model):
         verbose_name_plural = 'Bloqueos'
 
 class Mantenimiento(models.Model):
-    """Registro de mantenimiento con la regla del 70%."""
 
     class Decision(models.TextChoices):
         REPARAR = 'reparar', 'Reparar'
@@ -279,7 +271,6 @@ class Mantenimiento(models.Model):
         return f'Mantenimiento #{self.pk} — {self.equipo}'
         
 class Migracion(models.Model):
-    """Registro de migraciones CSV realizadas."""
 
     archivo_origen = models.CharField(max_length=255, blank=True, null=True)
     filas_totales = models.PositiveIntegerField(default=0)

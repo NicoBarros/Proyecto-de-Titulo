@@ -1,7 +1,3 @@
-"""
-Comandos de administracion y panel admin (Django incluye esto gratis,
-reemplazando el backend custom de Node.js donde habia que crear todo a mano).
-"""
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 from .models import Usuario, Equipo, Insumo, Solicitud, SolicitudItem, Movimiento, Bloqueo, Mantenimiento, Migracion
