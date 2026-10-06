@@ -63,8 +63,6 @@
       {% endfor %}
     </tbody>
   </table>
-  <p class="hint">RF-02: cada fila tiene un número de versión interno (bloqueo optimista). Editar un equipo específico
-    requiere ir al <a href="{% url 'admin:inventario_equipo_changelist' %}">panel de administración automático</a>.</p>
   {% else %}
   {% if puede_escribir %}
   <form class="inline" method="post">

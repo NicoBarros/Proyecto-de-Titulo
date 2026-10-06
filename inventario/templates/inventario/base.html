@@ -74,12 +74,12 @@
       <a href="{% url 'migracion' %}"><button
           class="{% if request.resolver_match.url_name == 'migracion' %}active{% endif %}">Migración Excel</button></a>
       {% endif %}
+    </nav>
+    <div id="userbox" class="userbox">
       {% if user.is_staff %}
       <a href="{% url 'admin:index' %}" target="_blank" style="margin-left: 20px;"><button
           style="background: var(--rojo); color: white; border: none;">Admin Panel</button></a>
       {% endif %}
-    </nav>
-    <div id="userbox" class="userbox">
       {{ user.first_name|default:user.username }} · <strong>{{ user.get_rol_display }}</strong>
       <form method="post" action="{% url 'logout' %}" style="display:inline">
         {% csrf_token %}
