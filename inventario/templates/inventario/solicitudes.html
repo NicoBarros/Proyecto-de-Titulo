@@ -66,8 +66,7 @@
         <td>{{ s.id }}</td>
         <td>
           {% for item in s.items.all %}
-          {% if item.equipo %}{{ item.equipo.nombre }}{% else %}{{ item.insumo.nombre }}{% endif %}{% if not
-          forloop.last %}, {% endif %}
+            {% if item.equipo %}{{ item.equipo.nombre }}{% else %}{{ item.insumo.nombre }}{% endif %}{% if not forloop.last %}, {% endif %}
           {% endfor %}
         </td>
         <td>{{ s.horario_inicio|date:"d/m/Y H:i" }} → {{ s.horario_fin|date:"d/m/Y H:i" }}</td>
