@@ -1,6 +1,3 @@
-"""
-Vistas de Django - Lógica de negocio equivalente a src/routes/ en Node.
-"""
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import login
@@ -26,7 +23,6 @@ from .decorators import role_required
 
 @login_required
 def dashboard_view(request):
-    """RF-13: Dashboard de resumen."""
     totales = {
         'total_equipos': Equipo.objects.count(),
         'equipos_disponibles': Equipo.objects.filter(estado=Equipo.Estado.DISPONIBLE).count(),
@@ -41,7 +37,6 @@ def dashboard_view(request):
 
 @login_required
 def inventario_view(request):
-    """RF-01 a RF-04: Gestion de inventario."""
     puede_escribir = request.user.rol in Usuario.ROLES_ESCRITURA_INVENTARIO
     tab = request.GET.get('tab', 'equipos')
     
@@ -93,7 +88,6 @@ def editar_equipo(request, id):
     if request.method == 'POST':
         form = EquipoForm(request.POST, instance=equipo)
         if form.is_valid():
-            # Aumentamos la versión manual para el bloqueo optimista
             equipo = form.save(commit=False)
             equipo.version += 1
             equipo.save()
@@ -134,15 +128,12 @@ def editar_insumo(request, id):
 def solicitudes_view(request):
     """RF-06, RF-07, RF-08, RF-09: Gestion de solicitudes."""
     puede_aprobar = request.user.rol in Usuario.ROLES_APROBADORES
-    
-    # Crear nueva solicitud (Soporte para Kits)
     if request.method == 'POST' and 'item[]' in request.POST:
         items = request.POST.getlist('item[]')
         cantidades = request.POST.getlist('cantidad[]')
         
         try:
             with transaction.atomic():
-                # Crear la solicitud base
                 solicitud = Solicitud.objects.create(
                     solicitante=request.user,
                     lugar_uso=request.POST.get('lugar_uso'),
@@ -151,7 +142,6 @@ def solicitudes_view(request):
                     horario_fin=request.POST.get('horario_fin'),
                 )
                 
-                # Procesar cada ítem del Kit
                 for i in range(len(items)):
                     tipo, item_id = items[i].split(':')
                     cantidad = int(cantidades[i]) if i < len(cantidades) else 1
@@ -173,7 +163,6 @@ def solicitudes_view(request):
             
         return redirect('solicitudes')
 
-    # Procesar acciones (Aprobar, Entregar, Devolver, Rechazar)
     if request.method == 'POST' and 'accion' in request.POST:
         if not puede_aprobar:
             messages.error(request, 'No tienes permiso para aprobar solicitudes.')
@@ -185,7 +174,6 @@ def solicitudes_view(request):
         
         try:
             if accion == 'aprobar':
-                # Validar choques de horario (RF-07)
                 for item in solicitud.items.all():
                     if item.equipo:
                         choque = SolicitudItem.objects.filter(
@@ -244,7 +232,6 @@ def solicitudes_view(request):
                     estado_equipo=estado_equipo,
                 )
                 
-                # RF-09: Bloqueo
                 if atrasada:
                     usuario = solicitud.en_representacion_de or solicitud.solicitante
                     hasta = timezone.now() + timedelta(days=7)
@@ -265,7 +252,6 @@ def solicitudes_view(request):
             
         return redirect('solicitudes')
 
-    # GET datos para renderizar
     solicitudes = Solicitud.objects.all().prefetch_related('items', 'items__equipo', 'items__insumo')
     equipos = Equipo.objects.filter(estado=Equipo.Estado.DISPONIBLE)
     insumos = Insumo.objects.all()
@@ -283,7 +269,6 @@ def mantenimiento_view(request):
     """RF-10: Mantenimiento y regla del 70%."""
     if request.method == 'POST':
         if 'decision' in request.POST:
-            # Resolver
             mant_id = request.POST.get('mant_id')
             decision = request.POST.get('decision')
             mant = get_object_or_404(Mantenimiento, id=mant_id)
@@ -296,13 +281,11 @@ def mantenimiento_view(request):
             mant.equipo.save()
             messages.success(request, f'Decisión confirmada: {mant.get_decision_display()}.')
         else:
-            # Diagnosticar
             form = MantenimientoForm(request.POST)
             if form.is_valid():
                 equipo = get_object_or_404(Equipo, id=form.cleaned_data['equipo_id'])
                 costo = Decimal(form.cleaned_data['costo_cotizado'])
 
-                # Redondeamos a 4 decimales para que quepa en el DecimalField
                 if equipo.valor_adquisicion:
                     porcentaje = (costo / Decimal(equipo.valor_adquisicion)).quantize(
                         Decimal('0.0001'), rounding=ROUND_HALF_UP
@@ -379,7 +362,6 @@ def busqueda_view(request):
     resultados = []
     fuente = 'palabras_clave_local'
     
-    # 1. Intentar con Gemini si hay API key
     if getattr(settings, 'GEMINI_API_KEY', None):
         try:
             from google import genai
@@ -399,12 +381,10 @@ Responde SOLO con un JSON array de los ids de equipo mas relevantes (maximo 5), 
                 contents=prompt,
             )
             
-            # Limpiar posible markdown en la respuesta
             text = response.text.replace('```json', '').replace('```', '').strip()
             ids = json.loads(text)
             
             if isinstance(ids, list):
-                # Mantener orden
                 for item_id in ids:
                     equipo = next((e for e in disponibles if e.id == item_id), None)
                     if equipo:
@@ -415,11 +395,9 @@ Responde SOLO con un JSON array de los ids de equipo mas relevantes (maximo 5), 
                 fuente = 'ia_gemini'
         except Exception as e:
             print(f"Error llamando a Gemini: {e}")
-            # Fallback a local continua abajo
     
-    # 2. Fallback palabras clave
-    if not resultados:
-        terminos = consulta.lower().split()
+        if not resultados:
+            terminos = consulta.lower().split()
         for e in disponibles:
             texto = f"{e.nombre} {e.modelo or ''} {e.especificaciones or ''}".lower()
             score = sum(1 for t in terminos if t in texto)
@@ -522,15 +500,12 @@ def exportar_inventario(request):
     response['Content-Disposition'] = f'attachment; filename="inventario_leica_{timezone.now().strftime("%Y%m%d")}.csv"'
 
     writer = csv.writer(response)
-    # Escribir la cabecera idéntica a la esperada por RF-14
     writer.writerow(['tipo', 'codigo_inventario', 'nombre', 'modelo', 'especificaciones', 'ubicacion', 'estado', 'valor_adquisicion', 'categoria', 'tipo_insumo', 'cantidad'])
 
-    # Exportar Equipos
     equipos = Equipo.objects.all()
     for e in equipos:
         writer.writerow(['equipo', e.codigo_inventario, e.nombre, e.modelo or '', e.especificaciones or '', e.ubicacion or '', e.estado, e.valor_adquisicion or '', '', '', ''])
 
-    # Exportar Insumos
     insumos = Insumo.objects.all()
     for i in insumos:
         writer.writerow(['insumo', '', i.nombre, '', '', '', '', '', i.categoria or '', i.tipo, i.cantidad_total])

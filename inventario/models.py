@@ -1,20 +1,10 @@
-"""
-Modelos del Sistema de Gestion de Inventario LEICA.
-Cubre RF-01 a RF-14 segun Formulacion de Proyecto de Titulo.
 
-Traduccion directa del schema.sql de Node.js a modelos Django ORM.
-"""
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.utils import timezone
 
 
-# ──────────────────────────────────────────────────────────────────────
-# RF-04 / RF-05: Usuarios y roles (autenticacion por correo institucional)
-# ──────────────────────────────────────────────────────────────────────
-
 class Usuario(AbstractUser):
-    """Usuario del sistema con rol institucional."""
 
     class Rol(models.TextChoices):
         ESTUDIANTE = 'estudiante', 'Estudiante'
@@ -39,11 +29,9 @@ class Usuario(AbstractUser):
         help_text='RF-09: fecha hasta la cual el usuario esta bloqueado',
     )
 
-    # Usamos email como campo de login en vez de username
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = ['username']
 
-    # Aseguramos que el email sea unico
     email = models.EmailField(unique=True)
 
     class Meta:
@@ -59,19 +47,11 @@ class Usuario(AbstractUser):
             return True
         return False
 
-    # Roles con permiso de escritura sobre el inventario (RF-04)
     ROLES_ESCRITURA_INVENTARIO = [Rol.ENCARGADO_LABORATORIO, Rol.CONTROL_CALIDAD]
 
-    # Roles que pueden autorizar una solicitud (RF-06)
     ROLES_APROBADORES = [Rol.DOCENTE, Rol.DIRECTOR_CARRERA, Rol.ENCARGADO_LABORATORIO]
 
-
-# ──────────────────────────────────────────────────────────────────────
-# RF-01: Equipos activos (con codigo unico)
-# ──────────────────────────────────────────────────────────────────────
-
 class Equipo(models.Model):
-    """Equipo activo con codigo de inventario unico."""
 
     class Estado(models.TextChoices):
         DISPONIBLE = 'disponible', 'Disponible'
@@ -94,7 +74,6 @@ class Equipo(models.Model):
         max_digits=12, decimal_places=2, blank=True, null=True,
         verbose_name='Valor de adquisición ($)',
     )
-    # RF-02: control de edicion concurrente (optimistic locking)
     version = models.PositiveIntegerField(default=1)
 
     created_at = models.DateTimeField(auto_now_add=True)
@@ -107,11 +86,6 @@ class Equipo(models.Model):
 
     def __str__(self):
         return f'{self.codigo_inventario} — {self.nombre}'
-
-
-# ──────────────────────────────────────────────────────────────────────
-# RF-03: Insumos (por cantidad, sin codigo individual)
-# ──────────────────────────────────────────────────────────────────────
 
 class Insumo(models.Model):
     """Insumo gestionado por cantidad (no por codigo individual)."""
@@ -148,11 +122,6 @@ class Insumo(models.Model):
     @property
     def bajo_stock(self):
         return self.cantidad_disponible <= self.umbral_minimo
-
-
-# ──────────────────────────────────────────────────────────────────────
-# RF-06 / RF-07: Solicitudes
-# ──────────────────────────────────────────────────────────────────────
 
 class Solicitud(models.Model):
     """Solicitud de prestamo de equipos/insumos."""
@@ -227,11 +196,6 @@ class SolicitudItem(models.Model):
         nombre = self.equipo.nombre if self.equipo else self.insumo.nombre
         return f'{nombre} x{self.cantidad}'
 
-
-# ──────────────────────────────────────────────────────────────────────
-# RF-08 / RNF-07: Movimientos (trazabilidad)
-# ──────────────────────────────────────────────────────────────────────
-
 class Movimiento(models.Model):
     """Registro de entrega / devolucion para trazabilidad completa."""
 
@@ -258,11 +222,6 @@ class Movimiento(models.Model):
         verbose_name_plural = 'Movimientos'
         ordering = ['fecha']
 
-
-# ──────────────────────────────────────────────────────────────────────
-# RF-09: Bloqueos automaticos por atraso
-# ──────────────────────────────────────────────────────────────────────
-
 class Bloqueo(models.Model):
     """Registro de bloqueo por devolucion atrasada."""
 
@@ -282,11 +241,6 @@ class Bloqueo(models.Model):
     class Meta:
         verbose_name = 'Bloqueo'
         verbose_name_plural = 'Bloqueos'
-
-
-# ──────────────────────────────────────────────────────────────────────
-# RF-10: Mantenimiento y regla del 70%
-# ──────────────────────────────────────────────────────────────────────
 
 class Mantenimiento(models.Model):
     """Registro de mantenimiento con la regla del 70%."""
@@ -323,12 +277,7 @@ class Mantenimiento(models.Model):
 
     def __str__(self):
         return f'Mantenimiento #{self.pk} — {self.equipo}'
-
-
-# ──────────────────────────────────────────────────────────────────────
-# RF-14: Registro de migraciones desde planilla Excel/SharePoint
-# ──────────────────────────────────────────────────────────────────────
-
+        
 class Migracion(models.Model):
     """Registro de migraciones CSV realizadas."""
 

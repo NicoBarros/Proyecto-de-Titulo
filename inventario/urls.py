@@ -3,11 +3,10 @@ from django.contrib.auth.views import LoginView, LogoutView
 from . import views
 
 urlpatterns = [
-    # Auth
+
     path('login/', LoginView.as_view(template_name='inventario/login.html'), name='login'),
     path('logout/', LogoutView.as_view(next_page='login'), name='logout'),
-    
-    # Dashboard y vistas
+
     path('', views.dashboard_view, name='dashboard'),
     path('inventario/', views.inventario_view, name='inventario'),
     path('inventario/equipo/<int:id>/eliminar/', views.eliminar_equipo, name='eliminar_equipo'),
