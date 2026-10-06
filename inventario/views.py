@@ -5,6 +5,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import login
 from django.contrib import messages
+from decimal import Decimal, ROUND_HALF_UP
 from django.db.models import Count, Q
 from django.utils import timezone
 from django.conf import settings
@@ -276,6 +277,8 @@ def solicitudes_view(request):
 
 @login_required
 @role_required(Usuario.Rol.ENCARGADO_LABORATORIO, Usuario.Rol.CONTROL_CALIDAD)
+@login_required
+@role_required(Usuario.Rol.ENCARGADO_LABORATORIO, Usuario.Rol.CONTROL_CALIDAD)
 def mantenimiento_view(request):
     """RF-10: Mantenimiento y regla del 70%."""
     if request.method == 'POST':
@@ -287,7 +290,7 @@ def mantenimiento_view(request):
             mant.decision = decision
             mant.fecha_resolucion = timezone.now()
             mant.save()
-            
+
             mant.equipo.estado = Equipo.Estado.FUERA_SERVICIO if decision == 'dar_baja' else Equipo.Estado.DISPONIBLE
             mant.equipo.version += 1
             mant.equipo.save()
@@ -297,11 +300,22 @@ def mantenimiento_view(request):
             form = MantenimientoForm(request.POST)
             if form.is_valid():
                 equipo = get_object_or_404(Equipo, id=form.cleaned_data['equipo_id'])
-                costo = form.cleaned_data['costo_cotizado']
-                
-                porcentaje = costo / equipo.valor_adquisicion if equipo.valor_adquisicion else None
-                sugerencia = Mantenimiento.Decision.DAR_BAJA if porcentaje and porcentaje >= 0.70 else Mantenimiento.Decision.REPARAR
-                
+                costo = Decimal(form.cleaned_data['costo_cotizado'])
+
+                # Redondeamos a 4 decimales para que quepa en el DecimalField
+                if equipo.valor_adquisicion:
+                    porcentaje = (costo / Decimal(equipo.valor_adquisicion)).quantize(
+                        Decimal('0.0001'), rounding=ROUND_HALF_UP
+                    )
+                else:
+                    porcentaje = None
+
+                sugerencia = (
+                    Mantenimiento.Decision.DAR_BAJA
+                    if porcentaje is not None and porcentaje >= Decimal('0.70')
+                    else Mantenimiento.Decision.REPARAR
+                )
+
                 Mantenimiento.objects.create(
                     equipo=equipo,
                     falla_descrita=form.cleaned_data['falla_descrita'],
@@ -310,17 +324,20 @@ def mantenimiento_view(request):
                     decision=sugerencia,
                     reportado_por=request.user
                 )
-                
+
                 equipo.estado = Equipo.Estado.EN_MANTENIMIENTO
                 equipo.version += 1
                 equipo.save()
-                
+
                 msg = f"Sugerencia del sistema: {sugerencia.upper()} "
-                msg += f"(Costo representa {(porcentaje*100):.1f}% del valor)" if porcentaje else "(Falta valor de adquisición)"
+                if porcentaje is not None:
+                    msg += f"(Costo representa {(porcentaje * 100):.1f}% del valor)"
+                else:
+                    msg += "(Falta valor de adquisición)"
                 messages.info(request, msg)
-                
+
         return redirect('mantenimiento')
-        
+
     mantenimientos = Mantenimiento.objects.all().select_related('equipo')
     equipos = Equipo.objects.all()
     return render(request, 'inventario/mantenimiento.html', {'mantenimientos': mantenimientos, 'equipos': equipos})
