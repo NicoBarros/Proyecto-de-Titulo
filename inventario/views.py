@@ -43,7 +43,53 @@ def inventario_view(request):
     context = {'puede_escribir': puede_escribir, 'tab': tab}
     
     if tab == 'equipos':
-        context['equipos'] = Equipo.objects.all()
+        q = request.GET.get('q', '').strip()
+        filtro_estado = request.GET.get('estado', '').strip()
+        filtro_ubicacion = request.GET.get('ubicacion', '').strip()
+        orden = request.GET.get('orden', 'nombre')
+
+        qs = Equipo.objects.all()
+
+        if q:
+            qs = qs.filter(
+                Q(codigo_inventario__icontains=q) |
+                Q(nombre__icontains=q) |
+                Q(modelo__icontains=q) |
+                Q(especificaciones__icontains=q) |
+                Q(ubicacion__icontains=q)
+            )
+
+        if filtro_estado:
+            qs = qs.filter(estado=filtro_estado)
+
+        if filtro_ubicacion:
+            qs = qs.filter(ubicacion__icontains=filtro_ubicacion)
+
+        orden_map = {
+            'nombre': 'nombre',
+            '-nombre': '-nombre',
+            'codigo': 'codigo_inventario',
+            '-codigo': '-codigo_inventario',
+            'estado': 'estado',
+            '-estado': '-estado',
+            '-valor': '-valor_adquisicion',
+            'valor': 'valor_adquisicion',
+            '-recientes': '-created_at',
+        }
+        qs = qs.order_by(orden_map.get(orden, 'nombre'))
+
+        ubicaciones = Equipo.objects.exclude(ubicacion__isnull=True).exclude(ubicacion='').values_list('ubicacion', flat=True).distinct()
+
+        context['equipos'] = qs
+        context['total_equipos_filtrados'] = qs.count()
+        context['total_equipos_general'] = Equipo.objects.count()
+        context['q'] = q
+        context['filtro_estado'] = filtro_estado
+        context['filtro_ubicacion'] = filtro_ubicacion
+        context['orden'] = orden
+        context['estados_choices'] = Equipo.Estado.choices
+        context['ubicaciones'] = sorted(list(set(ubicaciones)))
+
         if puede_escribir and request.method == 'POST' and 'codigo_inventario' in request.POST:
             form = EquipoForm(request.POST)
             if form.is_valid():
@@ -53,7 +99,43 @@ def inventario_view(request):
             else:
                 messages.error(request, 'Error al agregar equipo.')
     else:
-        context['insumos'] = Insumo.objects.all()
+        q_insumo = request.GET.get('q_insumo', '').strip()
+        filtro_categoria = request.GET.get('categoria', '').strip()
+        filtro_tipo = request.GET.get('tipo', '').strip()
+        filtro_stock = request.GET.get('stock', '').strip()
+
+        qs = Insumo.objects.all()
+
+        if q_insumo:
+            qs = qs.filter(
+                Q(nombre__icontains=q_insumo) |
+                Q(categoria__icontains=q_insumo)
+            )
+
+        if filtro_categoria:
+            qs = qs.filter(categoria__icontains=filtro_categoria)
+
+        if filtro_tipo:
+            qs = qs.filter(tipo=filtro_tipo)
+
+        if filtro_stock == 'bajo':
+            qs = [i for i in qs if i.bajo_stock]
+        elif filtro_stock == 'agotado':
+            qs = qs.filter(cantidad_disponible=0)
+        elif filtro_stock == 'disponible':
+            qs = qs.filter(cantidad_disponible__gt=0)
+
+        categorias = Insumo.objects.exclude(categoria__isnull=True).exclude(categoria='').values_list('categoria', flat=True).distinct()
+
+        context['insumos'] = qs
+        context['total_insumos_general'] = Insumo.objects.count()
+        context['q_insumo'] = q_insumo
+        context['filtro_categoria'] = filtro_categoria
+        context['filtro_tipo'] = filtro_tipo
+        context['filtro_stock'] = filtro_stock
+        context['tipos_choices'] = Insumo.Tipo.choices
+        context['categorias'] = sorted(list(set(categorias)))
+
         if puede_escribir and request.method == 'POST' and 'cantidad_total' in request.POST:
             form = InsumoForm(request.POST)
             if form.is_valid():
@@ -126,8 +208,11 @@ def editar_insumo(request, id):
 
 @login_required
 def solicitudes_view(request):
-    """RF-06, RF-07, RF-08, RF-09: Gestion de solicitudes."""
-    puede_aprobar = request.user.rol in Usuario.ROLES_APROBADORES
+    puede_aprobar = (
+        request.user.rol in Usuario.ROLES_APROBADORES or
+        request.user.is_staff or
+        request.user.is_superuser
+    )
     if request.method == 'POST' and 'item[]' in request.POST:
         items = request.POST.getlist('item[]')
         cantidades = request.POST.getlist('cantidad[]')
@@ -262,24 +347,46 @@ def solicitudes_view(request):
 
 
 @login_required
-@role_required(Usuario.Rol.ENCARGADO_LABORATORIO, Usuario.Rol.CONTROL_CALIDAD)
-@login_required
-@role_required(Usuario.Rol.ENCARGADO_LABORATORIO, Usuario.Rol.CONTROL_CALIDAD)
+@role_required(Usuario.Rol.ENCARGADO_LABORATORIO, Usuario.Rol.CONTROL_CALIDAD, Usuario.Rol.DIRECTOR_CARRERA)
 def mantenimiento_view(request):
-    """RF-10: Mantenimiento y regla del 70%."""
+    """RF-10: Mantenimiento y regla del 70% con finalización de reparación."""
     if request.method == 'POST':
-        if 'decision' in request.POST:
+        if 'mant_id' in request.POST or 'decision' in request.POST or 'accion_mant' in request.POST:
             mant_id = request.POST.get('mant_id')
-            decision = request.POST.get('decision')
+            accion = request.POST.get('accion_mant') or request.POST.get('decision')
             mant = get_object_or_404(Mantenimiento, id=mant_id)
-            mant.decision = decision
-            mant.fecha_resolucion = timezone.now()
-            mant.save()
 
-            mant.equipo.estado = Equipo.Estado.FUERA_SERVICIO if decision == 'dar_baja' else Equipo.Estado.DISPONIBLE
-            mant.equipo.version += 1
-            mant.equipo.save()
-            messages.success(request, f'Decisión confirmada: {mant.get_decision_display()}.')
+            if accion in ['completar_reparacion', 'completado']:
+                mant.decision = Mantenimiento.Decision.COMPLETADO
+                mant.fecha_resolucion = timezone.now()
+                mant.save()
+
+                mant.equipo.estado = Equipo.Estado.DISPONIBLE
+                mant.equipo.version += 1
+                mant.equipo.save()
+                messages.success(
+                    request,
+                    f'¡Reparación completada! El equipo "{mant.equipo.nombre}" ({mant.equipo.codigo_inventario}) '
+                    f'ha salido de reparación y su estado en el inventario se actualizó a DISPONIBLE.'
+                )
+            elif accion == 'dar_baja':
+                mant.decision = Mantenimiento.Decision.DAR_BAJA
+                mant.fecha_resolucion = timezone.now()
+                mant.save()
+
+                mant.equipo.estado = Equipo.Estado.FUERA_SERVICIO
+                mant.equipo.version += 1
+                mant.equipo.save()
+                messages.warning(request, f'El equipo "{mant.equipo.nombre}" ha sido dado de baja (Fuera de servicio).')
+            elif accion == 'reparar':
+                mant.decision = Mantenimiento.Decision.REPARAR
+                mant.fecha_resolucion = timezone.now()
+                mant.save()
+
+                mant.equipo.estado = Equipo.Estado.EN_MANTENIMIENTO
+                mant.equipo.version += 1
+                mant.equipo.save()
+                messages.info(request, f'El equipo "{mant.equipo.nombre}" ha sido confirmado en proceso de reparación.')
         else:
             form = MantenimientoForm(request.POST)
             if form.is_valid():
@@ -312,11 +419,11 @@ def mantenimiento_view(request):
                 equipo.version += 1
                 equipo.save()
 
-                msg = f"Sugerencia del sistema: {sugerencia.upper()} "
+                msg = f"Diagnóstico registrado. Sugerencia del sistema: {sugerencia.upper()} "
                 if porcentaje is not None:
-                    msg += f"(Costo representa {(porcentaje * 100):.1f}% del valor)"
+                    msg += f"(Costo representa {(porcentaje * 100):.1f}% del valor de adquisición)"
                 else:
-                    msg += "(Falta valor de adquisición)"
+                    msg += "(Sin valor de adquisición registrado)"
                 messages.info(request, msg)
 
         return redirect('mantenimiento')
@@ -328,7 +435,11 @@ def mantenimiento_view(request):
 
 @login_required
 def reportes_view(request):
-    """RF-13: Reportes."""
+    """RF-13: Reportes (Restringido para Estudiantes y Docentes)."""
+    if request.user.rol in [Usuario.Rol.ESTUDIANTE, Usuario.Rol.DOCENTE] and not request.user.is_staff and not request.user.is_superuser:
+        messages.error(request, 'Acceso denegado: Los estudiantes y docentes no tienen autorización para ver Reportes y KPIs.')
+        return redirect('dashboard')
+
     top_equipos = Equipo.objects.annotate(veces=Count('solicituditem')).order_by('-veces')[:20]
     vencidos = Solicitud.objects.filter(estado=Solicitud.EstadoSolicitud.ENTREGADA, horario_fin__lt=timezone.now()).select_related('solicitante')
     
@@ -511,3 +622,156 @@ def exportar_inventario(request):
         writer.writerow(['insumo', '', i.nombre, '', '', '', '', '', i.categoria or '', i.tipo, i.cantidad_total])
 
     return response
+
+
+@login_required
+def admin_panel_view(request):
+    """Panel de Administración Integrado institucional (no el admin genérico de Django)."""
+    if not (request.user.is_staff or request.user.is_superuser):
+        messages.error(request, 'Acceso denegado: este panel es exclusivo para administradores del sistema.')
+        return redirect('dashboard')
+
+    if request.method == 'POST':
+        accion = request.POST.get('accion')
+
+        if accion == 'crear_usuario':
+            email = request.POST.get('email', '').strip().lower()
+            nombre = request.POST.get('first_name', '').strip()
+            apellido = request.POST.get('last_name', '').strip()
+            rol = request.POST.get('rol')
+            seccion = request.POST.get('seccion', '').strip()
+            password = request.POST.get('password', '')
+            es_staff = request.POST.get('is_staff') == 'on'
+
+            dominio = getattr(settings, 'DOMINIO_INSTITUCIONAL', 'inacapmail.cl')
+            if not email.endswith(f"@{dominio}") and not email.endswith('@inacapmail.cl'):
+                messages.error(request, f'El correo debe pertenecer al dominio institucional (@{dominio}).')
+            elif Usuario.objects.filter(email=email).exists():
+                messages.error(request, f'Ya existe un usuario registrado con el correo {email}.')
+            elif len(password) < 6:
+                messages.error(request, 'La contraseña debe tener al menos 6 caracteres.')
+            else:
+                username = email.split('@')[0]
+                base_username = username
+                counter = 1
+                while Usuario.objects.filter(username=username).exists():
+                    username = f"{base_username}_{counter}"
+                    counter += 1
+
+                user = Usuario.objects.create_user(
+                    username=username,
+                    email=email,
+                    first_name=nombre,
+                    last_name=apellido,
+                    rol=rol,
+                    seccion=seccion,
+                    password=password,
+                    is_staff=es_staff,
+                )
+                messages.success(request, f'Usuario {user.email} ({user.get_rol_display()}) creado exitosamente.')
+
+        elif accion == 'cambiar_rol':
+            user_id = request.POST.get('user_id')
+            nuevo_rol = request.POST.get('nuevo_rol')
+            user_obj = get_object_or_404(Usuario, id=user_id)
+            user_obj.rol = nuevo_rol
+            user_obj.save()
+            messages.success(request, f'Rol de {user_obj.email} actualizado a {user_obj.get_rol_display()}.')
+
+        elif accion == 'toggle_activo':
+            user_id = request.POST.get('user_id')
+            user_obj = get_object_or_404(Usuario, id=user_id)
+            if user_obj == request.user:
+                messages.error(request, 'No puedes desactivar tu propia cuenta en uso.')
+            else:
+                user_obj.is_active = not user_obj.is_active
+                user_obj.save()
+                estado_txt = 'activada' if user_obj.is_active else 'desactivada'
+                messages.success(request, f'Cuenta {user_obj.email} {estado_txt}.')
+
+        elif accion == 'desbloquear':
+            user_id = request.POST.get('user_id')
+            user_obj = get_object_or_404(Usuario, id=user_id)
+            user_obj.bloqueado_hasta = None
+            user_obj.save()
+            messages.success(request, f'Sanción removida: {user_obj.email} ahora está desbloqueado.')
+
+        elif accion == 'reset_password':
+            user_id = request.POST.get('user_id')
+            nueva_clave = request.POST.get('nueva_password', '')
+            user_obj = get_object_or_404(Usuario, id=user_id)
+            if len(nueva_clave) < 6:
+                messages.error(request, 'La nueva contraseña debe tener al menos 6 caracteres.')
+            else:
+                user_obj.set_password(nueva_clave)
+                user_obj.save()
+                messages.success(request, f'Contraseña de {user_obj.email} restablecida correctamente.')
+
+        elif accion == 'cambiar_estado_equipo':
+            equipo_id = request.POST.get('equipo_id')
+            nuevo_estado = request.POST.get('nuevo_estado')
+            equipo_obj = get_object_or_404(Equipo, id=equipo_id)
+            estado_antiguo = equipo_obj.get_estado_display()
+            equipo_obj.estado = nuevo_estado
+            equipo_obj.version += 1
+            equipo_obj.save()
+            messages.success(
+                request,
+                f'Estado del equipo "{equipo_obj.nombre}" ({equipo_obj.codigo_inventario}) '
+                f'actualizado exitosamente de {estado_antiguo} a {equipo_obj.get_estado_display()}.'
+            )
+
+        return redirect('admin_panel')
+
+    filtro_rol = request.GET.get('rol', '')
+    busqueda = request.GET.get('q', '').strip()
+    busqueda_equipo = request.GET.get('q_equipo', '').strip()
+    filtro_estado_equipo = request.GET.get('estado_equipo', '').strip()
+
+    qs = Usuario.objects.all().order_by('-date_joined')
+    if filtro_rol:
+        qs = qs.filter(rol=filtro_rol)
+    if busqueda:
+        qs = qs.filter(Q(email__icontains=busqueda) | Q(first_name__icontains=busqueda) | Q(last_name__icontains=busqueda))
+
+    qs_equipos = Equipo.objects.all().order_by('nombre')
+    if busqueda_equipo:
+        qs_equipos = qs_equipos.filter(
+            Q(codigo_inventario__icontains=busqueda_equipo) |
+            Q(nombre__icontains=busqueda_equipo) |
+            Q(modelo__icontains=busqueda_equipo)
+        )
+    if filtro_estado_equipo:
+        qs_equipos = qs_equipos.filter(estado=filtro_estado_equipo)
+
+    metricas = {
+        'total_usuarios': Usuario.objects.count(),
+        'estudiantes': Usuario.objects.filter(rol=Usuario.Rol.ESTUDIANTE).count(),
+        'docentes': Usuario.objects.filter(rol=Usuario.Rol.DOCENTE).count(),
+        'directores': Usuario.objects.filter(rol=Usuario.Rol.DIRECTOR_CARRERA).count(),
+        'encargados': Usuario.objects.filter(rol=Usuario.Rol.ENCARGADO_LABORATORIO).count(),
+        'control_calidad': Usuario.objects.filter(rol=Usuario.Rol.CONTROL_CALIDAD).count(),
+        'bloqueados': Usuario.objects.filter(bloqueado_hasta__gt=timezone.now()).count(),
+        'staff': Usuario.objects.filter(is_staff=True).count(),
+        'equipos_total': Equipo.objects.count(),
+        'equipos_disponibles': Equipo.objects.filter(estado=Equipo.Estado.DISPONIBLE).count(),
+        'equipos_mantenimiento': Equipo.objects.filter(estado=Equipo.Estado.EN_MANTENIMIENTO).count(),
+        'equipos_prestados': Equipo.objects.filter(estado=Equipo.Estado.PRESTADO).count(),
+        'equipos_baja': Equipo.objects.filter(estado=Equipo.Estado.FUERA_SERVICIO).count(),
+    }
+
+    ultimos_movimientos = Movimiento.objects.select_related('solicitud', 'responsable').order_by('-fecha')[:10]
+
+    return render(request, 'inventario/admin_panel.html', {
+        'usuarios': qs,
+        'equipos_admin': qs_equipos,
+        'metricas': metricas,
+        'roles_choices': Usuario.Rol.choices,
+        'estados_equipos_choices': Equipo.Estado.choices,
+        'filtro_rol': filtro_rol,
+        'busqueda': busqueda,
+        'busqueda_equipo': busqueda_equipo,
+        'filtro_estado_equipo': filtro_estado_equipo,
+        'ultimos_movimientos': ultimos_movimientos,
+    })
+

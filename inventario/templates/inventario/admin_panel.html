@@ -1,0 +1,346 @@
+{% extends 'inventario/base.html' %}
+
+{% block content %}
+<div class="card" style="margin-bottom: 24px;">
+  <h2>
+    <span>Panel de Administración Integrado · LEICA</span>
+    <span style="font-size: 0.8rem; font-weight: 500; color: var(--inacap-text-muted);">
+      Control de Usuarios, Roles y Seguridad
+    </span>
+  </h2>
+  <p style="font-size: 0.85rem; color: var(--inacap-text-muted); margin-top: -8px;">
+    Panel centralizado para la administración de cuentas institucionales INACAP, asignación de roles de acceso, desbloqueo de sanciones y auditoría de operaciones del pañol.
+  </p>
+
+  <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); margin-bottom: 20px;">
+    <div class="stat">
+      <div class="n" style="color: #1f2937; font-size: 1.6rem;">{{ metricas.total_usuarios }}</div>
+      <div class="l">Total Usuarios</div>
+    </div>
+    <div class="stat">
+      <div class="n" style="color: #2563eb; font-size: 1.6rem;">{{ metricas.estudiantes }}</div>
+      <div class="l">Estudiantes</div>
+    </div>
+    <div class="stat">
+      <div class="n" style="color: #f59e0b; font-size: 1.6rem;">{{ metricas.docentes }}</div>
+      <div class="l">Docentes</div>
+    </div>
+    <div class="stat">
+      <div class="n" style="color: #10b981; font-size: 1.6rem;">{{ metricas.directores }}</div>
+      <div class="l">Directores</div>
+    </div>
+    <div class="stat">
+      <div class="n" style="color: #7c3aed; font-size: 1.6rem;">{{ metricas.encargados }}</div>
+      <div class="l">Encargados</div>
+    </div>
+    <div class="stat">
+      <div class="n" style="color: #06b6d4; font-size: 1.6rem;">{{ metricas.control_calidad }}</div>
+      <div class="l">Calidad</div>
+    </div>
+    <div class="stat">
+      <div class="n" style="color: var(--inacap-red); font-size: 1.6rem;">{{ metricas.bloqueados }}</div>
+      <div class="l">Sancionados</div>
+    </div>
+    <div class="stat">
+      <div class="n" style="color: #dc2626; font-size: 1.6rem;">{{ metricas.staff }}</div>
+      <div class="l">Staff Admin</div>
+    </div>
+  </div>
+</div>
+
+<div class="card" style="margin-bottom: 24px;">
+  <h2>+ Registrar Nuevo Usuario Institucional</h2>
+  <form method="post" action="{% url 'admin_panel' %}" class="inline" style="background: #f9fafb; padding: 18px; border-radius: 8px;">
+    {% csrf_token %}
+    <input type="hidden" name="accion" value="crear_usuario">
+
+    <div class="field">
+      <label>Correo (@inacapmail.cl)*</label>
+      <input type="email" name="email" placeholder="usuario@inacapmail.cl" required style="min-width: 220px;">
+    </div>
+
+    <div class="field">
+      <label>Nombres*</label>
+      <input type="text" name="first_name" placeholder="Ej: Juan" required>
+    </div>
+
+    <div class="field">
+      <label>Apellidos*</label>
+      <input type="text" name="last_name" placeholder="Ej: Pérez González" required>
+    </div>
+
+    <div class="field">
+      <label>Rol Institucional*</label>
+      <select name="rol" required style="min-width: 170px;">
+        {% for val, label in roles_choices %}
+        <option value="{{ val }}">{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="field">
+      <label>Sección (Estudiantes)</label>
+      <input type="text" name="seccion" placeholder="Ej: INF-401">
+    </div>
+
+    <div class="field">
+      <label>Contraseña inicial*</label>
+      <input type="password" name="password" placeholder="Mínimo 6 caracteres" required>
+    </div>
+
+    <div class="field" style="justify-content: flex-end; padding-bottom: 8px;">
+      <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+        <input type="checkbox" name="is_staff" style="min-width: auto; cursor: pointer;">
+        Es Staff / Admin
+      </label>
+    </div>
+
+    <button type="submit" class="btn" style="height: 38px;">Crear Usuario</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2>
+    <span>Gestión de Cuentas y Permisos</span>
+    <form method="get" action="{% url 'admin_panel' %}" style="display: flex; gap: 8px; align-items: center; font-size: 0.85rem;">
+      <input type="text" name="q" value="{{ busqueda }}" placeholder="Buscar por nombre o correo..." style="padding: 6px 10px; border: 1px solid var(--gris-300); border-radius: 6px; font-size: 0.85rem;">
+      <select name="rol" onchange="this.form.submit()" style="padding: 6px 10px; border: 1px solid var(--gris-300); border-radius: 6px; font-size: 0.85rem;">
+        <option value="">Todos los roles</option>
+        {% for val, label in roles_choices %}
+        <option value="{{ val }}" {% if filtro_rol == val %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+      <button type="submit" class="btn chico">Buscar</button>
+      {% if busqueda or filtro_rol %}
+      <a href="{% url 'admin_panel' %}" class="btn chico secundario" style="text-decoration: none;">Limpiar</a>
+      {% endif %}
+    </form>
+  </h2>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Usuario / Nombre</th>
+        <th>Correo Institucional</th>
+        <th>Rol en Sistema</th>
+        <th>Sanción RF-09</th>
+        <th>Estado</th>
+        <th>Staff</th>
+        <th>Acciones</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for u in usuarios %}
+      <tr>
+        <td>
+          <strong>{{ u.get_full_name|default:u.username }}</strong>
+          {% if u.seccion %}<br><small style="color: var(--inacap-text-muted);">Sección: {{ u.seccion }}</small>{% endif %}
+        </td>
+        <td>{{ u.email }}</td>
+        <td>
+          <form method="post" action="{% url 'admin_panel' %}" style="display: inline-flex; align-items: center; gap: 4px;">
+            {% csrf_token %}
+            <input type="hidden" name="accion" value="cambiar_rol">
+            <input type="hidden" name="user_id" value="{{ u.id }}">
+            <select name="nuevo_rol" onchange="this.form.submit()" style="padding: 4px 6px; font-size: 0.78rem; border-radius: 4px; border: 1px solid var(--gris-300);">
+              {% for val, label in roles_choices %}
+              <option value="{{ val }}" {% if u.rol == val %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </form>
+        </td>
+        <td>
+          {% if u.esta_bloqueado %}
+            <span class="badge fuera_servicio" title="Hasta {{ u.bloqueado_hasta|date:'d/m/Y H:i' }}">
+              Bloqueado
+            </span>
+            <form method="post" action="{% url 'admin_panel' %}" style="display: inline;">
+              {% csrf_token %}
+              <input type="hidden" name="accion" value="desbloquear">
+              <input type="hidden" name="user_id" value="{{ u.id }}">
+              <button type="submit" class="btn chico" style="background: #16a34a; padding: 2px 6px; font-size: 0.72rem;" title="Quitar sanción">Desbloquear</button>
+            </form>
+          {% else %}
+            <span style="color: #16a34a; font-size: 0.8rem;">✓ Al día</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if u.is_active %}
+            <span class="badge disponible">Activo</span>
+          {% else %}
+            <span class="badge fuera_servicio">Inactivo</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if u.is_staff %}
+            <span style="color: var(--inacap-red); font-weight: 700; font-size: 0.8rem;">SÍ</span>
+          {% else %}
+            <span style="color: #9ca3af; font-size: 0.8rem;">No</span>
+          {% endif %}
+        </td>
+        <td>
+          <div style="display: flex; gap: 4px; align-items: center;">
+            {% if u != request.user %}
+            <form method="post" action="{% url 'admin_panel' %}" style="display: inline;">
+              {% csrf_token %}
+              <input type="hidden" name="accion" value="toggle_activo">
+              <input type="hidden" name="user_id" value="{{ u.id }}">
+              <button type="submit" class="btn chico secundario" style="font-size: 0.72rem;" title="Alternar acceso">
+                {% if u.is_active %}Desactivar{% else %}Activar{% endif %}
+              </button>
+            </form>
+            {% endif %}
+
+            <button type="button" class="btn chico" style="font-size: 0.72rem; background: #4b5563;" onclick="resetPasswordModal({{ u.id }}, '{{ u.email }}')">
+              Clave
+            </button>
+          </div>
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="7" style="text-align: center; color: var(--inacap-text-muted); padding: 20px;">
+          No se encontraron usuarios con los criterios indicados.
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div id="pwdModal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
+  <div style="background: white; border-radius: 10px; padding: 24px; max-width: 380px; width: 90%; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
+    <h3 style="margin-top: 0; font-size: 1.1rem; color: #111827;">Restablecer Contraseña</h3>
+    <p id="pwdModalUser" style="font-size: 0.85rem; color: var(--inacap-text-muted); margin-bottom: 16px;"></p>
+    <form method="post" action="{% url 'admin_panel' %}">
+      {% csrf_token %}
+      <input type="hidden" name="accion" value="reset_password">
+      <input type="hidden" name="user_id" id="pwdModalUserId">
+      <div class="field" style="margin-bottom: 16px;">
+        <label>Nueva Contraseña</label>
+        <input type="password" name="nueva_password" placeholder="Mínimo 6 caracteres" required style="padding: 8px;">
+      </div>
+      <div style="display: flex; gap: 8px; justify-content: flex-end;">
+        <button type="button" class="btn secundario chico" onclick="document.getElementById('pwdModal').style.display='none'">Cancelar</button>
+        <button type="submit" class="btn chico">Guardar Clave</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card" style="margin-top: 24px;">
+  <h2>
+    <span>Control y Estado de Dispositivos / Equipos</span>
+    <form method="get" action="{% url 'admin_panel' %}" style="display: flex; gap: 8px; align-items: center; font-size: 0.85rem;">
+      <input type="text" name="q_equipo" value="{{ busqueda_equipo }}" placeholder="Buscar por código, nombre..." style="padding: 6px 10px; border: 1px solid var(--gris-300); border-radius: 6px; font-size: 0.85rem;">
+      <select name="estado_equipo" onchange="this.form.submit()" style="padding: 6px 10px; border: 1px solid var(--gris-300); border-radius: 6px; font-size: 0.85rem;">
+        <option value="">Todos los estados</option>
+        {% for val, label in estados_equipos_choices %}
+        <option value="{{ val }}" {% if filtro_estado_equipo == val %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+      <button type="submit" class="btn chico">Filtrar</button>
+      {% if busqueda_equipo or filtro_estado_equipo %}
+      <a href="{% url 'admin_panel' %}" class="btn chico secundario" style="text-decoration: none;">Limpiar</a>
+      {% endif %}
+    </form>
+  </h2>
+  <p style="font-size: 0.85rem; color: var(--inacap-text-muted); margin-top: -8px; margin-bottom: 14px;">
+    Permite modificar directamente el estado de cualquier dispositivo en el inventario institucional (Disponible, Prestado, En mantenimiento o Fuera de servicio).
+  </p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Código</th>
+        <th>Nombre del Dispositivo</th>
+        <th>Modelo / Ubicación</th>
+        <th>Estado Actual</th>
+        <th>Cambiar Estado (Admin)</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for eq in equipos_admin %}
+      <tr>
+        <td><strong>{{ eq.codigo_inventario }}</strong></td>
+        <td>{{ eq.nombre }}</td>
+        <td>{{ eq.modelo|default:"-" }} / {{ eq.ubicacion|default:"-" }}</td>
+        <td>
+          <span class="badge {{ eq.estado }}">{{ eq.get_estado_display }}</span>
+        </td>
+        <td>
+          <form method="post" action="{% url 'admin_panel' %}" style="display: inline-flex; align-items: center; gap: 6px;">
+            {% csrf_token %}
+            <input type="hidden" name="accion" value="cambiar_estado_equipo">
+            <input type="hidden" name="equipo_id" value="{{ eq.id }}">
+            <select name="nuevo_estado" onchange="this.form.submit()" style="padding: 5px 8px; font-size: 0.82rem; border-radius: 5px; border: 1px solid var(--gris-300); font-weight: 600;">
+              {% for val, label in estados_equipos_choices %}
+              <option value="{{ val }}" {% if eq.estado == val %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </form>
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="5" style="text-align: center; color: var(--inacap-text-muted); padding: 20px;">
+          No se encontraron dispositivos con los criterios de búsqueda.
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="card" style="margin-top: 24px;">
+  <h2>Registro de Actividad y Movimientos Recientes</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Fecha y Hora</th>
+        <th>Tipo</th>
+        <th>Solicitud</th>
+        <th>Responsable</th>
+        <th>Condición / Estado</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for m in ultimos_movimientos %}
+      <tr>
+        <td>{{ m.fecha|date:"d/m/Y H:i:s" }}</td>
+        <td>
+          <span class="badge {% if m.tipo == 'entrega' %}prestado{% else %}disponible{% endif %}">
+            {{ m.get_tipo_display }}
+          </span>
+        </td>
+        <td>Solicitud #{{ m.solicitud.id }} ({{ m.solicitud.solicitante.get_full_name|default:m.solicitud.solicitante.username }})</td>
+        <td>{{ m.responsable.get_full_name|default:m.responsable.username }}</td>
+        <td>{{ m.estado_equipo|default:"Bueno" }}</td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="5" style="text-align: center; color: var(--inacap-text-muted); padding: 14px;">
+          Sin movimientos registrados recientemente.
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <div style="margin-top: 16px; text-align: right;">
+    <a href="{% url 'admin:index' %}" target="_blank" style="font-size: 0.75rem; color: #6b7280; text-decoration: underline;">
+      Consola Django Admin técnica avanzada &rarr;
+    </a>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function resetPasswordModal(userId, email) {
+  document.getElementById('pwdModalUserId').value = userId;
+  document.getElementById('pwdModalUser').innerText = 'Usuario: ' + email;
+  document.getElementById('pwdModal').style.display = 'flex';
+}
+</script>
+{% endblock %}

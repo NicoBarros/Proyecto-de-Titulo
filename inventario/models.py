@@ -48,7 +48,8 @@ class Usuario(AbstractUser):
 
     ROLES_ESCRITURA_INVENTARIO = [Rol.ENCARGADO_LABORATORIO, Rol.CONTROL_CALIDAD]
 
-    ROLES_APROBADORES = [Rol.DOCENTE, Rol.DIRECTOR_CARRERA, Rol.ENCARGADO_LABORATORIO]
+    ROLES_APROBADORES = [Rol.ENCARGADO_LABORATORIO, Rol.CONTROL_CALIDAD, Rol.DIRECTOR_CARRERA]
+    ROLES_REPORTES = [Rol.ENCARGADO_LABORATORIO, Rol.CONTROL_CALIDAD, Rol.DIRECTOR_CARRERA, Rol.COMITE_EJECUTIVO]
 
 class Equipo(models.Model):
 
@@ -241,6 +242,7 @@ class Mantenimiento(models.Model):
         REPARAR = 'reparar', 'Reparar'
         DAR_BAJA = 'dar_baja', 'Dar de baja'
         PENDIENTE = 'pendiente', 'Pendiente'
+        COMPLETADO = 'completado', 'Reparación completada'
 
     equipo = models.ForeignKey(
         Equipo, on_delete=models.CASCADE, related_name='mantenimientos',
@@ -254,7 +256,7 @@ class Mantenimiento(models.Model):
         help_text='costo_cotizado / valor_adquisicion',
     )
     decision = models.CharField(
-        max_length=10, choices=Decision.choices, default=Decision.PENDIENTE,
+        max_length=20, choices=Decision.choices, default=Decision.PENDIENTE,
     )
     fecha_diagnostico = models.DateTimeField(auto_now_add=True)
     fecha_resolucion = models.DateTimeField(blank=True, null=True)

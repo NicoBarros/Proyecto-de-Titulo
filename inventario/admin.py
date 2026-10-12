@@ -9,8 +9,6 @@ class CustomUserAdmin(UserAdmin):
     list_filter = ('rol', 'is_active', 'is_staff')
     search_fields = ('email', 'first_name', 'last_name')
     ordering = ('email',)
-    
-    # Custom fields mapping
     fieldsets = UserAdmin.fieldsets + (
         ('Datos INACAP', {'fields': ('rol', 'seccion', 'bloqueado_hasta')}),
     )

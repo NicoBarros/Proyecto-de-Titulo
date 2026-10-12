@@ -1,25 +1,43 @@
 {% extends 'inventario/base.html' %}
 
-{% block content %}
-<div class="login-wrap card">
-  <h2>Ingresar</h2>
+{% block login_content %}
+<div class="login-wrap card" style="box-shadow: 0 4px 20px rgba(0,0,0,0.08); border-radius: 12px; padding: 30px;">
+  <div style="text-align: center; margin-bottom: 24px;">
+    {% include 'inventario/inacap_logo.html' %}
+    <h2 style="border: none; margin: 16px 0 4px; justify-content: center; font-size: 1.3rem;">Iniciar Sesión</h2>
+    <p style="margin: 0; font-size: 0.85rem; color: var(--inacap-text-muted);">
+      Portal de Pañol y Laboratorio · Sede Valdivia
+    </p>
+  </div>
+
   {% if form.errors %}
-    <div class="msg error">Tu email y contraseña no coinciden o la cuenta está inactiva.</div>
+    <div class="msg error" style="margin-bottom: 16px;">
+      Tu correo o contraseña son incorrectos. Recuerda usar tu cuenta institucional <code>@inacapmail.cl</code>.
+    </div>
   {% endif %}
+
   <form method="post" action="{% url 'login' %}">
     {% csrf_token %}
-    <div class="field">
-      <label>Correo institucional</label>
-      <input name="username" type="email" placeholder="encargado.leica@inacapmail.cl" required autofocus>
+    <div class="field" style="margin-bottom: 14px;">
+      <label style="font-weight: 600; color: #374151;">Correo institucional</label>
+      <input name="username" type="email" placeholder="ejemplo@inacapmail.cl" required autofocus style="padding: 10px; font-size: 0.95rem;">
     </div>
-    <div class="field" style="margin-top:8px">
-      <label>Contraseña</label>
-      <input name="password" type="password" required>
+    <div class="field" style="margin-bottom: 18px;">
+      <label style="font-weight: 600; color: #374151;">Contraseña</label>
+      <input name="password" type="password" placeholder="••••••••" required style="padding: 10px; font-size: 0.95rem;">
     </div>
-    <button class="btn" style="margin-top:14px" type="submit">Ingresar</button>
+    <button class="btn" style="width: 100%; justify-content: center; padding: 11px; font-size: 0.95rem;" type="submit">
+      Ingresar al Portal
+    </button>
   </form>
-  <p class="hint">RF-05: autenticación con correo institucional (@inacapmail.cl).<br>
-  Usuarios de ejemplo, contraseña <code>Leica2026!</code>:<br>
-  encargado.leica@inacapmail.cl · docente1@inacapmail.cl · calidad@inacapmail.cl · dcarrera@inacapmail.cl · estudiante1@inacapmail.cl</p>
+
+  <div class="hint" style="margin-top: 20px;">
+    <strong>Autenticación Institucional (RF-05):</strong><br>
+    Cuentas de prueba (contraseña: <code>Leica2026!</code>):<br>
+    • <code>encargado.leica@inacapmail.cl</code> (Encargado)<br>
+    • <code>docente1@inacapmail.cl</code> (Docente)<br>
+    • <code>calidad@inacapmail.cl</code> (Control Calidad)<br>
+    • <code>estudiante1@inacapmail.cl</code> (Estudiante)
+  </div>
 </div>
 {% endblock %}

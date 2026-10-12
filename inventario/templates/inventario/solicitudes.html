@@ -8,21 +8,25 @@
     <div id="items-container">
       <div class="inline item-row" style="align-items: flex-end; margin-bottom: 10px;">
         <div class="field"><label>Ítem</label>
-          <select name="item[]">
+          <select name="item[]" class="item-select" onchange="actualizarTopeStock(this)">
             <optgroup label="Equipos disponibles">
               {% for e in equipos %}
-              <option value="equipo:{{ e.id }}">{{ e.nombre }} ({{ e.codigo_inventario }})</option>
+              <option value="equipo:{{ e.id }}" data-tipo="equipo" data-stock="1">{{ e.nombre }} ({{ e.codigo_inventario }})</option>
               {% endfor %}
             </optgroup>
             <optgroup label="Insumos">
               {% for i in insumos %}
-              <option value="insumo:{{ i.id }}" {% if not i.cantidad_disponible %}disabled{% endif %}>{{ i.nombre }} —
-                disp. {{ i.cantidad_disponible }}</option>
+              <option value="insumo:{{ i.id }}" data-tipo="insumo" data-stock="{{ i.cantidad_disponible }}" {% if not i.cantidad_disponible %}disabled{% endif %}>
+                {{ i.nombre }} — disp. {{ i.cantidad_disponible }}
+              </option>
               {% endfor %}
             </optgroup>
           </select>
         </div>
-        <div class="field"><label>Cantidad</label><input name="cantidad[]" type="number" value="1" min="1"></div>
+        <div class="field">
+          <label>Cantidad <small class="stock-hint" style="color: var(--inacap-text-muted); font-weight: normal;"></small></label>
+          <input name="cantidad[]" type="number" value="1" min="1" max="1" class="cantidad-input" oninput="validarCantidadInput(this)" style="min-width: 90px;">
+        </div>
         <button type="button" class="btn chico secundario" onclick="removerItem(this)"
           style="margin-bottom: 4px;">X</button>
       </div>
@@ -114,12 +118,61 @@
     }
   }
 
+  function actualizarTopeStock(selectEl) {
+    const row = selectEl.closest('.item-row');
+    if (!row) return;
+    const inputCantidad = row.querySelector('.cantidad-input');
+    const stockHint = row.querySelector('.stock-hint');
+    const selectedOpt = selectEl.options[selectEl.selectedIndex];
+    if (!selectedOpt) return;
+
+    const tipo = selectedOpt.dataset.tipo;
+    const stock = parseInt(selectedOpt.dataset.stock) || 1;
+
+    if (tipo === 'equipo') {
+      inputCantidad.min = 1;
+      inputCantidad.max = 1;
+      inputCantidad.value = 1;
+      inputCantidad.readOnly = true;
+      if (stockHint) stockHint.innerText = '(Máx. 1)';
+    } else {
+      inputCantidad.readOnly = false;
+      inputCantidad.min = 1;
+      inputCantidad.max = stock;
+      if (stockHint) stockHint.innerText = `(Máx. ${stock} disponibles)`;
+
+      let currentVal = parseInt(inputCantidad.value) || 1;
+      if (currentVal > stock) {
+        inputCantidad.value = stock;
+      } else if (currentVal < 1) {
+        inputCantidad.value = 1;
+      }
+    }
+  }
+
+  function validarCantidadInput(inputEl) {
+    const max = parseInt(inputEl.max);
+    const min = parseInt(inputEl.min) || 1;
+    let val = parseInt(inputEl.value);
+
+    if (max && val > max) {
+      inputEl.value = max;
+      inputEl.style.borderColor = 'var(--inacap-red)';
+      setTimeout(() => { inputEl.style.borderColor = ''; }, 800);
+    } else if (val < min && inputEl.value !== '') {
+      inputEl.value = min;
+    }
+  }
+
   function agregarItem() {
     const container = document.getElementById('items-container');
     const firstRow = container.querySelector('.item-row');
     const newRow = firstRow.cloneNode(true);
-    newRow.querySelector('input[type="number"]').value = 1;
+    const select = newRow.querySelector('.item-select');
+    const input = newRow.querySelector('.cantidad-input');
+    input.value = 1;
     container.appendChild(newRow);
+    actualizarTopeStock(select);
   }
 
   function removerItem(btn) {
@@ -130,5 +183,11 @@
       alert("La solicitud debe tener al menos un ítem.");
     }
   }
+
+  document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.item-select').forEach(function(sel) {
+      actualizarTopeStock(sel);
+    });
+  });
 </script>
 {% endblock %}
