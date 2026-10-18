@@ -2,9 +2,11 @@
 
 {% block content %}
 <div class="card">
-  <h2>Mantenimiento y Control Técnico (RF-10 — Regla del 70%)</h2>
+  <h2>Mantenimiento and Control Técnico</h2>
   <p style="font-size: 0.85rem; color: var(--inacap-text-muted); margin-top: -8px; margin-bottom: 16px;">
-    Si el costo de reparación de un equipo supera o iguala el <strong>70% de su valor de adquisición</strong>, el sistema sugiere automáticamente darle de baja. Al finalizar una reparación, presiona <strong>"Reparación Completada"</strong> para retornar el equipo a estado <strong>Disponible</strong> en el inventario.
+    Si el costo de reparación de un equipo supera o iguala el <strong>70% de su valor de adquisición</strong>, el
+    sistema sugiere automáticamente darle de baja. Al finalizar una reparación, presiona <strong>"Reparación
+      Completada"</strong> para retornar el equipo a estado <strong>Disponible</strong> en el inventario.
   </p>
 
   <form class="inline" method="post" action="{% url 'mantenimiento' %}">
@@ -13,7 +15,8 @@
       <label>Equipo a diagnosticar</label>
       <select name="equipo_id" required>
         {% for e in equipos %}
-        <option value="{{ e.id }}">{{ e.nombre }} ({{ e.codigo_inventario }}) — Estado: {{ e.get_estado_display }}</option>
+        <option value="{{ e.id }}">{{ e.nombre }} ({{ e.codigo_inventario }}) — Estado: {{ e.get_estado_display }}
+        </option>
         {% endfor %}
       </select>
     </div>
@@ -25,7 +28,7 @@
       <label>Costo cotizado ($)</label>
       <input name="costo_cotizado" type="number" step="0.01" placeholder="Ej: 45000" required>
     </div>
-    <button class="btn" type="submit">Diagnosticar (RF-10)</button>
+    <button class="btn" type="submit">Diagnosticar</button>
   </form>
 
   <table>
@@ -48,29 +51,37 @@
           <small style="color: var(--inacap-text-muted);">{{ m.equipo.codigo_inventario }}</small>
         </td>
         <td>
-          <span class="badge {{ m.equipo.estado }}">{{ m.equipo.get_estado_display }}</span>
+          {% if m.decision == 'completado' %}
+          <span class="badge disponible">Disponible</span>
+          {% elif m.decision == 'dar_baja' %}
+          <span class="badge fuera_servicio">Fuera de servicio</span>
+          {% else %}
+          <span class="badge en_mantenimiento">En mantenimiento</span>
+          {% endif %}
         </td>
         <td>{{ m.falla_descrita }}</td>
         <td>${{ m.costo_cotizado|floatformat:'0'|default:"-" }}</td>
         <td>
           {% if m.porcentaje_costo %}
-            {% widthratio m.porcentaje_costo 1 100 %}%
-            {% if m.porcentaje_costo >= 0.7 %}
-              <span title="Supera el 70%" style="color: var(--inacap-red); font-weight: bold;">(≥70%)</span>
-            {% endif %}
+          {% widthratio m.porcentaje_costo 1 100 %}%
+          {% if m.porcentaje_costo >= 0.7 %}
+          <span title="Supera el 70%" style="color: var(--inacap-red); font-weight: bold;">(≥70%)</span>
+          {% endif %}
           {% else %}
-            -
+          -
           {% endif %}
         </td>
         <td>
           <span class="badge {{ m.decision }}">{{ m.get_decision_display }}</span>
         </td>
         <td>
-          {% if m.equipo.estado == 'en_mantenimiento' or m.decision == 'reparar' or m.decision == 'pendiente' %}
+          {% if m.decision != 'completado' and m.decision != 'dar_baja' %}
           <form method="post" style="display:flex; gap: 6px; flex-wrap: wrap;">
             {% csrf_token %}
             <input type="hidden" name="mant_id" value="{{ m.id }}">
-            <button type="submit" name="accion_mant" value="completar_reparacion" class="btn chico" style="background: #16a34a; color: white;" title="Marcar reparación lista y dejar el equipo disponible en inventario">
+            <button type="submit" name="accion_mant" value="completar_reparacion" class="btn chico"
+              style="background: #16a34a; color: white;"
+              title="Marcar reparación lista y dejar el equipo disponible en inventario">
               ✓ Reparación Completada
             </button>
 
@@ -78,23 +89,25 @@
             <button type="submit" name="accion_mant" value="reparar" class="btn chico">
               Confirmar Reparar
             </button>
-            <button type="submit" name="accion_mant" value="dar_baja" class="btn chico secundario" onclick="return confirm('¿Confirmas dar de baja este equipo?');">
+            <button type="submit" name="accion_mant" value="dar_baja" class="btn chico secundario"
+              onclick="return confirm('¿Confirmas dar de baja este equipo?');">
               Dar de baja
             </button>
             {% elif m.decision == 'reparar' %}
-            <button type="submit" name="accion_mant" value="dar_baja" class="btn chico secundario" onclick="return confirm('¿Dar de baja este equipo?');">
+            <button type="submit" name="accion_mant" value="dar_baja" class="btn chico secundario"
+              onclick="return confirm('¿Dar de baja este equipo?');">
               Dar de baja
             </button>
             {% endif %}
           </form>
           {% elif m.decision == 'completado' %}
-            <span style="color: #16a34a; font-size: 0.8rem; font-weight: 600;">
-              ✓ Reparado ({{ m.fecha_resolucion|date:"d/m/Y H:i" }})
-            </span>
+          <span style="color: #16a34a; font-size: 0.8rem; font-weight: 600;">
+            ✓ Reparado ({{ m.fecha_resolucion|date:"d/m/Y H:i" }})
+          </span>
           {% elif m.decision == 'dar_baja' %}
-            <span style="color: var(--inacap-red); font-size: 0.8rem; font-weight: 600;">
-              ✕ Fuera de servicio
-            </span>
+          <span style="color: var(--inacap-red); font-size: 0.8rem; font-weight: 600;">
+            ✕ Fuera de servicio
+          </span>
           {% endif %}
         </td>
       </tr>

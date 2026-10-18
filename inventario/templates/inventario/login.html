@@ -11,16 +11,17 @@
   </div>
 
   {% if form.errors %}
-    <div class="msg error" style="margin-bottom: 16px;">
-      Tu correo o contraseña son incorrectos. Recuerda usar tu cuenta institucional <code>@inacapmail.cl</code>.
-    </div>
+  <div class="msg error" style="margin-bottom: 16px;">
+    Tu correo o contraseña son incorrectos. Recuerda usar tu cuenta institucional <code>@inacapmail.cl</code>.
+  </div>
   {% endif %}
 
   <form method="post" action="{% url 'login' %}">
     {% csrf_token %}
     <div class="field" style="margin-bottom: 14px;">
       <label style="font-weight: 600; color: #374151;">Correo institucional</label>
-      <input name="username" type="email" placeholder="ejemplo@inacapmail.cl" required autofocus style="padding: 10px; font-size: 0.95rem;">
+      <input name="username" type="email" placeholder="ejemplo@inacapmail.cl" required autofocus
+        style="padding: 10px; font-size: 0.95rem;">
     </div>
     <div class="field" style="margin-bottom: 18px;">
       <label style="font-weight: 600; color: #374151;">Contraseña</label>
@@ -34,7 +35,7 @@
   {% if debug %}
   {# Solo en desarrollo (DEBUG=True y acceso desde INTERNAL_IPS): nunca mostrar credenciales en produccion. #}
   <div class="hint" style="margin-top: 20px;">
-    <strong>Autenticación Institucional (RF-05):</strong><br>
+    <strong>Autenticación Institucional:</strong><br>
     Cuentas de prueba (contraseña: <code>Leica2026!</code>):<br>
     • <code>encargado.leica@inacapmail.cl</code> (Encargado)<br>
     • <code>docente1@inacapmail.cl</code> (Docente)<br>

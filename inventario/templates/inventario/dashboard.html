@@ -110,7 +110,15 @@
     <a href="{% url 'solicitudes' %}" class="btn chico">Ir a solicitudes</a>
   </h2>
   <table>
-    <thead><tr><th>#</th><th>Responsable</th><th>Ítems</th><th>Debía devolverse</th><th>Atraso</th></tr></thead>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Responsable</th>
+        <th>Ítems</th>
+        <th>Debía devolverse</th>
+        <th>Atraso</th>
+      </tr>
+    </thead>
     <tbody>
       {% for s in atrasadas %}
       <tr>
@@ -120,7 +128,8 @@
           {{ r.get_full_name|default:r.email }}{% if r.seccion %} <small>({{ r.seccion }})</small>{% endif %}
           {% endwith %}
         </td>
-        <td>{% for item in s.items.all %}{% if item.equipo %}{{ item.equipo.nombre }}{% else %}{{ item.insumo.nombre }} x{{ item.cantidad }}{% endif %}{% if not forloop.last %}, {% endif %}{% endfor %}</td>
+        <td>{% for item in s.items.all %}{% if item.equipo %}{{ item.equipo.nombre }}{% else %}{{ item.insumo.nombre }}
+          x{{ item.cantidad }}{% endif %}{% if not forloop.last %}, {% endif %}{% endfor %}</td>
         <td>{{ s.horario_fin|date:"d/m/Y H:i" }}</td>
         <td><span class="badge atrasada">{{ s.horario_fin|timesince }}</span></td>
       </tr>
@@ -132,7 +141,7 @@
 
 <div class="card">
   <h2>
-    <span>Estado Operativo del Pañol (RF-13)</span>
+    <span>Estado Operativo de Inventario</span>
     <span style="font-size: 0.8rem; font-weight: 500; color: var(--inacap-text-muted);">Sede Valdivia · Tiempo
       Real</span>
   </h2>

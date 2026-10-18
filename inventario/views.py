@@ -275,8 +275,6 @@ def _parse_fecha(valor):
         fecha = timezone.make_aware(fecha)
     return fecha
 
-
-# Estados desde los que se permite cada accion sobre una solicitud.
 TRANSICIONES_SOLICITUD = {
     'aprobar': [Solicitud.EstadoSolicitud.PENDIENTE],
     'rechazar': [Solicitud.EstadoSolicitud.PENDIENTE, Solicitud.EstadoSolicitud.APROBADA],
@@ -299,8 +297,6 @@ def _ejecutar_accion_solicitud(request, solicitud_id, accion):
         )
 
     items = list(solicitud.items.select_related('insumo'))
-    # Se bloquean todos los equipos de una vez y en orden fijo: serializa las acciones
-    # concurrentes sobre los mismos equipos (doble reserva) y evita deadlocks.
     equipos = Equipo.objects.select_for_update().filter(
         id__in=[i.equipo_id for i in items if i.equipo_id]
     ).order_by('id')
@@ -335,7 +331,6 @@ def _ejecutar_accion_solicitud(request, solicitud_id, accion):
             auditoria.registrar(equipo, request.user, HistorialEquipo.Accion.ESTADO, antes, f'Entrega de la solicitud #{solicitud.id}')
         for item in items:
             if item.insumo_id:
-                # Descuento condicional en la BD: evita stock negativo con pedidos simultaneos.
                 actualizados = Insumo.objects.filter(
                     id=item.insumo_id, cantidad_disponible__gte=item.cantidad,
                 ).update(cantidad_disponible=F('cantidad_disponible') - item.cantidad, version=F('version') + 1)
@@ -353,7 +348,6 @@ def _ejecutar_accion_solicitud(request, solicitud_id, accion):
         atrasada = timezone.now() > solicitud.horario_fin
 
         for equipo in equipos:
-            # Si mientras estaba prestado se dio de baja o se envio a mantenimiento, se respeta ese estado.
             if equipo.estado == Equipo.Estado.PRESTADO:
                 antes = auditoria.foto(equipo)
                 equipo.estado = (Equipo.Estado.EN_MANTENIMIENTO if estado_equipo in ('dañado', 'inservible')
@@ -445,8 +439,7 @@ def solicitudes_view(request):
                     horario_fin=fin,
                 )
                 
-                # Se agrupan las filas: un equipo no puede repetirse y las cantidades
-                # de un mismo insumo se suman antes de validar el stock.
+
                 equipos_ids, insumos_cant = [], {}
                 for i, valor in enumerate(items):
                     tipo, _, item_id = valor.partition(':')

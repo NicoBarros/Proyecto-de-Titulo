@@ -2,7 +2,7 @@
 
 {% block content %}
 <div class="card">
-  <h2>Búsqueda inteligente (RF-11 / RNF-06)</h2>
+  <h2>Búsqueda inteligente</h2>
   <form id="fBusqueda" class="inline" onsubmit="buscarIA(event)">
     {% csrf_token %}
     <div class="field" style="flex:1"><label>Describe lo que necesitas</label>
@@ -17,8 +17,7 @@
 
 {% block scripts %}
 <script>
-  // Los datos vienen de la BD (p. ej. importados por CSV): se insertan con
-  // textContent, nunca como HTML, para evitar XSS.
+
   function el(tag, texto, clase) {
     const n = document.createElement(tag);
     if (texto !== undefined) n.textContent = texto;

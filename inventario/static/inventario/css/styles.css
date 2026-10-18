@@ -585,6 +585,19 @@ tr:hover td {
   background: #f9fafb;
 }
 
+div.inline {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+
+.field input[type="date"],
+.field input[type="datetime-local"] {
+  width: 210px;
+  cursor: pointer;
+}
+
 form.inline {
   display: flex;
   gap: 10px;

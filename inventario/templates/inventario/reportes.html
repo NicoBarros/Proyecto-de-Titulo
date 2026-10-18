@@ -2,14 +2,24 @@
 
 {% block content %}
 <div class="card">
-  <h2>Equipos más solicitados (RF-13)</h2>
+  <h2>Equipos más solicitados</h2>
   <table>
-    <thead><tr><th>Equipo</th><th>Veces solicitado</th></tr></thead>
+    <thead>
+      <tr>
+        <th>Equipo</th>
+        <th>Veces solicitado</th>
+      </tr>
+    </thead>
     <tbody>
       {% for t in top_equipos %}
-      <tr><td>{{ t.nombre }}</td><td>{{ t.veces }}</td></tr>
+      <tr>
+        <td>{{ t.nombre }}</td>
+        <td>{{ t.veces }}</td>
+      </tr>
       {% empty %}
-      <tr><td colspan="2">Sin datos aún.</td></tr>
+      <tr>
+        <td colspan="2">Sin datos aún.</td>
+      </tr>
       {% endfor %}
     </tbody>
   </table>
@@ -18,7 +28,13 @@
 <div class="card">
   <h2>Préstamos vencidos</h2>
   <table>
-    <thead><tr><th>Responsable</th><th>Solicitante</th><th>Vence</th></tr></thead>
+    <thead>
+      <tr>
+        <th>Responsable</th>
+        <th>Solicitante</th>
+        <th>Vence</th>
+      </tr>
+    </thead>
     <tbody>
       {% for v in vencidos %}
       {% with r=v.en_representacion_de|default:v.solicitante %}
@@ -29,7 +45,9 @@
       </tr>
       {% endwith %}
       {% empty %}
-      <tr><td colspan="3">Ninguno.</td></tr>
+      <tr>
+        <td colspan="3">Ninguno.</td>
+      </tr>
       {% endfor %}
     </tbody>
   </table>
@@ -38,12 +56,24 @@
 <div class="card">
   <h2>Equipos sin movimiento ({{ dias }} días)</h2>
   <table>
-    <thead><tr><th>Equipo</th><th>Código</th><th>Estado</th></tr></thead>
+    <thead>
+      <tr>
+        <th>Equipo</th>
+        <th>Código</th>
+        <th>Estado</th>
+      </tr>
+    </thead>
     <tbody>
       {% for e in sin_movimiento %}
-      <tr><td>{{ e.nombre }}</td><td>{{ e.codigo_inventario }}</td><td><span class="badge {{ e.estado }}">{{ e.get_estado_display }}</span></td></tr>
+      <tr>
+        <td>{{ e.nombre }}</td>
+        <td>{{ e.codigo_inventario }}</td>
+        <td><span class="badge {{ e.estado }}">{{ e.get_estado_display }}</span></td>
+      </tr>
       {% empty %}
-      <tr><td colspan="3">Todos los equipos tienen movimiento reciente.</td></tr>
+      <tr>
+        <td colspan="3">Todos los equipos tienen movimiento reciente.</td>
+      </tr>
       {% endfor %}
     </tbody>
   </table>

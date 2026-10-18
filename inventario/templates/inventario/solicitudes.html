@@ -2,7 +2,7 @@
 
 {% block content %}
 <div class="card">
-  <h2>Nueva solicitud (RF-06, RF-07)</h2>
+  <h2>Nueva solicitud</h2>
   <form method="post" action="{% url 'solicitudes' %}">
     {% csrf_token %}
     <div id="items-container">
@@ -11,21 +11,24 @@
           <select name="item[]" class="item-select" onchange="actualizarTopeStock(this)">
             <optgroup label="Equipos disponibles">
               {% for e in equipos %}
-              <option value="equipo:{{ e.id }}" data-tipo="equipo" data-stock="1">{{ e.nombre }} ({{ e.codigo_inventario }})</option>
+              <option value="equipo:{{ e.id }}" data-tipo="equipo" data-stock="1">{{ e.nombre }} ({{ e.codigo_inventario
+                }})</option>
               {% endfor %}
             </optgroup>
             <optgroup label="Insumos">
               {% for i in insumos %}
-              <option value="insumo:{{ i.id }}" data-tipo="insumo" data-stock="{{ i.cantidad_disponible }}" {% if not i.cantidad_disponible %}disabled{% endif %}>
-                {{ i.nombre }} — disp. {{ i.cantidad_disponible }}
-              </option>
+                <option value="insumo:{{ i.id }}" data-tipo="insumo" data-stock="{{ i.cantidad_disponible }}" {% if not i.cantidad_disponible %}disabled{% endif %}>
+                  {{ i.nombre }} — disp. {{ i.cantidad_disponible }}
+                </option>
               {% endfor %}
             </optgroup>
           </select>
         </div>
         <div class="field">
-          <label>Cantidad <small class="stock-hint" style="color: var(--inacap-text-muted); font-weight: normal;"></small></label>
-          <input name="cantidad[]" type="number" value="1" min="1" max="1" class="cantidad-input" oninput="validarCantidadInput(this)" style="min-width: 90px;">
+          <label>Cantidad <small class="stock-hint"
+              style="color: var(--inacap-text-muted); font-weight: normal;"></small></label>
+          <input name="cantidad[]" type="number" value="1" min="1" max="1" class="cantidad-input"
+            oninput="validarCantidadInput(this)" style="min-width: 90px;">
         </div>
         <button type="button" class="btn chico secundario" onclick="removerItem(this)"
           style="margin-bottom: 4px;">X</button>
@@ -48,13 +51,17 @@
         <select name="en_representacion_de">
           <option value="">— Para mí —</option>
           {% for e in estudiantes %}
-          <option value="{{ e.id }}">{{ e.get_full_name|default:e.email }}{% if e.seccion %} ({{ e.seccion }}){% endif %}</option>
+          <option value="{{ e.id }}">
+            {{ e.get_full_name|default:e.email }}{% if e.seccion %} ({{ e.seccion }}){% endif %}
+          </option>
           {% endfor %}
         </select>
       </div>
       {% endif %}
-      <div class="field"><label>Inicio</label><input name="horario_inicio" type="datetime-local" required></div>
-      <div class="field"><label>Fin</label><input name="horario_fin" type="datetime-local" required></div>
+      <div class="field"><label>Inicio</label><input name="horario_inicio" id="horarioInicio" type="datetime-local"
+          required></div>
+      <div class="field"><label>Fin</label><input name="horario_fin" id="horarioFin" type="datetime-local" required>
+      </div>
       <div class="field"><label>Justificación</label><input name="justificacion" placeholder="ej. clase práctica"></div>
       <button class="btn" type="submit">Solicitar</button>
     </div>
@@ -91,14 +98,16 @@
         <td>
           {{ s.solicitante.get_full_name|default:s.solicitante.email }}
           {% if s.en_representacion_de %}
-          <br><small class="representacion">en representación de {{ s.en_representacion_de.get_full_name|default:s.en_representacion_de.email }}</small>
+          <br><small class="representacion">en representación de {{
+            s.en_representacion_de.get_full_name|default:s.en_representacion_de.email }}</small>
           {% endif %}
         </td>
         <td>{{ s.horario_inicio|date:"d/m/Y H:i" }} → {{ s.horario_fin|date:"d/m/Y H:i" }}</td>
         <td>{{ s.get_lugar_uso_display }}</td>
         <td>
           <span class="badge {{ s.estado }}">{{ s.get_estado_display }}</span>
-          {% if s.estado == 'atrasada' %}<br><small class="vencida">Vencida hace {{ s.horario_fin|timesince:ahora }}</small>{% endif %}
+          {% if s.estado == 'atrasada' %}<br><small class="vencida">Vencida hace {{ s.horario_fin|timesince:ahora
+            }}</small>{% endif %}
         </td>
         <td>
           {% if puede_aprobar %}
@@ -132,6 +141,18 @@
 {% endblock %}
 {% block scripts %}
 <script>
+  (function () {
+    const inicio = document.getElementById('horarioInicio');
+    const fin = document.getElementById('horarioFin');
+    const ahora = new Date();
+    ahora.setMinutes(ahora.getMinutes() - ahora.getTimezoneOffset());
+    inicio.min = ahora.toISOString().slice(0, 16);
+    inicio.addEventListener('change', () => {
+      fin.min = inicio.value;
+      if (fin.value && fin.value <= inicio.value) fin.value = '';
+    });
+  })();
+
   function actualizarTopeStock(selectEl) {
     const row = selectEl.closest('.item-row');
     if (!row) return;
@@ -198,8 +219,8 @@
     }
   }
 
-  document.addEventListener('DOMContentLoaded', function() {
-    document.querySelectorAll('.item-select').forEach(function(sel) {
+  document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('.item-select').forEach(function (sel) {
       actualizarTopeStock(sel);
     });
   });

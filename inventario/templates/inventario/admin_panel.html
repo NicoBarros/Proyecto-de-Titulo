@@ -9,7 +9,8 @@
     </span>
   </h2>
   <p style="font-size: 0.85rem; color: var(--inacap-text-muted); margin-top: -8px;">
-    Panel centralizado para la administración de cuentas institucionales INACAP, asignación de roles de acceso, desbloqueo de sanciones y auditoría de operaciones del pañol.
+    Panel centralizado para la administración de cuentas institucionales INACAP, asignación de roles de acceso,
+    desbloqueo de sanciones y auditoría de operaciones del pañol.
   </p>
 
   <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); margin-bottom: 20px;">
@@ -50,7 +51,8 @@
 
 <div class="card" style="margin-bottom: 24px;">
   <h2>+ Registrar Nuevo Usuario Institucional</h2>
-  <form method="post" action="{% url 'admin_panel' %}" class="inline" style="background: #f9fafb; padding: 18px; border-radius: 8px;">
+  <form method="post" action="{% url 'admin_panel' %}" class="inline"
+    style="background: #f9fafb; padding: 18px; border-radius: 8px;">
     {% csrf_token %}
     <input type="hidden" name="accion" value="crear_usuario">
 
@@ -102,9 +104,12 @@
 <div class="card">
   <h2>
     <span>Gestión de Cuentas y Permisos</span>
-    <form method="get" action="{% url 'admin_panel' %}" style="display: flex; gap: 8px; align-items: center; font-size: 0.85rem;">
-      <input type="text" name="q" value="{{ busqueda }}" placeholder="Buscar por nombre o correo..." style="padding: 6px 10px; border: 1px solid var(--gris-300); border-radius: 6px; font-size: 0.85rem;">
-      <select name="rol" onchange="this.form.submit()" style="padding: 6px 10px; border: 1px solid var(--gris-300); border-radius: 6px; font-size: 0.85rem;">
+    <form method="get" action="{% url 'admin_panel' %}"
+      style="display: flex; gap: 8px; align-items: center; font-size: 0.85rem;">
+      <input type="text" name="q" value="{{ busqueda }}" placeholder="Buscar por nombre o correo..."
+        style="padding: 6px 10px; border: 1px solid var(--gris-300); border-radius: 6px; font-size: 0.85rem;">
+      <select name="rol" onchange="this.form.submit()"
+        style="padding: 6px 10px; border: 1px solid var(--gris-300); border-radius: 6px; font-size: 0.85rem;">
         <option value="">Todos los roles</option>
         {% for val, label in roles_choices %}
         <option value="{{ val }}" {% if filtro_rol == val %}selected{% endif %}>{{ label }}</option>
@@ -123,7 +128,7 @@
         <th>Usuario / Nombre</th>
         <th>Correo Institucional</th>
         <th>Rol en Sistema</th>
-        <th>Sanción RF-09</th>
+        <th>Sanción</th>
         <th>Estado</th>
         <th>Staff</th>
         <th>Acciones</th>
@@ -138,11 +143,13 @@
         </td>
         <td>{{ u.email }}</td>
         <td>
-          <form method="post" action="{% url 'admin_panel' %}" style="display: inline-flex; align-items: center; gap: 4px;">
+          <form method="post" action="{% url 'admin_panel' %}"
+            style="display: inline-flex; align-items: center; gap: 4px;">
             {% csrf_token %}
             <input type="hidden" name="accion" value="cambiar_rol">
             <input type="hidden" name="user_id" value="{{ u.id }}">
-            <select name="nuevo_rol" onchange="this.form.submit()" style="padding: 4px 6px; font-size: 0.78rem; border-radius: 4px; border: 1px solid var(--gris-300);">
+            <select name="nuevo_rol" onchange="this.form.submit()"
+              style="padding: 4px 6px; font-size: 0.78rem; border-radius: 4px; border: 1px solid var(--gris-300);">
               {% for val, label in roles_choices %}
               <option value="{{ val }}" {% if u.rol == val %}selected{% endif %}>{{ label }}</option>
               {% endfor %}
@@ -151,31 +158,32 @@
         </td>
         <td>
           {% if u.esta_bloqueado %}
-            <span class="badge fuera_servicio" title="Hasta {{ u.bloqueado_hasta|date:'d/m/Y H:i' }}">
-              Bloqueado
-            </span>
-            <form method="post" action="{% url 'admin_panel' %}" style="display: inline;">
-              {% csrf_token %}
-              <input type="hidden" name="accion" value="desbloquear">
-              <input type="hidden" name="user_id" value="{{ u.id }}">
-              <button type="submit" class="btn chico" style="background: #16a34a; padding: 2px 6px; font-size: 0.72rem;" title="Quitar sanción">Desbloquear</button>
-            </form>
+          <span class="badge fuera_servicio" title="Hasta {{ u.bloqueado_hasta|date:'d/m/Y H:i' }}">
+            Bloqueado
+          </span>
+          <form method="post" action="{% url 'admin_panel' %}" style="display: inline;">
+            {% csrf_token %}
+            <input type="hidden" name="accion" value="desbloquear">
+            <input type="hidden" name="user_id" value="{{ u.id }}">
+            <button type="submit" class="btn chico" style="background: #16a34a; padding: 2px 6px; font-size: 0.72rem;"
+              title="Quitar sanción">Desbloquear</button>
+          </form>
           {% else %}
-            <span style="color: #16a34a; font-size: 0.8rem;">✓ Al día</span>
+          <span style="color: #16a34a; font-size: 0.8rem;">✓ Al día</span>
           {% endif %}
         </td>
         <td>
           {% if u.is_active %}
-            <span class="badge disponible">Activo</span>
+          <span class="badge disponible">Activo</span>
           {% else %}
-            <span class="badge fuera_servicio">Inactivo</span>
+          <span class="badge fuera_servicio">Inactivo</span>
           {% endif %}
         </td>
         <td>
           {% if u.is_staff %}
-            <span style="color: var(--inacap-red); font-weight: 700; font-size: 0.8rem;">SÍ</span>
+          <span style="color: var(--inacap-red); font-weight: 700; font-size: 0.8rem;">SÍ</span>
           {% else %}
-            <span style="color: #9ca3af; font-size: 0.8rem;">No</span>
+          <span style="color: #9ca3af; font-size: 0.8rem;">No</span>
           {% endif %}
         </td>
         <td>
@@ -191,7 +199,8 @@
             </form>
             {% endif %}
 
-            <button type="button" class="btn chico" style="font-size: 0.72rem; background: #4b5563;" onclick="resetPasswordModal({{ u.id }}, '{{ u.email }}')">
+            <button type="button" class="btn chico" style="font-size: 0.72rem; background: #4b5563;"
+              onclick="resetPasswordModal({{ u.id }}, '{{ u.email }}')">
               Clave
             </button>
           </div>
@@ -208,8 +217,10 @@
   </table>
 </div>
 
-<div id="pwdModal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
-  <div style="background: white; border-radius: 10px; padding: 24px; max-width: 380px; width: 90%; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
+<div id="pwdModal"
+  style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
+  <div
+    style="background: white; border-radius: 10px; padding: 24px; max-width: 380px; width: 90%; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
     <h3 style="margin-top: 0; font-size: 1.1rem; color: #111827;">Restablecer Contraseña</h3>
     <p id="pwdModalUser" style="font-size: 0.85rem; color: var(--inacap-text-muted); margin-bottom: 16px;"></p>
     <form method="post" action="{% url 'admin_panel' %}">
@@ -221,7 +232,8 @@
         <input type="password" name="nueva_password" placeholder="Mínimo 6 caracteres" required style="padding: 8px;">
       </div>
       <div style="display: flex; gap: 8px; justify-content: flex-end;">
-        <button type="button" class="btn secundario chico" onclick="document.getElementById('pwdModal').style.display='none'">Cancelar</button>
+        <button type="button" class="btn secundario chico"
+          onclick="document.getElementById('pwdModal').style.display='none'">Cancelar</button>
         <button type="submit" class="btn chico">Guardar Clave</button>
       </div>
     </form>
@@ -231,9 +243,12 @@
 <div class="card" style="margin-top: 24px;">
   <h2>
     <span>Control y Estado de Dispositivos / Equipos</span>
-    <form method="get" action="{% url 'admin_panel' %}" style="display: flex; gap: 8px; align-items: center; font-size: 0.85rem;">
-      <input type="text" name="q_equipo" value="{{ busqueda_equipo }}" placeholder="Buscar por código, nombre..." style="padding: 6px 10px; border: 1px solid var(--gris-300); border-radius: 6px; font-size: 0.85rem;">
-      <select name="estado_equipo" onchange="this.form.submit()" style="padding: 6px 10px; border: 1px solid var(--gris-300); border-radius: 6px; font-size: 0.85rem;">
+    <form method="get" action="{% url 'admin_panel' %}"
+      style="display: flex; gap: 8px; align-items: center; font-size: 0.85rem;">
+      <input type="text" name="q_equipo" value="{{ busqueda_equipo }}" placeholder="Buscar por código, nombre..."
+        style="padding: 6px 10px; border: 1px solid var(--gris-300); border-radius: 6px; font-size: 0.85rem;">
+      <select name="estado_equipo" onchange="this.form.submit()"
+        style="padding: 6px 10px; border: 1px solid var(--gris-300); border-radius: 6px; font-size: 0.85rem;">
         <option value="">Todos los estados</option>
         {% for val, label in estados_equipos_choices %}
         <option value="{{ val }}" {% if filtro_estado_equipo == val %}selected{% endif %}>{{ label }}</option>
@@ -246,7 +261,8 @@
     </form>
   </h2>
   <p style="font-size: 0.85rem; color: var(--inacap-text-muted); margin-top: -8px; margin-bottom: 14px;">
-    Permite modificar directamente el estado de cualquier dispositivo en el inventario institucional (Disponible, Prestado, En mantenimiento o Fuera de servicio).
+    Permite modificar directamente el estado de cualquier dispositivo en el inventario institucional (Disponible,
+    Prestado, En mantenimiento o Fuera de servicio).
   </p>
 
   <table>
@@ -269,11 +285,13 @@
           <span class="badge {{ eq.estado }}">{{ eq.get_estado_display }}</span>
         </td>
         <td>
-          <form method="post" action="{% url 'admin_panel' %}" style="display: inline-flex; align-items: center; gap: 6px;">
+          <form method="post" action="{% url 'admin_panel' %}"
+            style="display: inline-flex; align-items: center; gap: 6px;">
             {% csrf_token %}
             <input type="hidden" name="accion" value="cambiar_estado_equipo">
             <input type="hidden" name="equipo_id" value="{{ eq.id }}">
-            <select name="nuevo_estado" onchange="this.form.submit()" style="padding: 5px 8px; font-size: 0.82rem; border-radius: 5px; border: 1px solid var(--gris-300); font-weight: 600;">
+            <select name="nuevo_estado" onchange="this.form.submit()"
+              style="padding: 5px 8px; font-size: 0.82rem; border-radius: 5px; border: 1px solid var(--gris-300); font-weight: 600;">
               {% for val, label in estados_equipos_choices %}
               <option value="{{ val }}" {% if eq.estado == val %}selected{% endif %}>{{ label }}</option>
               {% endfor %}
@@ -313,7 +331,8 @@
             {{ m.get_tipo_display }}
           </span>
         </td>
-        <td>Solicitud #{{ m.solicitud.id }} ({{ m.solicitud.solicitante.get_full_name|default:m.solicitud.solicitante.username }})</td>
+        <td>Solicitud #{{ m.solicitud.id }} ({{
+          m.solicitud.solicitante.get_full_name|default:m.solicitud.solicitante.username }})</td>
         <td>{{ m.responsable.get_full_name|default:m.responsable.username }}</td>
         <td>{{ m.estado_equipo|default:"Bueno" }}</td>
       </tr>
@@ -328,7 +347,8 @@
   </table>
 
   <div style="margin-top: 16px; text-align: right;">
-    <a href="{% url 'admin:index' %}" target="_blank" style="font-size: 0.75rem; color: #6b7280; text-decoration: underline;">
+    <a href="{% url 'admin:index' %}" target="_blank"
+      style="font-size: 0.75rem; color: #6b7280; text-decoration: underline;">
       Consola Django Admin técnica avanzada &rarr;
     </a>
   </div>
@@ -337,10 +357,10 @@
 
 {% block scripts %}
 <script>
-function resetPasswordModal(userId, email) {
-  document.getElementById('pwdModalUserId').value = userId;
-  document.getElementById('pwdModalUser').innerText = 'Usuario: ' + email;
-  document.getElementById('pwdModal').style.display = 'flex';
-}
+  function resetPasswordModal(userId, email) {
+    document.getElementById('pwdModalUserId').value = userId;
+    document.getElementById('pwdModalUser').innerText = 'Usuario: ' + email;
+    document.getElementById('pwdModal').style.display = 'flex';
+  }
 </script>
 {% endblock %}
