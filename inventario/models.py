@@ -93,7 +93,7 @@ class Insumo(models.Model):
         RENOVABLE = 'renovable', 'Renovable'
         PERECIBLE = 'perecible', 'Perecible'
 
-    nombre = models.CharField(max_length=200)
+    nombre = models.CharField(max_length=200, unique=True)  # la migracion CSV identifica insumos por nombre
     categoria = models.CharField(max_length=100, blank=True, null=True, verbose_name='Categoría')
     tipo = models.CharField(
         max_length=10, choices=Tipo.choices, default=Tipo.PERECIBLE,
@@ -138,7 +138,7 @@ class Solicitud(models.Model):
         FUERA_SEDE = 'fuera_sede', 'Fuera de sede'
 
     solicitante = models.ForeignKey(
-        Usuario, on_delete=models.CASCADE, related_name='solicitudes',
+        Usuario, on_delete=models.PROTECT, related_name='solicitudes',
     )
     en_representacion_de = models.ForeignKey(
         Usuario, on_delete=models.SET_NULL, blank=True, null=True,
@@ -177,10 +177,10 @@ class SolicitudItem(models.Model):
         Solicitud, on_delete=models.CASCADE, related_name='items',
     )
     equipo = models.ForeignKey(
-        Equipo, on_delete=models.CASCADE, blank=True, null=True,
+        Equipo, on_delete=models.PROTECT, blank=True, null=True,
     )
     insumo = models.ForeignKey(
-        Insumo, on_delete=models.CASCADE, blank=True, null=True,
+        Insumo, on_delete=models.PROTECT, blank=True, null=True,
     )
     cantidad = models.PositiveIntegerField(default=1)
 
@@ -204,7 +204,7 @@ class Movimiento(models.Model):
     tipo = models.CharField(max_length=10, choices=TipoMovimiento.choices)
     fecha = models.DateTimeField(auto_now_add=True)
     responsable = models.ForeignKey(
-        Usuario, on_delete=models.CASCADE, related_name='movimientos_responsable',
+        Usuario, on_delete=models.PROTECT, related_name='movimientos_responsable',
     )
     estado_equipo = models.CharField(
         max_length=20, blank=True, null=True,
@@ -245,7 +245,7 @@ class Mantenimiento(models.Model):
         COMPLETADO = 'completado', 'Reparación completada'
 
     equipo = models.ForeignKey(
-        Equipo, on_delete=models.CASCADE, related_name='mantenimientos',
+        Equipo, on_delete=models.PROTECT, related_name='mantenimientos',
     )
     falla_descrita = models.TextField(blank=True, null=True)
     costo_cotizado = models.DecimalField(

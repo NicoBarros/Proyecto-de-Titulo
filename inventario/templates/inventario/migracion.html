@@ -6,7 +6,14 @@
   <p>Exporta la planilla actual a CSV (Excel → Archivo → Guardar como → CSV) con columnas:<br>
   <code>tipo,codigo_inventario,nombre,modelo,especificaciones,ubicacion,estado,valor_adquisicion,categoria,tipo_insumo,cantidad</code><br>
   (<code>tipo</code> = <code>equipo</code> o <code>insumo</code>).</p>
-  
+  <p class="hint">
+    Reimportar actualiza los registros existentes: los equipos se identifican por <code>codigo_inventario</code>
+    y los insumos por <code>nombre</code>. Una columna vacía no modifica ese dato.
+    En los insumos, <code>cantidad</code> es el total (igual que en la exportación); las unidades prestadas
+    o consumidas se mantienen fuera del stock disponible.
+    <code>valor_adquisicion</code> usa punto decimal y no lleva separador de miles (ej. <code>1500000.50</code>).
+  </p>
+
   <form method="post" enctype="multipart/form-data" class="inline">
     {% csrf_token %}
     <input type="file" name="archivo" accept=".csv" required>

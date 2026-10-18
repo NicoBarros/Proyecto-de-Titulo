@@ -53,6 +53,14 @@ class InsumoModelTests(LeicaTestCase):
         self.assertTrue(i.bajo_stock)
 
 
+class InsumoNombreUnicoTests(LeicaTestCase):
+
+    def test_nombre_de_insumo_es_unico(self):
+        self.crear_insumo('Cables')
+        with self.assertRaises(IntegrityError):
+            self.crear_insumo('Cables')
+
+
 class SolicitudItemModelTests(LeicaTestCase):
 
     def test_str_con_equipo_y_con_insumo(self):

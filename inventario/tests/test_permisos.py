@@ -110,3 +110,7 @@ class PermisosPorRolTests(LeicaTestCase):
         self.accion_solicitud(s, 'aprobar')
         s.refresh_from_db()
         self.assertEqual(s.estado, 'pendiente')
+
+    def test_login_no_muestra_credenciales_fuera_de_debug(self):
+        self.client.logout()
+        self.assertNotContains(self.client.get('/login/'), 'Leica2026!')

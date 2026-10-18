@@ -2,7 +2,6 @@
 RF-10: Mantenimiento y regla del 70% (costo de reparacion vs valor de adquisicion).
 """
 from decimal import Decimal
-from unittest import expectedFailure
 
 from inventario.models import Equipo, Mantenimiento
 from .base import LeicaTestCase
@@ -28,9 +27,8 @@ class ReglaDel70Tests(LeicaTestCase):
         self.assertEqual(e.estado, Equipo.Estado.EN_MANTENIMIENTO)
         self.assertEqual(m.reportado_por, self.encargado)
 
-    @expectedFailure
-    def test_bug_redondeo_antes_de_comparar(self):
-        """69.999% se redondea a 0.7000 ANTES de comparar con 0.70 y termina sugiriendo dar de baja."""
+    def test_699_99_sobre_1000_sugiere_reparar(self):
+        """La regla usa el valor exacto: 69.999% no debe redondearse a 70% y sugerir dar de baja."""
         e = self.crear_equipo(valor=Decimal('1000'))
         self.diagnosticar(e, '699.99')
         self.assertEqual(Mantenimiento.objects.get().decision, Mantenimiento.Decision.REPARAR)

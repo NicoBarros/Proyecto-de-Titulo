@@ -11,9 +11,10 @@ class Command(BaseCommand):
         # 1. Usuarios
         usuarios = [
             {'email': 'encargado.leica@inacapmail.cl', 'rol': Usuario.Rol.ENCARGADO_LABORATORIO, 'first_name': 'Ana Soto', 'is_staff': True, 'is_superuser': True},
-            {'email': 'docente1@inacapmail.cl', 'rol': Usuario.Rol.DOCENTE, 'first_name': 'Carlos Ruiz', 'is_staff': True},
+            # Docente y director no son staff: sus permisos salen de 'rol', no de is_staff.
+            {'email': 'docente1@inacapmail.cl', 'rol': Usuario.Rol.DOCENTE, 'first_name': 'Carlos Ruiz'},
             {'email': 'calidad@inacapmail.cl', 'rol': Usuario.Rol.CONTROL_CALIDAD, 'first_name': 'María Gómez', 'is_staff': True},
-            {'email': 'dcarrera@inacapmail.cl', 'rol': Usuario.Rol.DIRECTOR_CARRERA, 'first_name': 'Roberto Paz', 'is_staff': True},
+            {'email': 'dcarrera@inacapmail.cl', 'rol': Usuario.Rol.DIRECTOR_CARRERA, 'first_name': 'Roberto Paz'},
             {'email': 'estudiante1@inacapmail.cl', 'rol': Usuario.Rol.ESTUDIANTE, 'first_name': 'Luis Pino', 'seccion': 'TIN-401'},
             {'email': 'estudiante2@inacapmail.cl', 'rol': Usuario.Rol.ESTUDIANTE, 'first_name': 'Paula Vega', 'seccion': 'TIN-401'},
         ]

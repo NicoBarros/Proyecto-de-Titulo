@@ -17,6 +17,15 @@
 
 {% block scripts %}
 <script>
+  // Los datos vienen de la BD (p. ej. importados por CSV): se insertan con
+  // textContent, nunca como HTML, para evitar XSS.
+  function el(tag, texto, clase) {
+    const n = document.createElement(tag);
+    if (texto !== undefined) n.textContent = texto;
+    if (clase) n.className = clase;
+    return n;
+  }
+
   async function buscarIA(e) {
     e.preventDefault();
     const consulta = document.getElementById('consulta').value;
@@ -38,19 +47,25 @@
       const data = await resp.json();
       if (!resp.ok) throw new Error(data.error || 'Error en la búsqueda');
 
-      let html = `<p class="hint">Fuente: ${data.fuente}</p>`;
+      res.replaceChildren(el('p', `Fuente: ${data.fuente}`, 'hint'));
       if (data.resultados.length > 0) {
-        html += `<table><thead><tr><th>Equipo</th><th>Código</th><th>Estado</th></tr></thead><tbody>`;
+        const tabla = el('table');
+        tabla.innerHTML = '<thead><tr><th>Equipo</th><th>Código</th><th>Estado</th></tr></thead>';
+        const tbody = el('tbody');
         data.resultados.forEach(r => {
-          html += `<tr><td>${r.nombre}</td><td>${r.codigo_inventario}</td><td><span class="badge ${r.estado.toLowerCase().replace(' ', '_')}">${r.estado}</span></td></tr>`;
+          const tr = el('tr');
+          const tdEstado = el('td');
+          tdEstado.append(el('span', r.estado, 'badge ' + r.estado.toLowerCase().replace(/ /g, '_')));
+          tr.append(el('td', r.nombre), el('td', r.codigo_inventario), tdEstado);
+          tbody.append(tr);
         });
-        html += `</tbody></table>`;
+        tabla.append(tbody);
+        res.append(tabla);
       } else {
-        html += '<p>No se encontraron equipos relevantes disponibles.</p>';
+        res.append(el('p', 'No se encontraron equipos relevantes disponibles.'));
       }
-      res.innerHTML = html;
     } catch (err) {
-      res.innerHTML = `<div class="msg error">${err.message}</div>`;
+      res.replaceChildren(el('div', err.message, 'msg error'));
     }
   }
 </script>

@@ -118,3 +118,20 @@ class ExportarTests(LeicaTestCase):
         self.assertEqual(filas[0]['codigo_inventario'], 'EXP-1')
         self.assertEqual(filas[1]['tipo'], 'insumo')
         self.assertEqual(filas[1]['cantidad'], '7')
+
+
+class TrazabilidadTests(LeicaTestCase):
+
+    def test_no_se_elimina_equipo_con_historial(self):
+        equipo = self.crear_equipo()
+        self.crear_solicitud(self.estudiante, equipos=[equipo], estado='devuelta')
+        self.client.force_login(self.encargado)
+        self.client.post(f'/inventario/equipo/{equipo.id}/eliminar/')
+        self.assertTrue(Equipo.objects.filter(id=equipo.id).exists())
+
+    def test_no_se_elimina_insumo_con_historial(self):
+        insumo = self.crear_insumo()
+        self.crear_solicitud(self.estudiante, insumos=[(insumo, 1)])
+        self.client.force_login(self.encargado)
+        self.client.post(f'/inventario/insumo/{insumo.id}/eliminar/')
+        self.assertTrue(Insumo.objects.filter(id=insumo.id).exists())

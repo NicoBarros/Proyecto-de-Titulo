@@ -91,10 +91,15 @@
             <button type="submit" name="accion" value="rechazar" class="btn chico secundario">Rechazar</button>
             {% elif s.estado == 'aprobada' %}
             <button type="submit" name="accion" value="entregar" class="btn chico">Entregar</button>
+            <button type="submit" name="accion" value="rechazar" class="btn chico secundario">Rechazar</button>
             {% elif s.estado == 'entregada' %}
-            <input type="hidden" name="estado_equipo" value="bueno" id="estado_equipo_{{ s.id }}">
-            <button type="button" class="btn chico" onclick="devolver({{ s.id }}, this.form)">Registrar
-              devolución</button>
+            <select name="estado_equipo" aria-label="Estado del equipo al devolver">
+              <option value="excelente">Excelente</option>
+              <option value="bueno" selected>Bueno</option>
+              <option value="dañado">Dañado</option>
+              <option value="inservible">Inservible</option>
+            </select>
+            <button type="submit" name="accion" value="devolver" class="btn chico">Registrar devolución</button>
             {% endif %}
           </form>
           {% endif %}
@@ -107,17 +112,6 @@
 {% endblock %}
 {% block scripts %}
 <script>
-  function devolver(id, form) {
-    const estado = prompt('Estado del equipo al devolver (excelente/bueno/dañado/inservible):', 'bueno');
-    if (estado) {
-      document.getElementById('estado_equipo_' + id).value = estado;
-      const inputAccion = document.createElement('input');
-      inputAccion.type = 'hidden'; inputAccion.name = 'accion'; inputAccion.value = 'devolver';
-      form.appendChild(inputAccion);
-      form.submit();
-    }
-  }
-
   function actualizarTopeStock(selectEl) {
     const row = selectEl.closest('.item-row');
     if (!row) return;

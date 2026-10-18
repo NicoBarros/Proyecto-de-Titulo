@@ -1,13 +1,12 @@
 """
 Flujo de solicitudes/prestamos: crear -> aprobar -> entregar -> devolver (RF-05 a RF-09).
 
-Los tests marcados con @expectedFailure documentan BUGS CONOCIDOS: describen el
-comportamiento correcto y hoy fallan. Cuando se corrija el bug, Django los
-reportara como "unexpected success" y hay que quitarles el decorador.
+Incluye regresiones de bugs ya corregidos (transiciones de estado, atomicidad,
+bloqueo RF-09 y validacion de horario).
 """
 from datetime import timedelta
-from unittest import expectedFailure
 
+from django.contrib.messages import get_messages
 from django.utils import timezone
 
 from inventario.models import Equipo, Insumo, Solicitud, Movimiento, Bloqueo
@@ -61,18 +60,39 @@ class CrearSolicitudTests(LeicaTestCase):
         self.post_solicitud([f'equipo:{equipo.id}', f'insumo:{insumo.id}'], ['1', '5'])
         self.assertFalse(Solicitud.objects.exists())
 
-    @expectedFailure
-    def test_bug_usuario_bloqueado_no_deberia_poder_solicitar(self):
-        """RF-09: el bloqueo (bloqueado_hasta) no se valida al crear la solicitud."""
+    def test_usuario_bloqueado_no_puede_solicitar(self):
+        """RF-09: un usuario bloqueado no puede crear solicitudes."""
         self.estudiante.bloqueado_hasta = timezone.now() + timedelta(days=3)
         self.estudiante.save()
         self.post_solicitud([f'equipo:{self.crear_equipo().id}'], ['1'])
         self.assertFalse(Solicitud.objects.exists())
 
-    @expectedFailure
-    def test_bug_horario_fin_anterior_al_inicio_deberia_rechazarse(self):
+    def test_horario_fin_anterior_al_inicio_se_rechaza(self):
         self.fin = self.inicio - timedelta(hours=1)
         self.post_solicitud([f'equipo:{self.crear_equipo().id}'], ['1'])
+        self.assertFalse(Solicitud.objects.exists())
+
+    def test_no_se_repite_un_equipo_en_el_kit(self):
+        e = self.crear_equipo()
+        self.post_solicitud([f'equipo:{e.id}', f'equipo:{e.id}'], ['1', '1'])
+        self.assertFalse(Solicitud.objects.exists())
+
+    def test_stock_se_valida_sumando_filas_del_mismo_insumo(self):
+        i = self.crear_insumo(cantidad=5)
+        self.post_solicitud([f'insumo:{i.id}', f'insumo:{i.id}'], ['3', '3'])
+        self.assertFalse(Solicitud.objects.exists())
+
+    def test_filas_del_mismo_insumo_se_agrupan(self):
+        i = self.crear_insumo(cantidad=10)
+        self.post_solicitud([f'insumo:{i.id}', f'insumo:{i.id}'], ['3', '2'])
+        self.assertEqual(Solicitud.objects.get().items.get().cantidad, 5)
+
+    def test_cantidad_negativa_o_invalida_no_da_error_500(self):
+        i = self.crear_insumo(cantidad=10)
+        for cantidad in ('-3', '0', 'abc'):
+            with self.subTest(cantidad=cantidad):
+                r = self.post_solicitud([f'insumo:{i.id}'], [cantidad])
+                self.assertEqual(r.status_code, 302)
         self.assertFalse(Solicitud.objects.exists())
 
 
@@ -192,16 +212,14 @@ class EntregaDevolucionTests(LeicaTestCase):
         self.assertTrue(self.estudiante.esta_bloqueado())
         self.assertFalse(self.docente.esta_bloqueado())
 
-    @expectedFailure
-    def test_bug_no_deberia_entregarse_sin_aprobacion(self):
-        """Las acciones no validan el estado actual: se puede 'entregar' una solicitud PENDIENTE."""
+    def test_no_se_entrega_sin_aprobacion(self):
+        """Las acciones validan el estado actual de la solicitud."""
         s = self.crear_solicitud(self.estudiante, equipos=[self.equipo])
         self.accion_solicitud(s, 'entregar')
         s.refresh_from_db()
         self.assertEqual(s.estado, Solicitud.EstadoSolicitud.PENDIENTE)
 
-    @expectedFailure
-    def test_bug_devolver_dos_veces_duplica_stock(self):
+    def test_devolver_dos_veces_no_duplica_stock(self):
         s = self.solicitud_aprobada(equipos=[], insumos=[(self.renovable, 3)])
         self.accion_solicitud(s, 'entregar')
         self.accion_solicitud(s, 'devolver')
@@ -209,11 +227,81 @@ class EntregaDevolucionTests(LeicaTestCase):
         self.renovable.refresh_from_db()
         self.assertEqual(self.renovable.cantidad_disponible, 10)
 
-    @expectedFailure
-    def test_bug_entrega_fallida_deja_cambios_a_medias(self):
-        """'entregar' no usa transaction.atomic: si falla un insumo, el equipo queda PRESTADO igual."""
+    def test_entrega_fallida_no_deja_cambios_a_medias(self):
+        """'entregar' es atomica: si falla un insumo, el equipo no queda PRESTADO."""
         s = self.solicitud_aprobada(insumos=[(self.renovable, 3)])
         Insumo.objects.filter(id=self.renovable.id).update(cantidad_disponible=1)
         self.accion_solicitud(s, 'entregar')
         self.equipo.refresh_from_db()
         self.assertEqual(self.equipo.estado, Equipo.Estado.DISPONIBLE)
+        s.refresh_from_db()
+        self.assertEqual(s.estado, Solicitud.EstadoSolicitud.APROBADA)
+        self.assertFalse(Movimiento.objects.exists())
+
+    def test_no_se_devuelve_una_solicitud_pendiente(self):
+        s = self.crear_solicitud(self.estudiante, insumos=[(self.renovable, 3)])
+        self.accion_solicitud(s, 'devolver')
+        self.renovable.refresh_from_db()
+        self.assertEqual(self.renovable.cantidad_disponible, 10)
+
+    def test_no_se_rechaza_una_solicitud_entregada(self):
+        s = self.solicitud_aprobada(insumos=[])
+        self.accion_solicitud(s, 'entregar')
+        self.accion_solicitud(s, 'rechazar')
+        s.refresh_from_db()
+        self.assertEqual(s.estado, Solicitud.EstadoSolicitud.ENTREGADA)
+
+    def test_no_se_entrega_equipo_que_ya_esta_prestado(self):
+        s = self.solicitud_aprobada(insumos=[])
+        Equipo.objects.filter(id=self.equipo.id).update(estado=Equipo.Estado.PRESTADO)
+        self.accion_solicitud(s, 'entregar')
+        s.refresh_from_db()
+        self.assertEqual(s.estado, Solicitud.EstadoSolicitud.APROBADA)
+
+    def test_accion_desconocida(self):
+        s = self.solicitud_aprobada()
+        r = self.client.post('/solicitudes/', {'solicitud_id': s.id, 'accion': 'borrar'}, follow=True)
+        textos = [str(m) for m in get_messages(r.wsgi_request)]
+        self.assertEqual(textos, ['Acción no válida.'])
+
+    def test_estado_de_devolucion_invalido(self):
+        s = self.solicitud_aprobada(insumos=[])
+        self.accion_solicitud(s, 'entregar')
+        self.accion_solicitud(s, 'devolver', estado_equipo='Dañado!!')
+        s.refresh_from_db()
+        self.assertEqual(s.estado, Solicitud.EstadoSolicitud.ENTREGADA)
+
+    def test_devolucion_respeta_equipo_dado_de_baja_mientras_estaba_prestado(self):
+        s = self.solicitud_aprobada(insumos=[])
+        self.accion_solicitud(s, 'entregar')
+        Equipo.objects.filter(id=self.equipo.id).update(estado=Equipo.Estado.FUERA_SERVICIO)
+        self.accion_solicitud(s, 'devolver', estado_equipo='bueno')
+        self.equipo.refresh_from_db()
+        self.assertEqual(self.equipo.estado, Equipo.Estado.FUERA_SERVICIO)
+
+    def test_no_se_aprueba_con_equipo_en_mantenimiento(self):
+        s = self.crear_solicitud(self.estudiante, equipos=[self.equipo])
+        Equipo.objects.filter(id=self.equipo.id).update(estado=Equipo.Estado.EN_MANTENIMIENTO)
+        self.accion_solicitud(s, 'aprobar')
+        s.refresh_from_db()
+        self.assertEqual(s.estado, Solicitud.EstadoSolicitud.PENDIENTE)
+
+    def test_solicitud_aprobada_ofrece_rechazar_y_devolucion_usa_select(self):
+        aprobada = self.solicitud_aprobada(insumos=[])
+        html = self.client.get('/solicitudes/').content.decode()
+        self.assertIn('value="rechazar"', html)
+        self.accion_solicitud(aprobada, 'entregar')
+        html = self.client.get('/solicitudes/').content.decode()
+        self.assertIn('<select name="estado_equipo"', html)
+        self.assertNotIn('prompt(', html)
+
+
+class VisibilidadSolicitudesTests(LeicaTestCase):
+
+    def test_estudiante_solo_ve_sus_solicitudes(self):
+        propia = self.crear_solicitud(self.estudiante)
+        ajena = self.crear_solicitud(self.docente)
+        self.client.force_login(self.estudiante)
+        self.assertEqual(list(self.client.get('/solicitudes/').context['solicitudes']), [propia])
+        self.client.force_login(self.encargado)
+        self.assertEqual(set(self.client.get('/solicitudes/').context['solicitudes']), {propia, ajena})

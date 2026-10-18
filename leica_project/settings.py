@@ -13,10 +13,11 @@ import dj_database_url
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # --- Variables de entorno ---
+# Valores por defecto seguros: DEBUG apagado y hosts locales. SECRET_KEY no tiene
+# default y debe venir del .env (o de las variables de entorno del servidor).
 env = environ.Env(
-    DEBUG=(bool, True),
-    SECRET_KEY=(str, 'django-dev-cambia-este-valor-en-produccion'),
-    ALLOWED_HOSTS=(list, ['*']),
+    DEBUG=(bool, False),
+    ALLOWED_HOSTS=(list, ['localhost', '127.0.0.1']),
     DATABASE_URL=(str, ''),
     DOMINIO_INSTITUCIONAL=(str, 'inacapmail.cl'),
     GEMINI_API_KEY=(str, ''),
@@ -26,6 +27,12 @@ environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
 SECRET_KEY = env('SECRET_KEY')
 DEBUG = env('DEBUG')
 ALLOWED_HOSTS = env('ALLOWED_HOSTS')
+INTERNAL_IPS = ['127.0.0.1']  # habilita la variable 'debug' en plantillas (solo con DEBUG=True)
+
+if not DEBUG:
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_CONTENT_TYPE_NOSNIFF = True
 
 # --- Aplicaciones ---
 INSTALLED_APPS = [
@@ -92,7 +99,10 @@ LOGIN_REDIRECT_URL = '/'
 LOGOUT_REDIRECT_URL = '/login/'
 
 AUTH_PASSWORD_VALIDATORS = [
+    {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
     {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
 ]
 
 # --- Internacionalizacion ---

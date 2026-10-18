@@ -2,7 +2,6 @@
 RF-14: Migracion (importacion) de inventario desde CSV.
 """
 import json
-from unittest import expectedFailure
 
 from django.core.files.uploadedfile import SimpleUploadedFile
 
@@ -69,14 +68,49 @@ class MigracionCSVTests(LeicaTestCase):
         self.subir(csv_exportado)
         self.assertTrue(Equipo.objects.filter(codigo_inventario='RT-1', nombre='Router').exists())
 
-    @expectedFailure
-    def test_bug_reimportar_insumo_lo_duplica(self):
+    def test_reimportar_insumo_no_lo_duplica(self):
         fila = CABECERA + 'insumo,,Cables,,,,,,Cables,renovable,25\n'
         self.subir(fila)
         self.subir(fila)
         self.assertEqual(Insumo.objects.filter(nombre='Cables').count(), 1)
 
-    @expectedFailure
-    def test_bug_estado_invalido_deberia_ser_error(self):
+    def test_estado_invalido_es_error(self):
         self.subir(CABECERA + 'equipo,BAD-1,Raro,,,,roto_total,,,,\n')
         self.assertFalse(Equipo.objects.filter(codigo_inventario='BAD-1').exists())
+
+    def test_acepta_csv_con_bom_de_excel(self):
+        self.subir('\ufeff' + CABECERA + 'equipo,BOM-1,Router,,,,,,,,\n')
+        self.assertTrue(Equipo.objects.filter(codigo_inventario='BOM-1').exists())
+
+    def test_reimportar_insumo_respeta_unidades_prestadas(self):
+        insumo = self.crear_insumo('Cables', cantidad=25)
+        Insumo.objects.filter(id=insumo.id).update(cantidad_disponible=20)  # 5 prestados
+        self.subir(CABECERA + 'insumo,,Cables,,,,,,Cables,renovable,30\n')
+        insumo.refresh_from_db()
+        self.assertEqual((insumo.cantidad_total, insumo.cantidad_disponible), (30, 25))
+
+    def test_sin_estado_no_cambia_equipo_prestado(self):
+        self.crear_equipo('PR-1', 'Router', estado=Equipo.Estado.PRESTADO)
+        self.subir(CABECERA + 'equipo,PR-1,Router nuevo,,,,,,,,\n')
+        e = Equipo.objects.get(codigo_inventario='PR-1')
+        self.assertEqual((e.nombre, e.estado), ('Router nuevo', Equipo.Estado.PRESTADO))
+
+    def test_columnas_vacias_no_borran_stock_ni_tipo(self):
+        insumo = self.crear_insumo('Cables', cantidad=25, tipo=Insumo.Tipo.RENOVABLE)
+        self.subir(CABECERA + 'insumo,,Cables,,,,,,Nueva categoria,,\n')
+        insumo.refresh_from_db()
+        self.assertEqual((insumo.cantidad_total, insumo.cantidad_disponible, insumo.tipo, insumo.categoria),
+                         (25, 25, Insumo.Tipo.RENOVABLE, 'Nueva categoria'))
+
+    def test_no_baja_el_total_por_debajo_de_lo_prestado(self):
+        insumo = self.crear_insumo('Cables', cantidad=10)
+        Insumo.objects.filter(id=insumo.id).update(cantidad_disponible=2)  # 8 prestados
+        self.subir(CABECERA + 'insumo,,Cables,,,,,,,,5\n')
+        insumo.refresh_from_db()
+        self.assertEqual((insumo.cantidad_total, insumo.cantidad_disponible), (10, 2))
+        self.assertEqual(Migracion.objects.get().filas_con_error, 1)
+
+    def test_valor_adquisicion_invalido_da_mensaje_legible(self):
+        self.subir(CABECERA + 'equipo,V-1,Router,,,,,1.500.000,,,\n')
+        errores = json.loads(Migracion.objects.get().detalle_errores)
+        self.assertIn('valor_adquisicion "1.500.000" no es un número válido', errores[0])
