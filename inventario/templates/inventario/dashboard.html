@@ -103,6 +103,33 @@
   </a>
 </div>
 
+{% if atrasadas %}
+<div class="card alerta-atrasos">
+  <h2>
+    <span>Préstamos vencidos sin devolver ({{ atrasadas|length }})</span>
+    <a href="{% url 'solicitudes' %}" class="btn chico">Ir a solicitudes</a>
+  </h2>
+  <table>
+    <thead><tr><th>#</th><th>Responsable</th><th>Ítems</th><th>Debía devolverse</th><th>Atraso</th></tr></thead>
+    <tbody>
+      {% for s in atrasadas %}
+      <tr>
+        <td>{{ s.id }}</td>
+        <td>
+          {% with r=s.en_representacion_de|default:s.solicitante %}
+          {{ r.get_full_name|default:r.email }}{% if r.seccion %} <small>({{ r.seccion }})</small>{% endif %}
+          {% endwith %}
+        </td>
+        <td>{% for item in s.items.all %}{% if item.equipo %}{{ item.equipo.nombre }}{% else %}{{ item.insumo.nombre }} x{{ item.cantidad }}{% endif %}{% if not forloop.last %}, {% endif %}{% endfor %}</td>
+        <td>{{ s.horario_fin|date:"d/m/Y H:i" }}</td>
+        <td><span class="badge atrasada">{{ s.horario_fin|timesince }}</span></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
 <div class="card">
   <h2>
     <span>Estado Operativo del Pañol (RF-13)</span>
@@ -153,8 +180,8 @@
         Ver y Filtrar Inventario Completo
       </a>
       {% if user.rol in 'encargado_laboratorio,control_calidad' %}
-      <a href="{% url 'reportes' %}" class="btn secundario" style="justify-content: center;">
-        Descargar Exportación Automática (CSV)
+      <a href="{% url 'exportar_inventario' %}" class="btn secundario" style="justify-content: center;">
+        Descargar Inventario (Excel)
       </a>
       {% endif %}
     </div>
@@ -169,7 +196,7 @@
         class="badge disponible">{{ user.get_rol_display }}</span></p>
     <p style="margin: 0; font-size: 0.82rem; color: var(--inacap-text-muted);">
       {% if user.rol in 'encargado_laboratorio,control_calidad' %}
-      Tienes permisos administrativos para aprobar solicitudes, gestionar mantenimientos e importar datos.
+      Tienes permisos administrativos para aprobar solicitudes, gestionar mantenimientos y exportar el inventario.
       {% else %}
       Tienes acceso a realizar préstamos y consultar disponibilidad de equipamiento.
       {% endif %}

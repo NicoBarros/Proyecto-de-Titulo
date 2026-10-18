@@ -6,10 +6,13 @@ bloqueo RF-09 y validacion de horario).
 """
 from datetime import timedelta
 
+from io import StringIO
+
 from django.contrib.messages import get_messages
+from django.core.management import call_command
 from django.utils import timezone
 
-from inventario.models import Equipo, Insumo, Solicitud, Movimiento, Bloqueo
+from inventario.models import Usuario, Equipo, Insumo, Solicitud, Movimiento, Bloqueo
 from .base import LeicaTestCase
 
 
@@ -194,7 +197,7 @@ class EntregaDevolucionTests(LeicaTestCase):
         self.accion_solicitud(s, 'entregar')
         self.accion_solicitud(s, 'devolver')
         s.refresh_from_db(); self.estudiante.refresh_from_db()
-        self.assertEqual(s.estado, Solicitud.EstadoSolicitud.ATRASADA)
+        self.assertEqual(s.estado, Solicitud.EstadoSolicitud.DEVUELTA_ATRASO)
         self.assertTrue(self.estudiante.esta_bloqueado())
         restante = self.estudiante.bloqueado_hasta - timezone.now()
         self.assertTrue(timedelta(days=6, hours=23) < restante <= timedelta(days=7))
@@ -305,3 +308,118 @@ class VisibilidadSolicitudesTests(LeicaTestCase):
         self.assertEqual(list(self.client.get('/solicitudes/').context['solicitudes']), [propia])
         self.client.force_login(self.encargado)
         self.assertEqual(set(self.client.get('/solicitudes/').context['solicitudes']), {propia, ajena})
+
+
+class AtrasosAutomaticosTests(LeicaTestCase):
+
+    def setUp(self):
+        self.equipo = self.crear_equipo(estado=Equipo.Estado.PRESTADO)
+        inicio = timezone.now() - timedelta(days=2)
+        self.vencida = self.crear_solicitud(self.estudiante, equipos=[self.equipo], inicio=inicio,
+                                            fin=inicio + timedelta(hours=3), estado=Solicitud.EstadoSolicitud.ENTREGADA)
+        self.vigente = self.crear_solicitud(self.docente, estado=Solicitud.EstadoSolicitud.ENTREGADA)
+
+    def test_al_abrir_el_dashboard_se_marcan_las_vencidas(self):
+        self.client.force_login(self.estudiante)
+        self.client.get('/')
+        self.vencida.refresh_from_db()
+        self.vigente.refresh_from_db()
+        self.assertEqual(self.vencida.estado, Solicitud.EstadoSolicitud.ATRASADA)
+        self.assertEqual(self.vigente.estado, Solicitud.EstadoSolicitud.ENTREGADA)
+
+    def test_dashboard_cuenta_y_alerta_solo_a_aprobadores(self):
+        self.client.force_login(self.encargado)
+        r = self.client.get('/')
+        self.assertEqual(r.context['totales']['solicitudes_atrasadas'], 1)
+        self.assertEqual(list(r.context['atrasadas']), [self.vencida])
+        self.assertContains(r, 'Préstamos vencidos sin devolver (1)')
+        self.client.force_login(self.estudiante)
+        self.assertNotContains(self.client.get('/'), 'Préstamos vencidos sin devolver')
+
+    def test_solicitud_atrasada_se_puede_devolver(self):
+        self.client.force_login(self.encargado)
+        self.client.get('/solicitudes/')
+        self.accion_solicitud(self.vencida, 'devolver', estado_equipo='bueno')
+        self.vencida.refresh_from_db()
+        self.equipo.refresh_from_db()
+        self.estudiante.refresh_from_db()
+        self.assertEqual(self.vencida.estado, Solicitud.EstadoSolicitud.DEVUELTA_ATRASO)
+        self.assertEqual(self.equipo.estado, Equipo.Estado.DISPONIBLE)
+        self.assertTrue(self.estudiante.esta_bloqueado())
+
+    def test_pantalla_muestra_vencimiento_y_boton_devolver(self):
+        self.client.force_login(self.encargado)
+        html = self.client.get('/solicitudes/').content.decode()
+        self.assertIn('Vencida hace', html)
+        self.assertIn('value="devolver"', html)
+
+    def test_equipo_atrasado_cuenta_como_reservado_al_aprobar(self):
+        Solicitud.marcar_atrasadas()
+        ahora = timezone.now()
+        otra = self.crear_solicitud(self.docente, equipos=[self.equipo],
+                                    inicio=ahora - timedelta(days=2), fin=ahora - timedelta(days=1, hours=22))
+        self.client.force_login(self.encargado)
+        self.accion_solicitud(otra, 'aprobar')
+        otra.refresh_from_db()
+        self.assertEqual(otra.estado, Solicitud.EstadoSolicitud.PENDIENTE)
+
+    def test_reportes_lista_las_atrasadas(self):
+        self.client.force_login(self.director)
+        self.assertEqual(list(self.client.get('/reportes/').context['vencidos']), [self.vencida])
+
+    def test_comando_marcar_atrasadas(self):
+        salida = StringIO()
+        call_command('marcar_atrasadas', stdout=salida)
+        self.assertIn('Solicitudes marcadas como atrasadas: 1', salida.getvalue())
+        self.vencida.refresh_from_db()
+        self.assertEqual(self.vencida.estado, Solicitud.EstadoSolicitud.ATRASADA)
+
+
+class RepresentacionTests(LeicaTestCase):
+
+    def post_solicitud(self, usuario, representado_id, equipo=None):
+        equipo = equipo or self.crear_equipo()
+        inicio = timezone.now() + timedelta(days=1)
+        self.client.force_login(usuario)
+        return self.client.post('/solicitudes/', {
+            'item[]': [f'equipo:{equipo.id}'], 'cantidad[]': ['1'], 'lugar_uso': 'dentro_sede',
+            'horario_inicio': fmt(inicio), 'horario_fin': fmt(inicio + timedelta(hours=2)),
+            'en_representacion_de': representado_id,
+        })
+
+    def test_docente_solicita_en_representacion_de_estudiante(self):
+        self.post_solicitud(self.docente, self.estudiante.id)
+        s = Solicitud.objects.get()
+        self.assertEqual((s.solicitante, s.en_representacion_de), (self.docente, self.estudiante))
+
+    def test_estudiante_ve_la_solicitud_hecha_a_su_nombre(self):
+        self.post_solicitud(self.docente, self.estudiante.id)
+        self.client.force_login(self.estudiante)
+        r = self.client.get('/solicitudes/')
+        self.assertEqual(len(r.context['solicitudes']), 1)
+        self.assertContains(r, 'en representación de')
+
+    def test_estudiante_no_puede_representar(self):
+        otro = self.crear_usuario('est2', Usuario.Rol.ESTUDIANTE)
+        self.post_solicitud(self.estudiante, otro.id)
+        self.assertFalse(Solicitud.objects.exists())
+
+    def test_solo_se_representa_a_estudiantes_activos(self):
+        inactivo = self.crear_usuario('inactivo', Usuario.Rol.ESTUDIANTE, is_active=False)
+        equipo = self.crear_equipo()
+        for representado in (self.director.id, inactivo.id, 'abc'):
+            with self.subTest(representado=representado):
+                self.post_solicitud(self.docente, representado, equipo)
+        self.assertFalse(Solicitud.objects.exists())
+
+    def test_no_se_representa_a_un_estudiante_bloqueado(self):
+        self.estudiante.bloqueado_hasta = timezone.now() + timedelta(days=2)
+        self.estudiante.save()
+        self.post_solicitud(self.docente, self.estudiante.id)
+        self.assertFalse(Solicitud.objects.exists())
+
+    def test_formulario_ofrece_estudiantes_solo_a_quien_puede_representar(self):
+        self.client.force_login(self.docente)
+        self.assertContains(self.client.get('/solicitudes/'), 'name="en_representacion_de"')
+        self.client.force_login(self.estudiante)
+        self.assertNotContains(self.client.get('/solicitudes/'), 'name="en_representacion_de"')

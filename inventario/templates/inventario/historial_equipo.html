@@ -1,0 +1,41 @@
+{% extends 'inventario/base.html' %}
+
+{% block content %}
+<div class="card">
+  <h2>
+    <span>Historial de cambios: {{ equipo.nombre }} ({{ equipo.codigo_inventario }})</span>
+    <a href="{% url 'inventario' %}?tab=equipos" class="btn chico secundario">Volver al inventario</a>
+  </h2>
+  <p class="hint">
+    Estado actual: <span class="badge {{ equipo.estado }}">{{ equipo.get_estado_display }}</span>
+    · Versión {{ equipo.version }}
+  </p>
+
+  <table>
+    <thead><tr><th>Fecha</th><th>Usuario</th><th>Acción</th><th>Cambios</th><th>Origen</th></tr></thead>
+    <tbody>
+      {% for r in registros %}
+      <tr>
+        <td style="white-space: nowrap;">{{ r.fecha|date:"d/m/Y H:i" }}</td>
+        <td>{{ r.usuario.get_full_name|default:r.usuario.email|default:"Sistema" }}</td>
+        <td><span class="badge historial-{{ r.accion }}">{{ r.get_accion_display }}</span></td>
+        <td>
+          <ul class="historial-cambios">
+            {% for campo, antes, despues in r.lista_cambios %}
+            <li><strong>{{ campo }}:</strong> <span class="historial-antes">{{ antes }}</span> → <span class="historial-despues">{{ despues }}</span></li>
+            {% empty %}
+            <li>Sin cambios en los datos</li>
+            {% endfor %}
+          </ul>
+        </td>
+        <td>{{ r.detalle|default:"Inventario" }}</td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="5" style="text-align: center; color: var(--inacap-text-muted); padding: 24px;">
+        Este equipo aún no tiene cambios registrados.
+      </td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

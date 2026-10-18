@@ -145,6 +145,17 @@ class ReportesTests(LeicaTestCase):
         self.client.force_login(self.director)
         self.assertEqual(self.client.get('/reportes/', {'dias': 'abc'}).context['dias'], 90)
 
+    def test_vencidos_muestran_al_estudiante_representado(self):
+        inicio = timezone.now() - timedelta(days=3)
+        s = self.crear_solicitud(self.docente, inicio=inicio, fin=inicio + timedelta(hours=1),
+                                 estado=Solicitud.EstadoSolicitud.ENTREGADA)
+        s.en_representacion_de = self.estudiante
+        s.save()
+        self.client.force_login(self.director)
+        html = self.client.get('/reportes/').content.decode()
+        self.assertIn('<th>Responsable</th>', html)
+        self.assertIn('estudiante@inacapmail.cl', html)
+
 
 class DashboardTests(LeicaTestCase):
 

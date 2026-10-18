@@ -43,6 +43,16 @@
           <option value="fuera_sede">Fuera de sede</option>
         </select>
       </div>
+      {% if estudiantes %}
+      <div class="field"><label>En representación de</label>
+        <select name="en_representacion_de">
+          <option value="">— Para mí —</option>
+          {% for e in estudiantes %}
+          <option value="{{ e.id }}">{{ e.get_full_name|default:e.email }}{% if e.seccion %} ({{ e.seccion }}){% endif %}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% endif %}
       <div class="field"><label>Inicio</label><input name="horario_inicio" type="datetime-local" required></div>
       <div class="field"><label>Fin</label><input name="horario_fin" type="datetime-local" required></div>
       <div class="field"><label>Justificación</label><input name="justificacion" placeholder="ej. clase práctica"></div>
@@ -57,6 +67,7 @@
       <tr>
         <th>#</th>
         <th>Ítems</th>
+        <th>Solicitante</th>
         <th>Horario</th>
         <th>Lugar</th>
         <th>Estado</th>
@@ -77,9 +88,18 @@
           {% if not forloop.last %}, {% endif %}
           {% endfor %}
         </td>
+        <td>
+          {{ s.solicitante.get_full_name|default:s.solicitante.email }}
+          {% if s.en_representacion_de %}
+          <br><small class="representacion">en representación de {{ s.en_representacion_de.get_full_name|default:s.en_representacion_de.email }}</small>
+          {% endif %}
+        </td>
         <td>{{ s.horario_inicio|date:"d/m/Y H:i" }} → {{ s.horario_fin|date:"d/m/Y H:i" }}</td>
         <td>{{ s.get_lugar_uso_display }}</td>
-        <td><span class="badge {{ s.estado }}">{{ s.get_estado_display }}</span></td>
+        <td>
+          <span class="badge {{ s.estado }}">{{ s.get_estado_display }}</span>
+          {% if s.estado == 'atrasada' %}<br><small class="vencida">Vencida hace {{ s.horario_fin|timesince:ahora }}</small>{% endif %}
+        </td>
         <td>
           {% if puede_aprobar %}
           <form method="post" action="{% url 'solicitudes' %}" style="display:inline">
@@ -92,7 +112,7 @@
             {% elif s.estado == 'aprobada' %}
             <button type="submit" name="accion" value="entregar" class="btn chico">Entregar</button>
             <button type="submit" name="accion" value="rechazar" class="btn chico secundario">Rechazar</button>
-            {% elif s.estado == 'entregada' %}
+            {% elif s.estado == 'entregada' or s.estado == 'atrasada' %}
             <select name="estado_equipo" aria-label="Estado del equipo al devolver">
               <option value="excelente">Excelente</option>
               <option value="bueno" selected>Bueno</option>

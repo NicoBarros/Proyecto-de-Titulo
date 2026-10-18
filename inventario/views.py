@@ -2,7 +2,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import login
 from django.contrib import messages
-from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
+from decimal import Decimal, ROUND_HALF_UP
 from django.db.models import Count, Q, F, ProtectedError
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
@@ -11,22 +11,27 @@ from django.http import JsonResponse, HttpResponse
 from django.db import transaction
 from datetime import timedelta
 import json
-import csv
 import io
 import logging
 
+import qrcode
+import qrcode.image.svg
+
 from .models import (
     Usuario, Equipo, Insumo, Solicitud, SolicitudItem, Movimiento,
-    Bloqueo, Mantenimiento, Migracion
+    Bloqueo, Mantenimiento, HistorialEquipo
 )
 from .forms import EquipoForm, InsumoForm, MantenimientoForm
 from .decorators import role_required
+from .exportar import generar_excel_inventario
+from . import auditoria
 
 logger = logging.getLogger(__name__)
 
 
 @login_required
 def dashboard_view(request):
+    Solicitud.marcar_atrasadas()
     totales = {
         'total_equipos': Equipo.objects.count(),
         'equipos_disponibles': Equipo.objects.filter(estado=Equipo.Estado.DISPONIBLE).count(),
@@ -36,7 +41,15 @@ def dashboard_view(request):
         'solicitudes_atrasadas': Solicitud.objects.filter(estado=Solicitud.EstadoSolicitud.ATRASADA).count(),
         'insumos_bajo_stock': len([i for i in Insumo.objects.all() if i.bajo_stock]),
     }
-    return render(request, 'inventario/dashboard.html', {'totales': totales})
+    atrasadas = []
+    if request.user.rol in Usuario.ROLES_APROBADORES or request.user.is_superuser:
+        atrasadas = (
+            Solicitud.objects.filter(estado=Solicitud.EstadoSolicitud.ATRASADA)
+            .select_related('solicitante', 'en_representacion_de')
+            .prefetch_related('items__equipo', 'items__insumo')
+            .order_by('horario_fin')
+        )
+    return render(request, 'inventario/dashboard.html', {'totales': totales, 'atrasadas': atrasadas})
 
 
 @login_required
@@ -97,7 +110,8 @@ def inventario_view(request):
         if puede_escribir and request.method == 'POST' and 'codigo_inventario' in request.POST:
             form = EquipoForm(request.POST)
             if form.is_valid():
-                form.save()
+                equipo = form.save()
+                auditoria.registrar(equipo, request.user, HistorialEquipo.Accion.CREADO)
                 messages.success(request, 'Equipo agregado exitosamente.')
                 return redirect('/inventario/?tab=equipos')
             else:
@@ -163,7 +177,9 @@ def eliminar_equipo(request, id):
             messages.error(request, 'No puedes eliminar un equipo que está prestado o en mantenimiento.')
         else:
             try:
-                equipo.delete()
+                with transaction.atomic():
+                    auditoria.registrar(equipo, request.user, HistorialEquipo.Accion.ELIMINADO)
+                    equipo.delete()
                 messages.success(request, 'Equipo eliminado exitosamente.')
             except ProtectedError:
                 messages.error(request, 'El equipo tiene préstamos o mantenimientos registrados y no se puede eliminar. '
@@ -176,16 +192,49 @@ def eliminar_equipo(request, id):
 def editar_equipo(request, id):
     equipo = get_object_or_404(Equipo, id=id)
     if request.method == 'POST':
+        antes = auditoria.foto(equipo)
         form = EquipoForm(request.POST, instance=equipo)
         if form.is_valid():
             equipo = form.save(commit=False)
             equipo.version += 1
             equipo.save()
+            auditoria.registrar(equipo, request.user, HistorialEquipo.Accion.EDITADO, antes)
             messages.success(request, 'Equipo actualizado exitosamente.')
             return redirect('/inventario/?tab=equipos')
     else:
         form = EquipoForm(instance=equipo)
     return render(request, 'inventario/editar_equipo.html', {'form': form, 'equipo': equipo})
+
+
+@login_required
+@role_required(Usuario.Rol.ENCARGADO_LABORATORIO, Usuario.Rol.CONTROL_CALIDAD)
+def historial_equipo(request, id):
+    equipo = get_object_or_404(Equipo, id=id)
+    registros = list(equipo.historial.select_related('usuario'))
+    for r in registros:
+        r.lista_cambios = [
+            (auditoria.CAMPOS_AUDITADOS.get(campo, campo),
+             auditoria.etiqueta_valor(campo, valores[0]),
+             auditoria.etiqueta_valor(campo, valores[1]))
+            for campo, valores in r.cambios.items()
+        ]
+    return render(request, 'inventario/historial_equipo.html', {'equipo': equipo, 'registros': registros})
+
+
+@login_required
+@role_required(Usuario.Rol.ENCARGADO_LABORATORIO, Usuario.Rol.CONTROL_CALIDAD)
+def qr_equipo(request, id):
+    equipo = get_object_or_404(Equipo, id=id)
+    imagen = qrcode.make(
+        f'LEICA_INVENTARIO:{equipo.codigo_inventario}',
+        image_factory=qrcode.image.svg.SvgPathImage, box_size=10, border=2,
+    )
+    salida = io.BytesIO()
+    imagen.save(salida)
+    response = HttpResponse(salida.getvalue(), content_type='image/svg+xml')
+    if request.GET.get('descargar'):
+        response['Content-Disposition'] = f'attachment; filename="qr_{equipo.codigo_inventario}.svg"'
+    return response
 
 
 @login_required
@@ -232,7 +281,7 @@ TRANSICIONES_SOLICITUD = {
     'aprobar': [Solicitud.EstadoSolicitud.PENDIENTE],
     'rechazar': [Solicitud.EstadoSolicitud.PENDIENTE, Solicitud.EstadoSolicitud.APROBADA],
     'entregar': [Solicitud.EstadoSolicitud.APROBADA],
-    'devolver': [Solicitud.EstadoSolicitud.ENTREGADA],
+    'devolver': Solicitud.ESTADOS_EN_PRESTAMO,
 }
 
 ESTADOS_DEVOLUCION = ['excelente', 'bueno', 'dañado', 'inservible']
@@ -262,7 +311,7 @@ def _ejecutar_accion_solicitud(request, solicitud_id, accion):
                 raise ValueError(f'El equipo {equipo.nombre} está {equipo.get_estado_display().lower()}.')
             choque = SolicitudItem.objects.filter(
                 equipo=equipo,
-                solicitud__estado__in=[Solicitud.EstadoSolicitud.APROBADA, Solicitud.EstadoSolicitud.ENTREGADA]
+                solicitud__estado__in=[Solicitud.EstadoSolicitud.APROBADA, *Solicitud.ESTADOS_EN_PRESTAMO]
             ).exclude(solicitud=solicitud).filter(
                 Q(solicitud__horario_inicio__lt=solicitud.horario_fin) &
                 Q(solicitud__horario_fin__gt=solicitud.horario_inicio)
@@ -279,9 +328,11 @@ def _ejecutar_accion_solicitud(request, solicitud_id, accion):
         for equipo in equipos:
             if equipo.estado != Equipo.Estado.DISPONIBLE:
                 raise ValueError(f'El equipo {equipo.nombre} no está disponible para entregar.')
+            antes = auditoria.foto(equipo)
             equipo.estado = Equipo.Estado.PRESTADO
             equipo.version += 1
             equipo.save(update_fields=['estado', 'version', 'updated_at'])
+            auditoria.registrar(equipo, request.user, HistorialEquipo.Accion.ESTADO, antes, f'Entrega de la solicitud #{solicitud.id}')
         for item in items:
             if item.insumo_id:
                 # Descuento condicional en la BD: evita stock negativo con pedidos simultaneos.
@@ -304,17 +355,20 @@ def _ejecutar_accion_solicitud(request, solicitud_id, accion):
         for equipo in equipos:
             # Si mientras estaba prestado se dio de baja o se envio a mantenimiento, se respeta ese estado.
             if equipo.estado == Equipo.Estado.PRESTADO:
+                antes = auditoria.foto(equipo)
                 equipo.estado = (Equipo.Estado.EN_MANTENIMIENTO if estado_equipo in ('dañado', 'inservible')
                                  else Equipo.Estado.DISPONIBLE)
                 equipo.version += 1
                 equipo.save(update_fields=['estado', 'version', 'updated_at'])
+                auditoria.registrar(equipo, request.user, HistorialEquipo.Accion.ESTADO, antes,
+                                    f'Devolución de la solicitud #{solicitud.id} (estado: {estado_equipo})')
         for item in items:
             if item.insumo_id and item.insumo.tipo == Insumo.Tipo.RENOVABLE:
                 Insumo.objects.filter(id=item.insumo_id).update(
                     cantidad_disponible=F('cantidad_disponible') + item.cantidad, version=F('version') + 1,
                 )
 
-        solicitud.estado = Solicitud.EstadoSolicitud.ATRASADA if atrasada else Solicitud.EstadoSolicitud.DEVUELTA
+        solicitud.estado = Solicitud.EstadoSolicitud.DEVUELTA_ATRASO if atrasada else Solicitud.EstadoSolicitud.DEVUELTA
         solicitud.save()
         Movimiento.objects.create(
             solicitud=solicitud,
@@ -340,10 +394,12 @@ def _ejecutar_accion_solicitud(request, solicitud_id, accion):
 
 @login_required
 def solicitudes_view(request):
+    Solicitud.marcar_atrasadas()
     puede_aprobar = (
         request.user.rol in Usuario.ROLES_APROBADORES or
         request.user.is_superuser
     )
+    puede_representar = request.user.rol in Usuario.ROLES_REPRESENTANTES
     if request.method == 'POST' and 'item[]' in request.POST:
         items = request.POST.getlist('item[]')
         cantidades = request.POST.getlist('cantidad[]')
@@ -352,6 +408,21 @@ def solicitudes_view(request):
             if request.user.esta_bloqueado():
                 hasta = timezone.localtime(request.user.bloqueado_hasta).strftime('%d-%m-%Y %H:%M')
                 raise ValueError(f'Tu cuenta está bloqueada para solicitar préstamos hasta el {hasta}.')
+
+            representado = None
+            representado_id = (request.POST.get('en_representacion_de') or '').strip()
+            if representado_id:
+                if not puede_representar:
+                    raise ValueError('Tu rol no permite solicitar en representación de un estudiante.')
+                representado = Usuario.objects.filter(
+                    id=representado_id if representado_id.isdigit() else None,
+                    rol=Usuario.Rol.ESTUDIANTE, is_active=True,
+                ).first()
+                if representado is None:
+                    raise ValueError('El estudiante seleccionado no es válido.')
+                if representado.esta_bloqueado():
+                    hasta = timezone.localtime(representado.bloqueado_hasta).strftime('%d-%m-%Y %H:%M')
+                    raise ValueError(f'{representado.get_full_name() or representado.email} está bloqueado para préstamos hasta el {hasta}.')
 
             inicio = _parse_fecha(request.POST.get('horario_inicio'))
             fin = _parse_fecha(request.POST.get('horario_fin'))
@@ -367,6 +438,7 @@ def solicitudes_view(request):
             with transaction.atomic():
                 solicitud = Solicitud.objects.create(
                     solicitante=request.user,
+                    en_representacion_de=representado,
                     lugar_uso=lugar_uso,
                     justificacion=request.POST.get('justificacion'),
                     horario_inicio=inicio,
@@ -426,15 +498,23 @@ def solicitudes_view(request):
 
         return redirect('solicitudes')
 
-    solicitudes = Solicitud.objects.all().prefetch_related('items', 'items__equipo', 'items__insumo')
+    solicitudes = (
+        Solicitud.objects.all()
+        .select_related('solicitante', 'en_representacion_de')
+        .prefetch_related('items', 'items__equipo', 'items__insumo')
+    )
     if not puede_aprobar:
         # Estudiantes y docentes solo ven sus propias solicitudes.
         solicitudes = solicitudes.filter(Q(solicitante=request.user) | Q(en_representacion_de=request.user))
     equipos = Equipo.objects.filter(estado=Equipo.Estado.DISPONIBLE)
     insumos = Insumo.objects.all()
-    
+    estudiantes = []
+    if puede_representar:
+        estudiantes = Usuario.objects.filter(rol=Usuario.Rol.ESTUDIANTE, is_active=True).order_by('first_name', 'email')
+
     return render(request, 'inventario/solicitudes.html', {
-        'solicitudes': solicitudes, 'equipos': equipos, 'insumos': insumos, 'puede_aprobar': puede_aprobar
+        'solicitudes': solicitudes, 'equipos': equipos, 'insumos': insumos, 'puede_aprobar': puede_aprobar,
+        'estudiantes': estudiantes, 'ahora': timezone.now(),
     })
 
 
@@ -453,9 +533,11 @@ def mantenimiento_view(request):
                 mant.fecha_resolucion = timezone.now()
                 mant.save()
 
+                antes = auditoria.foto(mant.equipo)
                 mant.equipo.estado = Equipo.Estado.DISPONIBLE
                 mant.equipo.version += 1
                 mant.equipo.save()
+                auditoria.registrar(mant.equipo, request.user, HistorialEquipo.Accion.ESTADO, antes, f'Mantenimiento #{mant.id}: reparación completada')
                 messages.success(
                     request,
                     f'¡Reparación completada! El equipo "{mant.equipo.nombre}" ({mant.equipo.codigo_inventario}) '
@@ -466,18 +548,22 @@ def mantenimiento_view(request):
                 mant.fecha_resolucion = timezone.now()
                 mant.save()
 
+                antes = auditoria.foto(mant.equipo)
                 mant.equipo.estado = Equipo.Estado.FUERA_SERVICIO
                 mant.equipo.version += 1
                 mant.equipo.save()
+                auditoria.registrar(mant.equipo, request.user, HistorialEquipo.Accion.ESTADO, antes, f'Mantenimiento #{mant.id}: dado de baja')
                 messages.warning(request, f'El equipo "{mant.equipo.nombre}" ha sido dado de baja (Fuera de servicio).')
             elif accion == 'reparar':
                 mant.decision = Mantenimiento.Decision.REPARAR
                 mant.fecha_resolucion = timezone.now()
                 mant.save()
 
+                antes = auditoria.foto(mant.equipo)
                 mant.equipo.estado = Equipo.Estado.EN_MANTENIMIENTO
                 mant.equipo.version += 1
                 mant.equipo.save()
+                auditoria.registrar(mant.equipo, request.user, HistorialEquipo.Accion.ESTADO, antes, f'Mantenimiento #{mant.id}: en reparación')
                 messages.info(request, f'El equipo "{mant.equipo.nombre}" ha sido confirmado en proceso de reparación.')
         else:
             form = MantenimientoForm(request.POST)
@@ -498,7 +584,8 @@ def mantenimiento_view(request):
                     else Mantenimiento.Decision.REPARAR
                 )
 
-                Mantenimiento.objects.create(
+                antes = auditoria.foto(equipo)
+                mantenimiento = Mantenimiento.objects.create(
                     equipo=equipo,
                     falla_descrita=form.cleaned_data['falla_descrita'],
                     costo_cotizado=costo,
@@ -510,6 +597,7 @@ def mantenimiento_view(request):
                 equipo.estado = Equipo.Estado.EN_MANTENIMIENTO
                 equipo.version += 1
                 equipo.save()
+                auditoria.registrar(equipo, request.user, HistorialEquipo.Accion.ESTADO, antes, f'Diagnóstico de mantenimiento #{mantenimiento.id}')
 
                 msg = f"Diagnóstico registrado. Sugerencia del sistema: {sugerencia.upper()} "
                 if porcentaje is not None:
@@ -533,7 +621,8 @@ def reportes_view(request):
         return redirect('dashboard')
 
     top_equipos = Equipo.objects.annotate(veces=Count('solicituditem')).order_by('-veces')[:20]
-    vencidos = Solicitud.objects.filter(estado=Solicitud.EstadoSolicitud.ENTREGADA, horario_fin__lt=timezone.now()).select_related('solicitante')
+    Solicitud.marcar_atrasadas()
+    vencidos = Solicitud.objects.filter(estado=Solicitud.EstadoSolicitud.ATRASADA).select_related('solicitante', 'en_representacion_de')
     
     dias_str = request.GET.get('dias', '90')
     dias = int(dias_str) if dias_str.isdigit() else 90
@@ -635,134 +724,13 @@ Responde SOLO con un JSON array de los ids de equipo mas relevantes (maximo 5), 
 
 @login_required
 @role_required(Usuario.Rol.ENCARGADO_LABORATORIO, Usuario.Rol.CONTROL_CALIDAD)
-def migracion_view(request):
-    """RF-14: Migracion de CSV."""
-    if request.method == 'GET':
-        migraciones = Migracion.objects.all()
-        return render(request, 'inventario/migracion.html', {'migraciones': migraciones})
-        
-    if 'archivo' not in request.FILES:
-        messages.error(request, 'Falta el archivo CSV.')
-        return redirect('migracion')
-        
-    archivo = request.FILES['archivo']
-    try:
-        decoded_file = archivo.read().decode('utf-8-sig')  # -sig: acepta el BOM que agrega Excel
-        reader = csv.DictReader(io.StringIO(decoded_file))
-    except Exception as e:
-        messages.error(request, f'No se pudo leer el CSV: {e}')
-        return redirect('migracion')
-        
-    importadas = 0
-    errores = []
-    totales = 0
-    
-    for idx, fila in enumerate(reader):
-        totales += 1
-        try:
-            tipo = fila.get('tipo', '').lower()
-            if tipo == 'equipo':
-                if not fila.get('codigo_inventario') or not fila.get('nombre'):
-                    raise ValueError('Faltan codigo_inventario/nombre')
-                estado = (fila.get('estado') or '').strip()
-                if estado and estado not in Equipo.Estado.values:
-                    raise ValueError(f'Estado "{estado}" no válido. Use: {", ".join(Equipo.Estado.values)}')
-                valor = (fila.get('valor_adquisicion') or '').strip()
-                try:
-                    valor = Decimal(valor) if valor else None
-                except InvalidOperation:
-                    raise ValueError(f'valor_adquisicion "{valor}" no es un número válido (use punto decimal, sin separador de miles)')
-                defaults = {
-                    'nombre': fila['nombre'],
-                    'modelo': fila.get('modelo', ''),
-                    'especificaciones': fila.get('especificaciones', ''),
-                    'ubicacion': fila.get('ubicacion', ''),
-                    'valor_adquisicion': valor,
-                }
-                # Sin estado en el CSV no se toca el de un equipo existente (p. ej. uno prestado).
-                if estado:
-                    defaults['estado'] = estado
-                Equipo.objects.update_or_create(codigo_inventario=fila['codigo_inventario'], defaults=defaults)
-            elif tipo == 'insumo':
-                if not fila.get('nombre'):
-                    raise ValueError('Falta nombre')
-                # Columnas vacias = "no cambiar" al reimportar un insumo existente.
-                cant_txt = (fila.get('cantidad') or '').strip()
-                cant = int(cant_txt) if cant_txt else None
-                if cant is not None and cant < 0:
-                    raise ValueError('La cantidad no puede ser negativa')
-                tipo_insumo = (fila.get('tipo_insumo') or '').strip() or None
-                if tipo_insumo and tipo_insumo not in Insumo.Tipo.values:
-                    raise ValueError(f'tipo_insumo "{tipo_insumo}" no válido. Use: {", ".join(Insumo.Tipo.values)}')
-                categoria = (fila.get('categoria') or '').strip() or None
-
-                with transaction.atomic():
-                    existentes = list(Insumo.objects.select_for_update().filter(nombre=fila['nombre'])[:2])
-                    if len(existentes) > 1:
-                        raise ValueError(f'Hay más de un insumo llamado "{fila["nombre"]}"; unifícalos antes de reimportar')
-                    if not existentes:
-                        Insumo.objects.create(
-                            nombre=fila['nombre'], categoria=categoria or '',
-                            tipo=tipo_insumo or Insumo.Tipo.PERECIBLE,
-                            cantidad_total=cant or 0, cantidad_disponible=cant or 0,
-                        )
-                    else:
-                        insumo = existentes[0]
-                        if cant is not None:
-                            # 'cantidad' es el total (igual que en la exportacion). Las unidades
-                            # fuera de stock (prestadas o consumidas) se mantienen fuera.
-                            en_uso = insumo.cantidad_total - insumo.cantidad_disponible
-                            if cant < en_uso:
-                                raise ValueError(f'La cantidad ({cant}) es menor que las {en_uso} unidades fuera de stock de "{insumo.nombre}"')
-                            insumo.cantidad_total = cant
-                            insumo.cantidad_disponible = cant - en_uso
-                        if categoria is not None:
-                            insumo.categoria = categoria
-                        if tipo_insumo:
-                            insumo.tipo = tipo_insumo
-                        insumo.version += 1
-                        insumo.save()
-            else:
-                raise ValueError(f'Columna "tipo" debe ser equipo o insumo (fila {idx+2})')
-            importadas += 1
-        except Exception as e:
-            errores.append(f"Fila {idx+2}: {e}")
-            
-    Migracion.objects.create(
-        archivo_origen=archivo.name,
-        filas_totales=totales,
-        filas_importadas=importadas,
-        filas_con_error=len(errores),
-        detalle_errores=json.dumps(errores),
-        ejecutado_por=request.user
-    )
-    
-    if errores:
-        messages.warning(request, f'Importadas {importadas}/{totales}. Errores: {len(errores)}. Revisa el historial.')
-    else:
-        messages.success(request, f'Importación completa: {importadas} registros.')
-        
-    return redirect('migracion')
-
-
-@login_required
-@role_required(Usuario.Rol.ENCARGADO_LABORATORIO, Usuario.Rol.CONTROL_CALIDAD)
 def exportar_inventario(request):
-    """Genera y descarga un CSV del inventario (Equipos e Insumos) automáticamente."""
-    response = HttpResponse(content_type='text/csv')
-    response['Content-Disposition'] = f'attachment; filename="inventario_leica_{timezone.now().strftime("%Y%m%d")}.csv"'
-
-    writer = csv.writer(response)
-    writer.writerow(['tipo', 'codigo_inventario', 'nombre', 'modelo', 'especificaciones', 'ubicacion', 'estado', 'valor_adquisicion', 'categoria', 'tipo_insumo', 'cantidad'])
-
-    equipos = Equipo.objects.all()
-    for e in equipos:
-        writer.writerow(['equipo', e.codigo_inventario, e.nombre, e.modelo or '', e.especificaciones or '', e.ubicacion or '', e.estado, e.valor_adquisicion or '', '', '', ''])
-
-    insumos = Insumo.objects.all()
-    for i in insumos:
-        writer.writerow(['insumo', '', i.nombre, '', '', '', '', '', i.categoria or '', i.tipo, i.cantidad_total])
-
+    """Genera y descarga un Excel del inventario (Equipos e Insumos) automáticamente."""
+    response = HttpResponse(
+        generar_excel_inventario(),
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    )
+    response['Content-Disposition'] = f'attachment; filename="inventario_leica_{timezone.localtime().strftime("%Y%m%d")}.xlsx"'
     return response
 
 
@@ -883,9 +851,11 @@ def admin_panel_view(request):
                 messages.error(request, 'Estado de equipo no válido.')
             else:
                 estado_antiguo = equipo_obj.get_estado_display()
+                antes = auditoria.foto(equipo_obj)
                 equipo_obj.estado = nuevo_estado
                 equipo_obj.version += 1
                 equipo_obj.save()
+                auditoria.registrar(equipo_obj, request.user, HistorialEquipo.Accion.ESTADO, antes, 'Panel de administración')
                 messages.success(
                     request,
                     f'Estado del equipo "{equipo_obj.nombre}" ({equipo_obj.codigo_inventario}) '

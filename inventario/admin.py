@@ -1,6 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
-from .models import Usuario, Equipo, Insumo, Solicitud, SolicitudItem, Movimiento, Bloqueo, Mantenimiento, Migracion
+from .models import Usuario, Equipo, Insumo, Solicitud, SolicitudItem, Movimiento, Bloqueo, Mantenimiento, Migracion, HistorialEquipo
+from . import auditoria
 
 
 @admin.register(Usuario)
@@ -19,6 +20,37 @@ class EquipoAdmin(admin.ModelAdmin):
     list_display = ('codigo_inventario', 'nombre', 'modelo', 'estado', 'ubicacion')
     list_filter = ('estado',)
     search_fields = ('codigo_inventario', 'nombre', 'modelo')
+
+    def save_model(self, request, obj, form, change):
+        antes = auditoria.foto(Equipo.objects.get(pk=obj.pk)) if change else None
+        super().save_model(request, obj, form, change)
+        accion = HistorialEquipo.Accion.EDITADO if change else HistorialEquipo.Accion.CREADO
+        auditoria.registrar(obj, request.user, accion, antes, 'Admin de Django')
+
+    def delete_model(self, request, obj):
+        auditoria.registrar(obj, request.user, HistorialEquipo.Accion.ELIMINADO, detalle='Admin de Django')
+        super().delete_model(request, obj)
+
+    def delete_queryset(self, request, queryset):
+        for obj in queryset:
+            auditoria.registrar(obj, request.user, HistorialEquipo.Accion.ELIMINADO, detalle='Admin de Django')
+        super().delete_queryset(request, queryset)
+
+
+@admin.register(HistorialEquipo)
+class HistorialEquipoAdmin(admin.ModelAdmin):
+    list_display = ('fecha', 'codigo_inventario', 'accion', 'usuario', 'detalle')
+    list_filter = ('accion',)
+    search_fields = ('codigo_inventario', 'detalle')
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(Insumo)

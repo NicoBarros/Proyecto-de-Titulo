@@ -5,8 +5,8 @@ Proyecto de título.
 
 Permite administrar equipos e insumos, solicitar préstamos (kits), aprobarlos, entregarlos y
 registrar su devolución, sancionar atrasos, gestionar mantenimientos con la regla del 70 %,
-generar reportes, importar inventario desde planillas CSV y buscar equipos en lenguaje natural
-con IA (Google Gemini).
+generar reportes, exportar el inventario a Excel, registrar el historial de cambios de cada equipo,
+generar códigos QR y buscar equipos en lenguaje natural con IA (Google Gemini).
 
 ## Stack
 
@@ -97,11 +97,12 @@ Los permisos se validan en el servidor según el rol del usuario, no solo en la 
 |---|:-:|:-:|:-:|:-:|:-:|:-:|
 | Ver inventario y buscar equipos | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | Crear solicitudes | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Solicitar en representación de un estudiante | | ✓ | ✓ | ✓ | ✓ | |
 | Ver todas las solicitudes (el resto ve solo las propias) | | | ✓ | ✓ | ✓ | |
 | Aprobar, entregar y recibir devoluciones | | | ✓ | ✓ | ✓ | |
 | Mantenimiento | | | ✓ | ✓ | ✓ | |
 | Reportes y KPIs | | | ✓ | ✓ | ✓ | ✓ |
-| Editar inventario, importar y exportar CSV | | | | ✓ | ✓ | |
+| Editar inventario, exportar a Excel, QR e historial de equipos | | | | ✓ | ✓ | |
 
 El **Panel Admin** es para usuarios staff. Un staff que no es superusuario solo gestiona cuentas
 comunes: no puede modificar a otros administradores ni asignar roles con permisos de aprobación.
@@ -111,26 +112,26 @@ comunes: no puede modificar a otros administradores ni asignar roles con permiso
 - **Préstamos:** una solicitud pasa por pendiente → aprobada → entregada → devuelta. Solo se puede
   rechazar mientras está pendiente o aprobada. Al aprobar se verifica que el equipo no esté reservado
   en un horario que se cruce.
+- **Atrasos:** un préstamo entregado cuyo plazo venció pasa automáticamente a "Atrasada" y aparece
+  como alerta en el dashboard de quienes aprueban. Si se devuelve tarde queda como "Devuelta con
+  atraso". El comando `python manage.py marcar_atrasadas` permite programar esta revisión.
+- **Representación:** docentes, directores, encargados y Control de Calidad pueden pedir un préstamo
+  a nombre de un estudiante; en ese caso la sanción por atraso se aplica al estudiante.
 - **Insumos:** los renovables vuelven al stock al devolverse; los perecibles se consumen.
 - **Sanciones (RF-09):** una devolución atrasada bloquea al estudiante por 7 días para pedir préstamos.
 - **Mantenimiento (RF-10):** si el costo de reparación es igual o mayor al 70 % del valor de
   adquisición, el sistema sugiere dar el equipo de baja.
 - **Historial:** un equipo, insumo o usuario con préstamos o mantenimientos registrados no se puede
   eliminar. Para retirar un equipo se marca como "Fuera de servicio".
+- **Auditoría:** cada creación, edición, cambio de estado o eliminación de un equipo queda registrada
+  con usuario, fecha, valores anteriores y nuevos, y origen (inventario, préstamo, mantenimiento,
+  panel o admin). Se consulta con el botón "Historial" de cada equipo.
 
-## Importar inventario desde CSV (RF-14)
+## Exportar inventario a Excel
 
-El archivo debe tener estas columnas (es el mismo formato que genera la exportación):
-
-```
-tipo,codigo_inventario,nombre,modelo,especificaciones,ubicacion,estado,valor_adquisicion,categoria,tipo_insumo,cantidad
-```
-
-- `tipo` es `equipo` o `insumo`.
-- Los equipos se identifican por `codigo_inventario` y los insumos por `nombre`. Reimportar actualiza
-  el registro existente, y una columna vacía no modifica ese dato.
-- `valor_adquisicion` usa punto decimal y no lleva separador de miles.
-- Se aceptan archivos guardados desde Excel como "CSV UTF-8".
+El botón "Exportar Inventario Excel" de la pantalla Inventario descarga `inventario_leica_AAAAMMDD.xlsx`
+con tres hojas con formato: **Resumen** (equipos por estado, valor total e insumos con stock bajo),
+**Equipos** e **Insumos**, con colores por estado y filtros en cada columna.
 
 ## Tests
 
@@ -139,7 +140,7 @@ python manage.py test inventario
 ```
 
 La suite está en `inventario/tests/` y cubre permisos por rol, inventario, el flujo de préstamos,
-mantenimiento, migración CSV, búsqueda con IA (Gemini simulado, nunca llama a la API real) y el panel
+mantenimiento, exportación a Excel, códigos QR, auditoría, búsqueda con IA (Gemini simulado, nunca llama a la API real) y el panel
 de administración.
 
 ## Despliegue

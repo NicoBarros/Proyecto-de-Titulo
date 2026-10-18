@@ -7,7 +7,7 @@ from .base import LeicaTestCase
 
 URLS_PROTEGIDAS = [
     '/', '/inventario/', '/solicitudes/', '/mantenimiento/', '/reportes/',
-    '/busqueda/', '/migracion/', '/panel-admin/', '/inventario/exportar/',
+    '/busqueda/', '/panel-admin/', '/inventario/exportar/',
 ]
 
 
@@ -58,11 +58,11 @@ class PermisosPorRolTests(LeicaTestCase):
             with self.subTest(rol=u.rol):
                 self.assertAcceso(u, '/mantenimiento/', ok)
 
-    def test_migracion_solo_encargado_y_calidad(self):
-        for u, ok in [(self.encargado, True), (self.calidad, True), (self.director, False),
-                      (self.docente, False), (self.estudiante, False)]:
-            with self.subTest(rol=u.rol):
-                self.assertAcceso(u, '/migracion/', ok)
+    def test_importacion_csv_ya_no_existe(self):
+        self.client.force_login(self.encargado)
+        for url in ('/inventario/importar/', '/migracion/'):
+            with self.subTest(url=url):
+                self.assertEqual(self.client.post(url, {}).status_code, 404)
 
     def test_reportes_bloqueado_a_estudiantes_y_docentes(self):
         for u, ok in [(self.encargado, True), (self.calidad, True), (self.director, True),

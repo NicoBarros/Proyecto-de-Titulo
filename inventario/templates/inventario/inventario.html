@@ -5,7 +5,7 @@
   <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--rojo); padding-bottom: 8px; margin-top: 0; margin-bottom: 20px;">
     <h2 style="margin: 0; border: none; padding: 0;">Inventario Institucional (RF-01 a RF-04)</h2>
     {% if puede_escribir %}
-    <a href="{% url 'exportar_inventario' %}"><button class="btn secundario chico">Exportar Inventario CSV</button></a>
+    <a href="{% url 'exportar_inventario' %}"><button class="btn secundario chico">Exportar Inventario Excel</button></a>
     {% endif %}
   </div>
 
@@ -101,8 +101,9 @@
         <td>{% if e.valor_adquisicion %}${{ e.valor_adquisicion|floatformat:'0' }}{% else %}-{% endif %}</td>
         {% if puede_escribir %}
         <td>
-          <button class="btn chico" onclick="mostrarQR('{{ e.codigo_inventario }}')">QR</button>
+          <button class="btn chico" type="button" data-codigo="{{ e.codigo_inventario }}" data-qr="{% url 'qr_equipo' e.id %}" onclick="mostrarQR(this)">QR</button>
           <a href="{% url 'editar_equipo' e.id %}"><button class="btn chico">Editar</button></a>
+          <a href="{% url 'historial_equipo' e.id %}"><button class="btn chico secundario">Historial</button></a>
           <form method="post" action="{% url 'eliminar_equipo' e.id %}" style="display:inline;"
             onsubmit="return confirm('¿Seguro que deseas eliminar este equipo?');">
             {% csrf_token %}
@@ -235,8 +236,9 @@
   <div class="card" style="text-align:center; min-width:300px;">
     <h3 id="qrTitle" style="margin-top:0;">Código QR</h3>
     <img id="qrImage" src="" alt="QR"
-      style="margin: 20px 0; border: 1px solid #ccc; padding: 10px; border-radius: 8px;">
+      style="margin: 20px 0; border: 1px solid #ccc; padding: 10px; border-radius: 8px; width: 200px; height: 200px;">
     <div>
+      <a id="qrDescargar" href="#" class="btn" style="text-decoration: none;">Descargar</a>
       <button class="btn secundario" onclick="document.getElementById('qrModal').style.display='none'">Cerrar</button>
     </div>
   </div>
@@ -245,10 +247,10 @@
 
 {% block scripts %}
 <script>
-  function mostrarQR(codigo) {
-    const url = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=LEICA_INVENTARIO:${codigo}`;
-    document.getElementById('qrTitle').innerText = `QR: ${codigo}`;
-    document.getElementById('qrImage').src = url;
+  function mostrarQR(boton) {
+    document.getElementById('qrTitle').textContent = `QR: ${boton.dataset.codigo}`;
+    document.getElementById('qrImage').src = boton.dataset.qr;
+    document.getElementById('qrDescargar').href = `${boton.dataset.qr}?descargar=1`;
     document.getElementById('qrModal').style.display = 'flex';
   }
 </script>

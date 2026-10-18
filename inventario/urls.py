@@ -11,6 +11,8 @@ urlpatterns = [
     path('inventario/', views.inventario_view, name='inventario'),
     path('inventario/equipo/<int:id>/eliminar/', views.eliminar_equipo, name='eliminar_equipo'),
     path('inventario/equipo/<int:id>/editar/', views.editar_equipo, name='editar_equipo'),
+    path('inventario/equipo/<int:id>/qr/', views.qr_equipo, name='qr_equipo'),
+    path('inventario/equipo/<int:id>/historial/', views.historial_equipo, name='historial_equipo'),
     path('inventario/insumo/<int:id>/eliminar/', views.eliminar_insumo, name='eliminar_insumo'),
     path('inventario/insumo/<int:id>/editar/', views.editar_insumo, name='editar_insumo'),
     path('inventario/exportar/', views.exportar_inventario, name='exportar_inventario'),
@@ -18,6 +20,5 @@ urlpatterns = [
     path('mantenimiento/', views.mantenimiento_view, name='mantenimiento'),
     path('reportes/', views.reportes_view, name='reportes'),
     path('busqueda/', views.busqueda_view, name='busqueda'),
-    path('migracion/', views.migracion_view, name='migracion'),
     path('panel-admin/', views.admin_panel_view, name='admin_panel'),
 ]

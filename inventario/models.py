@@ -49,6 +49,7 @@ class Usuario(AbstractUser):
     ROLES_ESCRITURA_INVENTARIO = [Rol.ENCARGADO_LABORATORIO, Rol.CONTROL_CALIDAD]
 
     ROLES_APROBADORES = [Rol.ENCARGADO_LABORATORIO, Rol.CONTROL_CALIDAD, Rol.DIRECTOR_CARRERA]
+    ROLES_REPRESENTANTES = [Rol.DOCENTE, Rol.DIRECTOR_CARRERA, Rol.ENCARGADO_LABORATORIO, Rol.CONTROL_CALIDAD]
     ROLES_REPORTES = [Rol.ENCARGADO_LABORATORIO, Rol.CONTROL_CALIDAD, Rol.DIRECTOR_CARRERA, Rol.COMITE_EJECUTIVO]
 
 class Equipo(models.Model):
@@ -93,7 +94,7 @@ class Insumo(models.Model):
         RENOVABLE = 'renovable', 'Renovable'
         PERECIBLE = 'perecible', 'Perecible'
 
-    nombre = models.CharField(max_length=200, unique=True)  # la migracion CSV identifica insumos por nombre
+    nombre = models.CharField(max_length=200, unique=True)
     categoria = models.CharField(max_length=100, blank=True, null=True, verbose_name='Categoría')
     tipo = models.CharField(
         max_length=10, choices=Tipo.choices, default=Tipo.PERECIBLE,
@@ -131,6 +132,7 @@ class Solicitud(models.Model):
         ENTREGADA = 'entregada', 'Entregada'
         DEVUELTA = 'devuelta', 'Devuelta'
         ATRASADA = 'atrasada', 'Atrasada'
+        DEVUELTA_ATRASO = 'devuelta_atraso', 'Devuelta con atraso'
         CANCELADA = 'cancelada', 'Cancelada'
 
     class LugarUso(models.TextChoices):
@@ -162,10 +164,18 @@ class Solicitud(models.Model):
     fecha_aprobacion = models.DateTimeField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
+    ESTADOS_EN_PRESTAMO = [EstadoSolicitud.ENTREGADA, EstadoSolicitud.ATRASADA]
+
     class Meta:
         verbose_name = 'Solicitud'
         verbose_name_plural = 'Solicitudes'
         ordering = ['-created_at']
+
+    @classmethod
+    def marcar_atrasadas(cls):
+        return cls.objects.filter(
+            estado=cls.EstadoSolicitud.ENTREGADA, horario_fin__lt=timezone.now(),
+        ).update(estado=cls.EstadoSolicitud.ATRASADA)
 
     def __str__(self):
         return f'Solicitud #{self.pk} — {self.get_estado_display()}'
@@ -291,3 +301,33 @@ class Migracion(models.Model):
 
     def __str__(self):
         return f'Migración #{self.pk} — {self.archivo_origen}'
+
+
+class HistorialEquipo(models.Model):
+
+    class Accion(models.TextChoices):
+        CREADO = 'creado', 'Creado'
+        EDITADO = 'editado', 'Editado'
+        ESTADO = 'estado', 'Cambio de estado'
+        IMPORTADO = 'importado', 'Importado'
+        ELIMINADO = 'eliminado', 'Eliminado'
+
+    equipo = models.ForeignKey(
+        Equipo, on_delete=models.SET_NULL, blank=True, null=True, related_name='historial',
+    )
+    codigo_inventario = models.CharField(max_length=50)
+    usuario = models.ForeignKey(
+        Usuario, on_delete=models.SET_NULL, blank=True, null=True, related_name='cambios_equipos',
+    )
+    fecha = models.DateTimeField(auto_now_add=True)
+    accion = models.CharField(max_length=15, choices=Accion.choices)
+    cambios = models.JSONField(default=dict, blank=True)
+    detalle = models.CharField(max_length=255, blank=True, default='')
+
+    class Meta:
+        verbose_name = 'Historial de equipo'
+        verbose_name_plural = 'Historial de equipos'
+        ordering = ['-fecha', '-id']
+
+    def __str__(self):
+        return f'{self.codigo_inventario} — {self.get_accion_display()} ({self.fecha:%d/%m/%Y %H:%M})'

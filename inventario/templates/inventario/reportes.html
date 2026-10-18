@@ -18,12 +18,18 @@
 <div class="card">
   <h2>Préstamos vencidos</h2>
   <table>
-    <thead><tr><th>Solicitante</th><th>Vence</th></tr></thead>
+    <thead><tr><th>Responsable</th><th>Solicitante</th><th>Vence</th></tr></thead>
     <tbody>
       {% for v in vencidos %}
-      <tr><td>{{ v.solicitante.first_name|default:v.solicitante.email }}</td><td>{{ v.horario_inicio|date:"d/m/Y H:i" }} → {{ v.horario_fin|date:"d/m/Y H:i" }}</td></tr>
+      {% with r=v.en_representacion_de|default:v.solicitante %}
+      <tr>
+        <td>{{ r.get_full_name|default:r.email }}{% if r.seccion %} <small>({{ r.seccion }})</small>{% endif %}</td>
+        <td>{{ v.solicitante.get_full_name|default:v.solicitante.email }}</td>
+        <td>{{ v.horario_inicio|date:"d/m/Y H:i" }} → {{ v.horario_fin|date:"d/m/Y H:i" }}</td>
+      </tr>
+      {% endwith %}
       {% empty %}
-      <tr><td colspan="2">Ninguno.</td></tr>
+      <tr><td colspan="3">Ninguno.</td></tr>
       {% endfor %}
     </tbody>
   </table>

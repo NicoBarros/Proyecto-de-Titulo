@@ -832,3 +832,46 @@ form.inline {
     align-items: flex-start;
   }
 }
+
+.badge.devuelta_atraso {
+  background: #ffedd5;
+  color: #9a3412;
+}
+
+.alerta-atrasos {
+  border-left: 4px solid var(--inacap-red);
+}
+
+.alerta-atrasos h2 {
+  color: var(--inacap-red-dark);
+}
+
+small.vencida {
+  color: var(--inacap-red);
+  font-weight: 600;
+}
+
+small.representacion {
+  color: var(--inacap-text-muted);
+}
+
+.badge.historial-creado { background: #e3f6e3; color: #1e6b1e; }
+.badge.historial-editado { background: #dbeafe; color: #1e40af; }
+.badge.historial-estado { background: #fef3c7; color: #92400e; }
+.badge.historial-importado { background: #e0f2fe; color: #075985; }
+.badge.historial-eliminado { background: #fee2e2; color: #b91c1c; }
+
+.historial-cambios {
+  margin: 0;
+  padding-left: 16px;
+  font-size: 0.84rem;
+}
+
+.historial-antes {
+  color: var(--inacap-text-muted);
+  text-decoration: line-through;
+}
+
+.historial-despues {
+  font-weight: 600;
+}

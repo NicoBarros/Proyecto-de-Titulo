@@ -1,9 +1,10 @@
 """
-CRUD de equipos e insumos (inventario) y exportacion CSV.
+CRUD de equipos e insumos (inventario) y exportacion a Excel.
 """
-import csv
-import io
+from io import BytesIO
 from decimal import Decimal
+
+from openpyxl import load_workbook
 
 from inventario.models import Equipo, Insumo
 from .base import LeicaTestCase
@@ -105,19 +106,56 @@ class InsumosTests(LeicaTestCase):
 
 class ExportarTests(LeicaTestCase):
 
-    def test_exporta_equipos_e_insumos(self):
-        self.crear_equipo('EXP-1', 'Router')
-        self.crear_insumo('Cables', cantidad=7)
+    def exportar(self):
         self.client.force_login(self.encargado)
         r = self.client.get('/inventario/exportar/')
-        self.assertEqual(r['Content-Type'], 'text/csv')
-        self.assertIn('attachment;', r['Content-Disposition'])
-        filas = list(csv.DictReader(io.StringIO(r.content.decode())))
-        self.assertEqual(len(filas), 2)
-        self.assertEqual(filas[0]['tipo'], 'equipo')
-        self.assertEqual(filas[0]['codigo_inventario'], 'EXP-1')
-        self.assertEqual(filas[1]['tipo'], 'insumo')
-        self.assertEqual(filas[1]['cantidad'], '7')
+        self.assertEqual(r['Content-Type'], 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        self.assertRegex(r['Content-Disposition'], r'attachment; filename="inventario_leica_\d{8}\.xlsx"')
+        return load_workbook(BytesIO(r.content))
+
+    def test_excel_tiene_resumen_equipos_e_insumos(self):
+        self.assertEqual(self.exportar().sheetnames, ['Resumen', 'Equipos', 'Insumos'])
+
+    def test_hoja_equipos(self):
+        self.crear_equipo('EXP-2', 'Switch', valor=Decimal('250000'), estado=Equipo.Estado.PRESTADO)
+        self.crear_equipo('EXP-1', 'Router', valor=None)
+        ws = self.exportar()['Equipos']
+        self.assertEqual([c.value for c in ws[4]], ['Código', 'Nombre', 'Modelo', 'Especificaciones', 'Ubicación', 'Estado', 'Valor de adquisición'])
+        self.assertEqual([ws['A5'].value, ws['F5'].value, ws['G5'].value], ['EXP-1', 'Disponible', None])
+        self.assertEqual([ws['A6'].value, ws['F6'].value, ws['G6'].value], ['EXP-2', 'Prestado', 250000])
+        self.assertEqual(ws['F5'].fill.fgColor.rgb[-6:], 'E3F6E3')
+        self.assertEqual(ws['F6'].fill.fgColor.rgb[-6:], 'FEF3C7')
+        self.assertEqual(ws['G6'].number_format, '"$"#,##0')
+        self.assertIn('Equipos', ws.tables)
+
+    def test_hoja_insumos_marca_stock_bajo(self):
+        self.crear_insumo('Cables', cantidad=10, umbral=5)
+        bajo = self.crear_insumo('Resistencias', cantidad=10, umbral=5)
+        Insumo.objects.filter(id=bajo.id).update(cantidad_disponible=2)
+        ws = self.exportar()['Insumos']
+        self.assertEqual([c.value for c in ws[5]], ['Cables', None, 'Renovable', 10, 10, 5, 'OK'])
+        self.assertEqual([c.value for c in ws[6]], ['Resistencias', None, 'Renovable', 2, 10, 5, 'Bajo'])
+        self.assertEqual(ws['G6'].fill.fgColor.rgb[-6:], 'FEE2E2')
+
+    def test_resumen_cuenta_por_estado(self):
+        self.crear_equipo('R-1', valor=Decimal('1000'))
+        self.crear_equipo('R-2', valor=Decimal('500'), estado=Equipo.Estado.FUERA_SERVICIO)
+        ws = self.exportar()['Resumen']
+        valores = {ws.cell(row=f, column=1).value: ws.cell(row=f, column=2).value for f in range(5, ws.max_row + 1)}
+        self.assertEqual(valores['Disponible'], 1)
+        self.assertEqual(valores['Fuera de servicio'], 1)
+        self.assertEqual(valores['Total de equipos'], 2)
+        self.assertEqual(valores['Valor total de adquisición'], 1500)
+
+    def test_inventario_vacio_no_falla(self):
+        self.assertEqual(self.exportar()['Equipos']['A5'].value, None)
+
+    def test_excel_no_ejecuta_formulas_ni_falla_con_caracteres_de_control(self):
+        self.crear_equipo('=1+1', '=HYPERLINK("http://malicioso","clic")', especificaciones='Pegado de Word\x0b')
+        ws = self.exportar()['Equipos']
+        self.assertEqual((ws['A5'].value, ws['A5'].data_type), ('=1+1', 's'))
+        self.assertEqual((ws['B5'].value, ws['B5'].data_type), ('=HYPERLINK("http://malicioso","clic")', 's'))
+        self.assertEqual(ws['D5'].value, 'Pegado de Word')
 
 
 class TrazabilidadTests(LeicaTestCase):
