@@ -1,5 +1,15 @@
-node_modules/
+# Entorno y secretos
 .env
-data/*.db
-data/*.db-*
+venv/
+
+# Python
+__pycache__/
+*.pyc
+
+# Base de datos local (el proyecto usa PostgreSQL; SQLite queda solo como respaldo local)
+db.sqlite3
+
+# Salida de collectstatic (se genera en el despliegue)
+staticfiles/
+
 *.log
