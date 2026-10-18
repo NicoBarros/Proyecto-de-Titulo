@@ -454,12 +454,18 @@ def reportes_view(request):
         'top_equipos': top_equipos, 'vencidos': vencidos, 'sin_movimiento': sin_movimiento, 'dias': dias
     })
 
+import json
+from django.contrib.auth.decorators import login_required
+from django.http import JsonResponse
+from django.shortcuts import render
+from django.conf import settings
+from .models import Equipo 
 
 @login_required
 def busqueda_view(request):
     """
     RF-11 / RNF-06: Busqueda por IA.
-    Actualizado a Google Gemini.
+    Actualizado a Google Gemini con tolerancia a fallos (Error 503).
     """
     if request.method == 'GET':
         return render(request, 'inventario/busqueda.html')
@@ -476,6 +482,7 @@ def busqueda_view(request):
     if getattr(settings, 'GEMINI_API_KEY', None):
         try:
             from google import genai
+            from google.genai.errors import APIError
             client = genai.Client(api_key=settings.GEMINI_API_KEY)
             
             catalogo = "\n".join([f"- id={e.id}: {e.nombre} ({e.modelo or 's/modelo'}) - {e.especificaciones or ''}" for e in disponibles])
@@ -487,11 +494,20 @@ Necesidad del usuario: "{consulta}"
 
 Responde SOLO con un JSON array de los ids de equipo mas relevantes (maximo 5), ordenados del mas al menos relevante. Ejemplo: [3, 1, 7]"""
 
-            response = client.models.generate_content(
-                model='gemini-2.5-flash',
-                contents=prompt,
-            )
-            
+            try:
+                response = client.models.generate_content(
+                    model='gemini-3.8-flash',
+                    contents=prompt,
+                )
+            except APIError as e:
+                if e.code == 503 or "503" in str(e):
+                    response = client.models.generate_content(
+                        model='gemini-3.5-flash-lite',
+                        contents=prompt,
+                    )
+                else:
+                    raise e  
+
             text = response.text.replace('```json', '').replace('```', '').strip()
             ids = json.loads(text)
             
@@ -500,15 +516,19 @@ Responde SOLO con un JSON array de los ids de equipo mas relevantes (maximo 5), 
                     equipo = next((e for e in disponibles if e.id == item_id), None)
                     if equipo:
                         resultados.append({
-                            'nombre': equipo.nombre, 'codigo_inventario': equipo.codigo_inventario, 
+                            'nombre': equipo.nombre, 
+                            'codigo_inventario': equipo.codigo_inventario, 
                             'estado': equipo.get_estado_display()
                         })
                 fuente = 'ia_gemini'
+                
         except Exception as e:
-            print(f"Error llamando a Gemini: {e}")
-    
-        if not resultados:
-            terminos = consulta.lower().split()
+         
+            print(f"Advertencia: Falló la IA de Gemini ({str(e)}). Cayendo a búsqueda local.")
+            
+   
+    if not resultados:
+        terminos = consulta.lower().split()
         for e in disponibles:
             texto = f"{e.nombre} {e.modelo or ''} {e.especificaciones or ''}".lower()
             score = sum(1 for t in terminos if t in texto)
@@ -520,7 +540,8 @@ Responde SOLO con un JSON array de los ids de equipo mas relevantes (maximo 5), 
         
         for e in disp_con_score[:5]:
             resultados.append({
-                'nombre': e.nombre, 'codigo_inventario': e.codigo_inventario, 
+                'nombre': e.nombre, 
+                'codigo_inventario': e.codigo_inventario, 
                 'estado': e.get_estado_display()
             })
             
