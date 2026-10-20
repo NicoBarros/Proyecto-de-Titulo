@@ -143,19 +143,38 @@ La suite está en `inventario/tests/` y cubre permisos por rol, inventario, el f
 mantenimiento, exportación a Excel, códigos QR, auditoría, búsqueda con IA (Gemini simulado, nunca llama a la API real) y el panel
 de administración.
 
-## Despliegue
+## Despliegue en Render
 
-1. Define las variables de entorno del servidor: `SECRET_KEY`, `DEBUG=False`, `ALLOWED_HOSTS` y
-   `DATABASE_URL`.
-2. Comando de build:
-   ```
-   pip install -r requirements.txt && python manage.py collectstatic --noinput && python manage.py migrate
-   ```
-3. Comando de inicio:
-   ```
-   gunicorn leica_project.wsgi
-   ```
+El repositorio incluye `render.yaml` (Blueprint) y `build.sh`, que crean el servicio web y una base
+PostgreSQL administrada.
 
+1. En [Render](https://render.com), entra a **New → Blueprint** y conecta este repositorio de GitHub.
+2. Render lee `render.yaml` y propone crear `leica-inventario` (web) y `leica-db` (PostgreSQL).
+   Antes de confirmar, completa las variables marcadas como privadas:
+
+   | Variable | Valor |
+   |---|---|
+   | `ADMIN_EMAIL` | Correo del administrador inicial (ej. `encargado@inacapmail.cl`) |
+   | `ADMIN_PASSWORD` | Contraseña del administrador inicial |
+   | `GEMINI_API_KEY` | Opcional. Sin ella, la búsqueda usa solo palabras clave |
+
+3. Confirma con **Apply**. El primer despliegue tarda unos minutos.
+
+`SECRET_KEY` se genera automáticamente, `DATABASE_URL` se conecta sola a la base creada y el dominio
+`*.onrender.com` se agrega por sí mismo a `ALLOWED_HOSTS` y `CSRF_TRUSTED_ORIGINS`.
+
+En cada despliegue, `build.sh` instala las dependencias, genera los archivos estáticos, aplica las
+migraciones y crea el administrador (solo la primera vez; luego no cambia su contraseña). Para cargar
+los datos de prueba del comando `seed`, cambia `CARGAR_DATOS_DEMO` a `true` y vuelve a desplegar;
+esos usuarios usan la contraseña pública `Leica2026!`, así que no lo actives en un despliegue real.
+
+El comando `python manage.py marcar_atrasadas` se puede programar como **Cron Job** en Render para
+marcar los préstamos vencidos aunque nadie abra la aplicación.
+
+### Otro servidor
+
+Define `SECRET_KEY`, `DEBUG=False`, `ALLOWED_HOSTS`, `CSRF_TRUSTED_ORIGINS` y `DATABASE_URL`, ejecuta
+`bash build.sh` como comando de build y `gunicorn leica_project.wsgi:application` como comando de inicio.
 `staticfiles/` no se versiona: `collectstatic` lo genera en cada despliegue.
 
 ## Estructura

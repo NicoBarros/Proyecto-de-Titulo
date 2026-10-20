@@ -1,0 +1,36 @@
+databases:
+  - name: leica-db
+    databaseName: leica_inventario
+    user: leica
+    plan: free
+
+services:
+  - type: web
+    name: leica-inventario
+    runtime: python
+    plan: free
+    buildCommand: bash build.sh
+    startCommand: gunicorn leica_project.wsgi:application
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.14.0
+      - key: DATABASE_URL
+        fromDatabase:
+          name: leica-db
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DEBUG
+        value: "False"
+      - key: WEB_CONCURRENCY
+        value: "2"
+      - key: DOMINIO_INSTITUCIONAL
+        value: inacapmail.cl
+      - key: CARGAR_DATOS_DEMO
+        value: "false"
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false

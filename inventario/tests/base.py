@@ -22,6 +22,7 @@ STORAGES_TEST = {
     GEMINI_API_KEY='',
     # Hasher rapido: PBKDF2 hace muy lenta la creacion de usuarios en cada clase de test.
     PASSWORD_HASHERS=['django.contrib.auth.hashers.MD5PasswordHasher'],
+    SECURE_SSL_REDIRECT=False,
 )
 class LeicaTestCase(TestCase):
     """Base con un usuario por rol y helpers para crear datos de prueba."""

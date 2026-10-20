@@ -15,6 +15,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 env = environ.Env(
     DEBUG=(bool, False),
     ALLOWED_HOSTS=(list, ['localhost', '127.0.0.1']),
+    CSRF_TRUSTED_ORIGINS=(list, []),
+    RENDER_EXTERNAL_HOSTNAME=(str, ''),
+    SECURE_SSL_REDIRECT=(bool, True),
     DATABASE_URL=(str, ''),
     DOMINIO_INSTITUCIONAL=(str, 'inacapmail.cl'),
     GEMINI_API_KEY=(str, ''),
@@ -24,12 +27,20 @@ environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
 SECRET_KEY = env('SECRET_KEY')
 DEBUG = env('DEBUG')
 ALLOWED_HOSTS = env('ALLOWED_HOSTS')
-INTERNAL_IPS = ['127.0.0.1'] 
+CSRF_TRUSTED_ORIGINS = env('CSRF_TRUSTED_ORIGINS')
+INTERNAL_IPS = ['127.0.0.1']
+
+RENDER_EXTERNAL_HOSTNAME = env('RENDER_EXTERNAL_HOSTNAME')
+if RENDER_EXTERNAL_HOSTNAME:
+    ALLOWED_HOSTS.append(RENDER_EXTERNAL_HOSTNAME)
+    CSRF_TRUSTED_ORIGINS.append(f'https://{RENDER_EXTERNAL_HOSTNAME}')
 
 if not DEBUG:
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
     SECURE_CONTENT_TYPE_NOSNIFF = True
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    SECURE_SSL_REDIRECT = env('SECURE_SSL_REDIRECT')
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -75,7 +86,7 @@ WSGI_APPLICATION = 'leica_project.wsgi.application'
 
 if env('DATABASE_URL'):
     DATABASES = {
-        'default': dj_database_url.config(default=env('DATABASE_URL'), conn_max_age=600)
+        'default': dj_database_url.config(default=env('DATABASE_URL'), conn_max_age=600, conn_health_checks=True)
     }
 else:
     DATABASES = {
@@ -106,6 +117,9 @@ USE_TZ = True
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 STORAGES = {
+    'default': {
+        'BACKEND': 'django.core.files.storage.FileSystemStorage',
+    },
     'staticfiles': {
         'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage',
     },
@@ -115,3 +129,10 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 DOMINIO_INSTITUCIONAL = env('DOMINIO_INSTITUCIONAL')
 GEMINI_API_KEY = env('GEMINI_API_KEY')
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {'console': {'class': 'logging.StreamHandler'}},
+    'root': {'handlers': ['console'], 'level': 'WARNING'},
+}
