@@ -1,124 +1,146 @@
 {% extends 'inventario/base.html' %}
 
 {% block content %}
-<div class="card">
-  <h2>Mantenimiento and Control Técnico</h2>
-  <p style="font-size: 0.85rem; color: var(--inacap-text-muted); margin-top: -8px; margin-bottom: 16px;">
-    Si el costo de reparación de un equipo supera o iguala el <strong>70% de su valor de adquisición</strong>, el
-    sistema sugiere automáticamente darle de baja. Al finalizar una reparación, presiona <strong>"Reparación
-      Completada"</strong> para retornar el equipo a estado <strong>Disponible</strong> en el inventario.
-  </p>
-
-  <form class="inline" method="post" action="{% url 'mantenimiento' %}">
-    {% csrf_token %}
-    <div class="field">
-      <label>Equipo a diagnosticar</label>
-      <select name="equipo_id" required>
-        {% for e in equipos %}
-        <option value="{{ e.id }}">{{ e.nombre }} ({{ e.codigo_inventario }}) — Estado: {{ e.get_estado_display }}
-        </option>
-        {% endfor %}
-      </select>
+<div class="card mb-4">
+  <div class="card-header">
+    <i class="bi bi-tools me-2"></i>Mantenimiento y Control Técnico
+  </div>
+  <div class="card-body">
+    <div class="alert alert-info border-0 mb-3" role="alert">
+      <i class="bi bi-info-circle-fill me-2"></i>
+      Si el costo de reparación de un equipo supera o iguala el <strong>70% de su valor de adquisición</strong>, el
+      sistema sugiere automáticamente darle de baja. Al finalizar una reparación, presiona <strong>"Reparación
+        Completada"</strong> para retornar el equipo a estado <strong>Disponible</strong> en el inventario.
     </div>
-    <div class="field">
-      <label>Falla descrita</label>
-      <input name="falla_descrita" placeholder="Describa el problema o desperfecto" required>
-    </div>
-    <div class="field">
-      <label>Costo cotizado ($)</label>
-      <input name="costo_cotizado" type="number" step="0.01" placeholder="Ej: 45000" required>
-    </div>
-    <button class="btn" type="submit">Diagnosticar</button>
-  </form>
 
-  <table>
-    <thead>
-      <tr>
-        <th>Equipo</th>
-        <th>Estado Actual</th>
-        <th>Falla</th>
-        <th>Costo Cotizado</th>
-        <th>% Adquisición</th>
-        <th>Sugerencia / Decisión</th>
-        <th>Acciones</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for m in mantenimientos %}
-      <tr>
-        <td>
-          <strong>{{ m.equipo.nombre }}</strong><br>
-          <small style="color: var(--inacap-text-muted);">{{ m.equipo.codigo_inventario }}</small>
-        </td>
-        <td>
-          {% if m.decision == 'completado' %}
-          <span class="badge disponible">Disponible</span>
-          {% elif m.decision == 'dar_baja' %}
-          <span class="badge fuera_servicio">Fuera de servicio</span>
-          {% else %}
-          <span class="badge en_mantenimiento">En mantenimiento</span>
-          {% endif %}
-        </td>
-        <td>{{ m.falla_descrita }}</td>
-        <td>${{ m.costo_cotizado|floatformat:'0'|default:"-" }}</td>
-        <td>
-          {% if m.porcentaje_costo %}
-          {% widthratio m.porcentaje_costo 1 100 %}%
-          {% if m.porcentaje_costo >= 0.7 %}
-          <span title="Supera el 70%" style="color: var(--inacap-red); font-weight: bold;">(≥70%)</span>
-          {% endif %}
-          {% else %}
-          -
-          {% endif %}
-        </td>
-        <td>
-          <span class="badge {{ m.decision }}">{{ m.get_decision_display }}</span>
-        </td>
-        <td>
-          {% if m.decision != 'completado' and m.decision != 'dar_baja' %}
-          <form method="post" style="display:flex; gap: 6px; flex-wrap: wrap;">
-            {% csrf_token %}
-            <input type="hidden" name="mant_id" value="{{ m.id }}">
-            <button type="submit" name="accion_mant" value="completar_reparacion" class="btn chico"
-              style="background: #16a34a; color: white;"
-              title="Marcar reparación lista y dejar el equipo disponible en inventario">
-              ✓ Reparación Completada
-            </button>
+    <!-- Formulario diagnóstico -->
+    <form class="leica-filter-bar mb-4" method="post" action="{% url 'mantenimiento' %}">
+      {% csrf_token %}
+      <div class="row g-2 align-items-end">
+        <div class="col-md-4">
+          <label class="form-label fw-semibold small">Equipo a diagnosticar</label>
+          <select name="equipo_id" class="form-select form-select-sm" required>
+            {% for e in equipos %}
+            <option value="{{ e.id }}">{{ e.nombre }} ({{ e.codigo_inventario }}) — Estado: {{ e.get_estado_display }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label fw-semibold small">Falla descrita</label>
+          <input name="falla_descrita" class="form-control form-control-sm" placeholder="Describa el problema o desperfecto" required>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label fw-semibold small">Costo cotizado ($)</label>
+          <input name="costo_cotizado" type="number" step="0.01" class="form-control form-control-sm" placeholder="Ej: 45000" required>
+        </div>
+        <div class="col-md-2">
+          <button class="btn btn-leica btn-sm w-100" type="submit">
+            <i class="bi bi-search me-1"></i>Diagnosticar
+          </button>
+        </div>
+      </div>
+    </form>
 
-            {% if m.decision == 'pendiente' %}
-            <button type="submit" name="accion_mant" value="reparar" class="btn chico">
-              Confirmar Reparar
-            </button>
-            <button type="submit" name="accion_mant" value="dar_baja" class="btn chico secundario"
-              onclick="return confirm('¿Confirmas dar de baja este equipo?');">
-              Dar de baja
-            </button>
-            {% elif m.decision == 'reparar' %}
-            <button type="submit" name="accion_mant" value="dar_baja" class="btn chico secundario"
-              onclick="return confirm('¿Dar de baja este equipo?');">
-              Dar de baja
-            </button>
-            {% endif %}
-          </form>
-          {% elif m.decision == 'completado' %}
-          <span style="color: #16a34a; font-size: 0.8rem; font-weight: 600;">
-            ✓ Reparado ({{ m.fecha_resolucion|date:"d/m/Y H:i" }})
-          </span>
-          {% elif m.decision == 'dar_baja' %}
-          <span style="color: var(--inacap-red); font-size: 0.8rem; font-weight: 600;">
-            ✕ Fuera de servicio
-          </span>
-          {% endif %}
-        </td>
-      </tr>
-      {% empty %}
-      <tr>
-        <td colspan="7" style="text-align: center; color: var(--inacap-text-muted); padding: 20px;">
-          No hay registros de mantenimiento en el sistema.
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+    <!-- Tabla mantenimientos -->
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead>
+          <tr>
+            <th>Equipo</th>
+            <th>Estado Actual</th>
+            <th>Falla</th>
+            <th>Costo Cotizado</th>
+            <th>% Adquisición</th>
+            <th>Sugerencia / Decisión</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for m in mantenimientos %}
+          <tr>
+            <td>
+              <strong>{{ m.equipo.nombre }}</strong><br>
+              <small class="text-muted">{{ m.equipo.codigo_inventario }}</small>
+            </td>
+            <td>
+              {% if m.decision == 'completado' %}
+              <span class="badge disponible">Disponible</span>
+              {% elif m.decision == 'dar_baja' %}
+              <span class="badge fuera_servicio">Fuera de servicio</span>
+              {% else %}
+              <span class="badge en_mantenimiento">En mantenimiento</span>
+              {% endif %}
+            </td>
+            <td>{{ m.falla_descrita }}</td>
+            <td>${{ m.costo_cotizado|floatformat:'0'|default:"-" }}</td>
+            <td>
+              {% if m.porcentaje_costo %}
+              {% widthratio m.porcentaje_costo 1 100 %}%
+              {% if m.porcentaje_costo >= 0.7 %}
+              <span class="text-danger fw-bold" data-bs-toggle="tooltip" title="Supera el 70%">
+                <i class="bi bi-exclamation-triangle-fill"></i> (≥70%)
+              </span>
+              {% endif %}
+              {% else %}
+              -
+              {% endif %}
+            </td>
+            <td>
+              <span class="badge {{ m.decision }}">{{ m.get_decision_display }}</span>
+            </td>
+            <td>
+              {% if m.decision != 'completado' and m.decision != 'dar_baja' %}
+              <form method="post" class="d-flex gap-1 flex-wrap">
+                {% csrf_token %}
+                <input type="hidden" name="mant_id" value="{{ m.id }}">
+                <button type="submit" name="accion_mant" value="completar_reparacion" class="btn btn-success btn-sm"
+                  data-bs-toggle="tooltip"
+                  title="Marcar reparación lista y dejar el equipo disponible en inventario">
+                  <i class="bi bi-check-lg me-1"></i>Reparación Completada
+                </button>
+
+                {% if m.decision == 'pendiente' %}
+                <button type="submit" name="accion_mant" value="reparar" class="btn btn-primary btn-sm">
+                  Confirmar Reparar
+                </button>
+                <button type="button" name="accion_mant" value="dar_baja" class="btn btn-outline-danger btn-sm"
+                  data-confirm="¿Confirmas dar de baja este equipo por fallas técnicas?"
+                  data-confirm-title="Dar de Baja Equipo"
+                  data-confirm-btn="Sí, dar de baja">
+                  Dar de baja
+                </button>
+                {% elif m.decision == 'reparar' %}
+                <button type="button" name="accion_mant" value="dar_baja" class="btn btn-outline-danger btn-sm"
+                  data-confirm="¿Confirmas dar de baja este equipo definitivamente?"
+                  data-confirm-title="Dar de Baja Equipo"
+                  data-confirm-btn="Sí, dar de baja">
+                  Dar de baja
+                </button>
+                {% endif %}
+              </form>
+              {% elif m.decision == 'completado' %}
+              <span class="text-success fw-semibold" style="font-size: 0.8rem;">
+                <i class="bi bi-check-circle-fill me-1"></i>Reparado ({{ m.fecha_resolucion|date:"d/m/Y H:i" }})
+              </span>
+              {% elif m.decision == 'dar_baja' %}
+              <span class="text-danger fw-semibold" style="font-size: 0.8rem;">
+                <i class="bi bi-x-circle-fill me-1"></i>Fuera de servicio
+              </span>
+              {% endif %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="7" class="text-center text-muted py-4">
+              <i class="bi bi-wrench fs-3 d-block mb-2"></i>
+              No hay registros de mantenimiento en el sistema.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
 </div>
 {% endblock %}

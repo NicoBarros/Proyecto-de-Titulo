@@ -1,30 +1,24 @@
 {% extends 'inventario/base.html' %}
 
 {% block content %}
-<div class="inacap-banner">
-  <div class="inacap-banner-content">
-    <div class="inacap-banner-tag">
-      <svg width="16" height="16" fill="currentColor" viewBox="0 0 20 20">
-        <path
-          d="M10.394 2.08a1 1 0 00-.788 0l-7 3a1 1 0 000 1.84L5.25 8.051a10.978 10.978 0 01-1.636 2.87.5.5 0 00.41.808 10.96 10.96 0 003.957-.75l2.019.866V15a1 1 0 00.5.866l4 2.5a1 1 0 001.5-.866v-6.52l1.62-.694a1 1 0 000-1.84l-7-3z" />
-      </svg>
+<div class="leica-banner mb-4">
+  <div>
+    <div class="leica-banner-tag">
+      <i class="bi bi-mortarboard-fill"></i>
       INACAP · LABORATORIO LEICA
     </div>
-    <h1 class="inacap-banner-title">Dashboard</h1>
-    <p class="inacap-banner-subtitle" style="margin-bottom: 0;">
+    <h1 class="leica-banner-title">Dashboard</h1>
+    <p class="leica-banner-subtitle mb-0">
       Administración, trazabilidad QR y préstamo de equipamiento tecnológico e insumos para docencia y proyectos.
     </p>
   </div>
 </div>
 
-<div class="inacap-quick-grid">
-  <a href="{% url 'solicitudes' %}" class="inacap-quick-card quick-pink">
+<div class="leica-quick-grid mb-4">
+  <a href="{% url 'solicitudes' %}" class="leica-quick-card quick-pink">
     <div class="quick-card-left">
       <div class="quick-card-icon">
-        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-          <path stroke-linecap="round" stroke-linejoin="round"
-            d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
+        <i class="bi bi-info-circle-fill"></i>
       </div>
       <div class="quick-card-info">
         <h4>Mis Solicitudes</h4>
@@ -32,20 +26,14 @@
       </div>
     </div>
     <span class="quick-card-action">
-      <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-        <path stroke-linecap="round" stroke-linejoin="round"
-          d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-      </svg>
+      <i class="bi bi-box-arrow-up-right fs-5"></i>
     </span>
   </a>
 
-  <a href="{% url 'inventario' %}" class="inacap-quick-card quick-blue">
+  <a href="{% url 'inventario' %}" class="leica-quick-card quick-blue">
     <div class="quick-card-left">
       <div class="quick-card-icon">
-        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-          <path stroke-linecap="round" stroke-linejoin="round"
-            d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-        </svg>
+        <i class="bi bi-calendar-check-fill"></i>
       </div>
       <div class="quick-card-info">
         <h4>Inventario Activo</h4>
@@ -53,20 +41,14 @@
       </div>
     </div>
     <span class="quick-card-action">
-      <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-        <path stroke-linecap="round" stroke-linejoin="round"
-          d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-      </svg>
+      <i class="bi bi-box-arrow-up-right fs-5"></i>
     </span>
   </a>
 
-  <a href="{% url 'solicitudes' %}" class="inacap-quick-card quick-green">
+  <a href="{% url 'solicitudes' %}" class="leica-quick-card quick-green">
     <div class="quick-card-left">
       <div class="quick-card-icon">
-        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-          <path stroke-linecap="round" stroke-linejoin="round"
-            d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
-        </svg>
+        <i class="bi bi-patch-check-fill"></i>
       </div>
       <div class="quick-card-info">
         <h4>Solicitud de Equipos</h4>
@@ -74,20 +56,14 @@
       </div>
     </div>
     <span class="quick-card-action">
-      <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-        <path stroke-linecap="round" stroke-linejoin="round"
-          d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-      </svg>
+      <i class="bi bi-box-arrow-up-right fs-5"></i>
     </span>
   </a>
 
-  <a href="{% url 'busqueda' %}" class="inacap-quick-card quick-orange">
+  <a href="{% url 'busqueda' %}" class="leica-quick-card quick-orange">
     <div class="quick-card-left">
       <div class="quick-card-icon">
-        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-          <path stroke-linecap="round" stroke-linejoin="round"
-            d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-        </svg>
+        <i class="bi bi-lightbulb-fill"></i>
       </div>
       <div class="quick-card-info">
         <h4>Asistente IA Gemini</h4>
@@ -95,121 +71,144 @@
       </div>
     </div>
     <span class="quick-card-action">
-      <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-        <path stroke-linecap="round" stroke-linejoin="round"
-          d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-      </svg>
+      <i class="bi bi-box-arrow-up-right fs-5"></i>
     </span>
   </a>
 </div>
 
 {% if atrasadas %}
-<div class="card alerta-atrasos">
-  <h2>
-    <span>Préstamos vencidos sin devolver ({{ atrasadas|length }})</span>
-    <a href="{% url 'solicitudes' %}" class="btn chico">Ir a solicitudes</a>
-  </h2>
-  <table>
-    <thead>
-      <tr>
-        <th>#</th>
-        <th>Responsable</th>
-        <th>Ítems</th>
-        <th>Debía devolverse</th>
-        <th>Atraso</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for s in atrasadas %}
-      <tr>
-        <td>{{ s.id }}</td>
-        <td>
-          {% with r=s.en_representacion_de|default:s.solicitante %}
-          {{ r.get_full_name|default:r.email }}{% if r.seccion %} <small>({{ r.seccion }})</small>{% endif %}
-          {% endwith %}
-        </td>
-        <td>{% for item in s.items.all %}{% if item.equipo %}{{ item.equipo.nombre }}{% else %}{{ item.insumo.nombre }}
-          x{{ item.cantidad }}{% endif %}{% if not forloop.last %}, {% endif %}{% endfor %}</td>
-        <td>{{ s.horario_fin|date:"d/m/Y H:i" }}</td>
-        <td><span class="badge atrasada">{{ s.horario_fin|timesince }}</span></td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+<div class="card alerta-atrasos mb-4">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span><i class="bi bi-exclamation-triangle-fill me-2"></i>Préstamos vencidos sin devolver ({{ atrasadas|length }})</span>
+    <a href="{% url 'solicitudes' %}" class="btn btn-leica btn-sm">Ir a solicitudes</a>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Responsable</th>
+            <th>Ítems</th>
+            <th>Debía devolverse</th>
+            <th>Atraso</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in atrasadas %}
+          <tr>
+            <td>{{ s.id }}</td>
+            <td>
+              {% with r=s.en_representacion_de|default:s.solicitante %}
+              {{ r.get_full_name|default:r.email }}{% if r.seccion %} <small class="text-muted">({{ r.seccion }})</small>{% endif %}
+              {% endwith %}
+            </td>
+            <td>{% for item in s.items.all %}{% if item.equipo %}{{ item.equipo.nombre }}{% else %}{{ item.insumo.nombre }}
+              x{{ item.cantidad }}{% endif %}{% if not forloop.last %}, {% endif %}{% endfor %}</td>
+            <td>{{ s.horario_fin|date:"d/m/Y H:i" }}</td>
+            <td><span class="badge atrasada">{{ s.horario_fin|timesince }}</span></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
 </div>
 {% endif %}
 
-<div class="card">
-  <h2>
-    <span>Estado Operativo de Inventario</span>
-    <span style="font-size: 0.8rem; font-weight: 500; color: var(--inacap-text-muted);">Sede Valdivia · Tiempo
-      Real</span>
-  </h2>
-
-  <div class="grid">
-    <div class="stat">
-      <div class="n" style="color: #1f2937;">{{ totales.total_equipos }}</div>
-      <div class="l">Equipos totales</div>
-    </div>
-    <div class="stat">
-      <div class="n" style="color: #16a34a;">{{ totales.equipos_disponibles }}</div>
-      <div class="l">Disponibles en pañol</div>
-    </div>
-    <div class="stat">
-      <div class="n" style="color: #d97706;">{{ totales.equipos_prestados }}</div>
-      <div class="l">Actualmente prestados</div>
-    </div>
-    <div class="stat">
-      <div class="n" style="color: #7c3aed;">{{ totales.equipos_mantenimiento }}</div>
-      <div class="l">En mantenimiento</div>
-    </div>
-    <div class="stat">
-      <div class="n" style="color: #2563eb;">{{ totales.solicitudes_pendientes }}</div>
-      <div class="l">Solicitudes pendientes</div>
-    </div>
-    <div class="stat">
-      <div class="n" style="color: var(--inacap-red);">{{ totales.solicitudes_atrasadas }}</div>
-      <div class="l">Devoluciones atrasadas</div>
-    </div>
-    <div class="stat">
-      <div class="n" style="color: #dc2626;">{{ totales.insumos_bajo_stock }}</div>
-      <div class="l">Insumos bajo stock crítico</div>
+<div class="card mb-4">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span><i class="bi bi-activity me-2"></i>Estado Operativo de Inventario</span>
+    <span class="text-muted fw-normal" style="font-size: 0.8rem;">Sede Valdivia · Tiempo Real</span>
+  </div>
+  <div class="card-body">
+    <div class="row g-3">
+      <div class="col-6 col-md-4 col-xl">
+        <div class="leica-stat">
+          <div class="stat-number" style="color: #1f2937;">{{ totales.total_equipos }}</div>
+          <div class="stat-label">Equipos totales</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-4 col-xl">
+        <div class="leica-stat">
+          <div class="stat-number" style="color: #16a34a;">{{ totales.equipos_disponibles }}</div>
+          <div class="stat-label">Disponibles en pañol</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-4 col-xl">
+        <div class="leica-stat">
+          <div class="stat-number" style="color: #d97706;">{{ totales.equipos_prestados }}</div>
+          <div class="stat-label">Actualmente prestados</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-4 col-xl">
+        <div class="leica-stat">
+          <div class="stat-number" style="color: #7c3aed;">{{ totales.equipos_mantenimiento }}</div>
+          <div class="stat-label">En mantenimiento</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-4 col-xl">
+        <div class="leica-stat">
+          <div class="stat-number" style="color: #2563eb;">{{ totales.solicitudes_pendientes }}</div>
+          <div class="stat-label">Solicitudes pendientes</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-4 col-xl">
+        <div class="leica-stat">
+          <div class="stat-number" style="color: var(--leica-red);">{{ totales.solicitudes_atrasadas }}</div>
+          <div class="stat-label">Devoluciones atrasadas</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-4 col-xl">
+        <div class="leica-stat">
+          <div class="stat-number" style="color: #dc2626;">{{ totales.insumos_bajo_stock }}</div>
+          <div class="stat-label">Insumos bajo stock crítico</div>
+        </div>
+      </div>
     </div>
   </div>
 </div>
 
-<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-  <div class="card" style="margin-bottom: 0;">
-    <h2>Acciones Rápidas</h2>
-    <div style="display: flex; flex-direction: column; gap: 10px;">
-      <a href="{% url 'solicitudes' %}" class="btn" style="justify-content: center;">
-        + Crear Nueva Solicitud de Préstamo / Kit
-      </a>
-      <a href="{% url 'inventario' %}" class="btn secundario" style="justify-content: center;">
-        Ver y Filtrar Inventario Completo
-      </a>
-      {% if user.rol in 'encargado_laboratorio,control_calidad' %}
-      <a href="{% url 'exportar_inventario' %}" class="btn secundario" style="justify-content: center;">
-        Descargar Inventario (Excel)
-      </a>
-      {% endif %}
+<div class="row g-4">
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header">
+        <i class="bi bi-lightning-fill me-2"></i>Acciones Rápidas
+      </div>
+      <div class="card-body d-flex flex-column gap-3">
+        <a href="{% url 'solicitudes' %}" class="btn btn-leica w-100">
+          <i class="bi bi-plus-lg me-2"></i>Crear Nueva Solicitud de Préstamo / Kit
+        </a>
+        <a href="{% url 'inventario' %}" class="btn btn-leica-secondary w-100">
+          <i class="bi bi-search me-2"></i>Ver y Filtrar Inventario Completo
+        </a>
+        {% if user.rol in 'encargado_laboratorio,control_calidad' %}
+        <a href="{% url 'exportar_inventario' %}" class="btn btn-leica-secondary w-100">
+          <i class="bi bi-file-earmark-excel me-2"></i>Descargar Inventario (Excel)
+        </a>
+        {% endif %}
+      </div>
     </div>
   </div>
 
-  <div class="card" style="margin-bottom: 0;">
-    <h2>Información del Usuario</h2>
-    <p style="margin: 0 0 8px 0; font-size: 0.88rem;"><strong>Nombre:</strong>
-      {{user.get_full_name|default:user.username }}</p>
-    <p style="margin: 0 0 8px 0; font-size: 0.88rem;"><strong>Correo:</strong> {{ user.email }}</p>
-    <p style="margin: 0 0 8px 0; font-size: 0.88rem;"><strong>Rol en el Sistema:</strong> <span
-        class="badge disponible">{{ user.get_rol_display }}</span></p>
-    <p style="margin: 0; font-size: 0.82rem; color: var(--inacap-text-muted);">
-      {% if user.rol in 'encargado_laboratorio,control_calidad' %}
-      Tienes permisos administrativos para aprobar solicitudes, gestionar mantenimientos y exportar el inventario.
-      {% else %}
-      Tienes acceso a realizar préstamos y consultar disponibilidad de equipamiento.
-      {% endif %}
-    </p>
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header">
+        <i class="bi bi-person-badge-fill me-2"></i>Información del Usuario
+      </div>
+      <div class="card-body">
+        <p class="mb-2"><strong>Nombre:</strong> {{ user.get_full_name|default:user.username }}</p>
+        <p class="mb-2"><strong>Correo:</strong> {{ user.email }}</p>
+        <p class="mb-2"><strong>Rol en el Sistema:</strong> <span class="badge disponible">{{ user.get_rol_display }}</span></p>
+        <p class="mb-0 text-muted" style="font-size: 0.85rem;">
+          {% if user.rol in 'encargado_laboratorio,control_calidad' %}
+          Tienes permisos administrativos para aprobar solicitudes, gestionar mantenimientos y exportar el inventario.
+          {% else %}
+          Tienes acceso a realizar préstamos y consultar disponibilidad de equipamiento.
+          {% endif %}
+        </p>
+      </div>
+    </div>
   </div>
 </div>
 {% endblock %}

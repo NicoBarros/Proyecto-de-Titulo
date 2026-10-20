@@ -12,9 +12,6 @@ import dj_database_url
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# --- Variables de entorno ---
-# Valores por defecto seguros: DEBUG apagado y hosts locales. SECRET_KEY no tiene
-# default y debe venir del .env (o de las variables de entorno del servidor).
 env = environ.Env(
     DEBUG=(bool, False),
     ALLOWED_HOSTS=(list, ['localhost', '127.0.0.1']),
@@ -27,14 +24,13 @@ environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
 SECRET_KEY = env('SECRET_KEY')
 DEBUG = env('DEBUG')
 ALLOWED_HOSTS = env('ALLOWED_HOSTS')
-INTERNAL_IPS = ['127.0.0.1']  # habilita la variable 'debug' en plantillas (solo con DEBUG=True)
+INTERNAL_IPS = ['127.0.0.1'] 
 
 if not DEBUG:
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
     SECURE_CONTENT_TYPE_NOSNIFF = True
 
-# --- Aplicaciones ---
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -47,11 +43,12 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
-    'whitenoise.middleware.WhiteNoiseMiddleware',  # archivos estaticos en produccion
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'inventario.middleware.NoCacheForAuthenticatedMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
@@ -76,9 +73,6 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'leica_project.wsgi.application'
 
-# --- Base de datos ---
-# En desarrollo usa SQLite; en produccion (Render/Railway) usa la variable
-# DATABASE_URL que apunta a PostgreSQL.
 if env('DATABASE_URL'):
     DATABASES = {
         'default': dj_database_url.config(default=env('DATABASE_URL'), conn_max_age=600)
@@ -91,7 +85,6 @@ else:
         }
     }
 
-# --- Autenticacion ---
 AUTH_USER_MODEL = 'inventario.Usuario'
 
 LOGIN_URL = '/login/'
@@ -105,13 +98,11 @@ AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
 ]
 
-# --- Internacionalizacion ---
 LANGUAGE_CODE = 'es-cl'
 TIME_ZONE = 'America/Santiago'
 USE_I18N = True
 USE_TZ = True
 
-# --- Archivos estaticos ---
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 STORAGES = {
@@ -122,6 +113,5 @@ STORAGES = {
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# --- Variables personalizadas del proyecto ---
 DOMINIO_INSTITUCIONAL = env('DOMINIO_INSTITUCIONAL')
 GEMINI_API_KEY = env('GEMINI_API_KEY')

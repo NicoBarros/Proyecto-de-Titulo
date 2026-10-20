@@ -1,4 +1,5 @@
 from django.shortcuts import render, redirect, get_object_or_404
+from django.core.paginator import Paginator
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import login
 from django.contrib import messages
@@ -97,8 +98,14 @@ def inventario_view(request):
 
         ubicaciones = Equipo.objects.exclude(ubicacion__isnull=True).exclude(ubicacion='').values_list('ubicacion', flat=True).distinct()
 
-        context['equipos'] = qs
-        context['total_equipos_filtrados'] = qs.count()
+        total_filtrados = qs.count()
+        paginator = Paginator(qs, 25)
+        page_obj = paginator.get_page(request.GET.get('page'))
+
+        context['equipos'] = page_obj
+        context['page_obj'] = page_obj
+        context['paginator'] = paginator
+        context['total_equipos_filtrados'] = total_filtrados
         context['total_equipos_general'] = Equipo.objects.count()
         context['q'] = q
         context['filtro_estado'] = filtro_estado
@@ -137,7 +144,7 @@ def inventario_view(request):
             qs = qs.filter(tipo=filtro_tipo)
 
         if filtro_stock == 'bajo':
-            qs = [i for i in qs if i.bajo_stock]
+            qs = qs.filter(cantidad_disponible__lte=F('umbral_minimo'))
         elif filtro_stock == 'agotado':
             qs = qs.filter(cantidad_disponible=0)
         elif filtro_stock == 'disponible':
@@ -145,7 +152,14 @@ def inventario_view(request):
 
         categorias = Insumo.objects.exclude(categoria__isnull=True).exclude(categoria='').values_list('categoria', flat=True).distinct()
 
-        context['insumos'] = qs
+        total_insumos_filtrados = qs.count()
+        paginator_insumos = Paginator(qs, 25)
+        page_obj_insumos = paginator_insumos.get_page(request.GET.get('page_insumo'))
+
+        context['insumos'] = page_obj_insumos
+        context['page_obj_insumos'] = page_obj_insumos
+        context['paginator_insumos'] = paginator_insumos
+        context['total_insumos_filtrados'] = total_insumos_filtrados
         context['total_insumos_general'] = Insumo.objects.count()
         context['q_insumo'] = q_insumo
         context['filtro_categoria'] = filtro_categoria
@@ -482,7 +496,6 @@ def solicitudes_view(request):
             return redirect('solicitudes')
             
         try:
-            # Atomico: si algo falla a mitad de camino, no queda ningun cambio a medias.
             with transaction.atomic():
                 _ejecutar_accion_solicitud(request, request.POST.get('solicitud_id'), request.POST.get('accion'))
             messages.success(request, f'Solicitud {request.POST.get("accion")} correctamente.')
@@ -497,7 +510,6 @@ def solicitudes_view(request):
         .prefetch_related('items', 'items__equipo', 'items__insumo')
     )
     if not puede_aprobar:
-        # Estudiantes y docentes solo ven sus propias solicitudes.
         solicitudes = solicitudes.filter(Q(solicitante=request.user) | Q(en_representacion_de=request.user))
     equipos = Equipo.objects.filter(estado=Equipo.Estado.DISPONIBLE)
     insumos = Insumo.objects.all()
@@ -566,7 +578,7 @@ def mantenimiento_view(request):
 
                 if equipo.valor_adquisicion:
                     proporcion = costo / Decimal(equipo.valor_adquisicion)
-                    # El redondeo es solo para guardar/mostrar; la regla se evalua con el valor exacto.
+
                     porcentaje = proporcion.quantize(Decimal('0.0001'), rounding=ROUND_HALF_UP)
                 else:
                     proporcion = porcentaje = None
@@ -663,19 +675,23 @@ Responde SOLO con un JSON array de los ids de equipo mas relevantes (maximo 5), 
 
             try:
                 response = client.models.generate_content(
-                    model='gemini-3.8-flash',
+                    model='gemini-2.5-flash',
                     contents=prompt,
                 )
             except APIError as e:
                 if e.code == 503 or "503" in str(e):
                     response = client.models.generate_content(
-                        model='gemini-3.5-flash-lite',
+                        model='gemini-2.0-flash',
                         contents=prompt,
                     )
                 else:
                     raise e  
 
             text = response.text.replace('```json', '').replace('```', '').strip()
+            import re
+            match = re.search(r'\[[\d,\s]*\]', text)
+            if match:
+                text = match.group(0)
             ids = json.loads(text)
             
             if isinstance(ids, list):
@@ -742,8 +758,6 @@ def admin_panel_view(request):
                 messages.error(request, 'Identificador no válido.')
                 return redirect('admin_panel')
 
-        # Un administrador staff (no superusuario) solo gestiona cuentas comunes:
-        # no puede tocar a otros administradores ni otorgar roles con privilegios.
         if not request.user.is_superuser:
             if accion in ('cambiar_rol', 'toggle_activo', 'desbloquear', 'reset_password'):
                 objetivo = get_object_or_404(Usuario, id=request.POST.get('user_id'))

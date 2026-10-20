@@ -1,79 +1,69 @@
 <!DOCTYPE html>
 {% load static %}
-<html lang="es">
+<html lang="es" data-bs-theme="light" style="background-color: #F4F6F9;">
 
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>LEICA · Sistema de Gestión de Inventario INACAP</title>
-  <link rel="stylesheet" href="{% static 'inventario/css/styles.css' %}" />
+  <meta name="description" content="Sistema de Gestión de Inventario y Préstamo de Equipos de Laboratorio con IA · LEICA, INACAP Valdivia" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="{% static 'inventario/css/styles.css' %}?v=1.3" />
 </head>
 
-<body>
+<body style="background-color: #F4F6F9;">
   {% if user.is_authenticated %}
-  <div class="inacap-layout">
-    <aside class="inacap-sidebar">
-      <div class="inacap-sidebar-brand">
-        <a href="{% url 'dashboard' %}" title="INACAP - Portal LEICA">
+  <div class="d-flex min-vh-100">
+    <aside class="leica-sidebar d-none d-lg-flex flex-column">
+      <div class="leica-sidebar-brand">
+        <a href="{% url 'dashboard' %}" class="text-decoration-none" title="INACAP - Portal LEICA">
           {% include 'inventario/inacap_logo.html' %}
         </a>
-        <span class="inacap-sidebar-subtitle">LEICA</span>
+        <span class="leica-sidebar-subtitle">LEICA</span>
       </div>
 
-      <nav class="inacap-nav">
+      <nav class="leica-nav flex-grow-1">
         <a href="{% url 'dashboard' %}"
-          class="inacap-nav-item {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">
-          <span class="inacap-icon-bubble bubble-inicio">
-            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-              <path stroke-linecap="round" stroke-linejoin="round"
-                d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-            </svg>
+          class="leica-nav-item {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">
+          <span class="leica-icon-bubble bubble-inicio">
+            <i class="bi bi-house-door-fill"></i>
           </span>
           <span>Inicio</span>
         </a>
 
         <a href="{% url 'inventario' %}"
-          class="inacap-nav-item {% if request.resolver_match.url_name == 'inventario' %}active{% endif %}">
-          <span class="inacap-icon-bubble bubble-academico">
-            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-              <path stroke-linecap="round" stroke-linejoin="round"
-                d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-            </svg>
+          class="leica-nav-item {% if request.resolver_match.url_name == 'inventario' %}active{% endif %}">
+          <span class="leica-icon-bubble bubble-academico">
+            <i class="bi bi-grid-fill"></i>
           </span>
           <span>Inventario</span>
         </a>
 
         <a href="{% url 'solicitudes' %}"
-          class="inacap-nav-item {% if request.resolver_match.url_name == 'solicitudes' %}active{% endif %}">
-          <span class="inacap-icon-bubble bubble-curricular">
-            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-              <path stroke-linecap="round" stroke-linejoin="round"
-                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
+          class="leica-nav-item {% if request.resolver_match.url_name == 'solicitudes' %}active{% endif %}">
+          <span class="leica-icon-bubble bubble-curricular">
+            <i class="bi bi-file-earmark-text-fill"></i>
           </span>
           <span>Solicitudes</span>
         </a>
 
         <a href="{% url 'busqueda' %}"
-          class="inacap-nav-item {% if request.resolver_match.url_name == 'busqueda' %}active{% endif %}">
-          <span class="inacap-icon-bubble bubble-estudia">
-            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-              <path stroke-linecap="round" stroke-linejoin="round"
-                d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.286L13 21l-2.286-6.857L5 12l5.714-2.286L13 3z" />
-            </svg>
+          class="leica-nav-item {% if request.resolver_match.url_name == 'busqueda' %}active{% endif %}">
+          <span class="leica-icon-bubble bubble-estudia">
+            <i class="bi bi-stars"></i>
           </span>
           <span>Búsqueda IA</span>
         </a>
 
         {% if user.rol in 'encargado_laboratorio,control_calidad' %}
         <a href="{% url 'mantenimiento' %}"
-          class="inacap-nav-item {% if request.resolver_match.url_name == 'mantenimiento' %}active{% endif %}">
-          <span class="inacap-icon-bubble bubble-financiamiento">
-            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-              <path stroke-linecap="round" stroke-linejoin="round"
-                d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-              <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
+          class="leica-nav-item {% if request.resolver_match.url_name == 'mantenimiento' %}active{% endif %}">
+          <span class="leica-icon-bubble bubble-financiamiento">
+            <i class="bi bi-gear-fill"></i>
           </span>
           <span>Mantenimiento</span>
         </a>
@@ -81,42 +71,92 @@
 
         {% if user.rol not in 'estudiante,docente' %}
         <a href="{% url 'reportes' %}"
-          class="inacap-nav-item {% if request.resolver_match.url_name == 'reportes' %}active{% endif %}">
-          <span class="inacap-icon-bubble bubble-tecnologicos">
-            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-              <path stroke-linecap="round" stroke-linejoin="round"
-                d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-            </svg>
+          class="leica-nav-item {% if request.resolver_match.url_name == 'reportes' %}active{% endif %}">
+          <span class="leica-icon-bubble bubble-tecnologicos">
+            <i class="bi bi-bar-chart-line-fill"></i>
           </span>
-          <span>Reportes & KPIs</span>
+          <span>Reportes &amp; KPIs</span>
         </a>
         {% endif %}
 
         {% if user.is_staff %}
         <a href="{% url 'admin_panel' %}"
-          class="inacap-nav-item {% if request.resolver_match.url_name == 'admin_panel' %}active{% endif %}">
-          <span class="inacap-icon-bubble bubble-admin">
-            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-              <path stroke-linecap="round" stroke-linejoin="round"
-                d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-            </svg>
+          class="leica-nav-item {% if request.resolver_match.url_name == 'admin_panel' %}active{% endif %}">
+          <span class="leica-icon-bubble bubble-admin">
+            <i class="bi bi-shield-lock-fill"></i>
           </span>
           <span>Panel Admin</span>
         </a>
         {% endif %}
       </nav>
     </aside>
+    <div class="offcanvas offcanvas-start leica-offcanvas" tabindex="-1" id="mobileSidebar">
+      <div class="offcanvas-header border-bottom">
+        <div class="d-flex align-items-center gap-2">
+          {% include 'inventario/inacap_logo.html' %}
+          <span class="leica-sidebar-subtitle ms-2">LEICA</span>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Cerrar"></button>
+      </div>
+      <div class="offcanvas-body p-0">
+        <nav class="leica-nav">
+          <a href="{% url 'dashboard' %}"
+            class="leica-nav-item {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">
+            <span class="leica-icon-bubble bubble-inicio"><i class="bi bi-house-door-fill"></i></span>
+            <span>Inicio</span>
+          </a>
+          <a href="{% url 'inventario' %}"
+            class="leica-nav-item {% if request.resolver_match.url_name == 'inventario' %}active{% endif %}">
+            <span class="leica-icon-bubble bubble-academico"><i class="bi bi-grid-fill"></i></span>
+            <span>Inventario</span>
+          </a>
+          <a href="{% url 'solicitudes' %}"
+            class="leica-nav-item {% if request.resolver_match.url_name == 'solicitudes' %}active{% endif %}">
+            <span class="leica-icon-bubble bubble-curricular"><i class="bi bi-file-earmark-text-fill"></i></span>
+            <span>Solicitudes</span>
+          </a>
+          <a href="{% url 'busqueda' %}"
+            class="leica-nav-item {% if request.resolver_match.url_name == 'busqueda' %}active{% endif %}">
+            <span class="leica-icon-bubble bubble-estudia"><i class="bi bi-stars"></i></span>
+            <span>Búsqueda IA</span>
+          </a>
+          {% if user.rol in 'encargado_laboratorio,control_calidad' %}
+          <a href="{% url 'mantenimiento' %}"
+            class="leica-nav-item {% if request.resolver_match.url_name == 'mantenimiento' %}active{% endif %}">
+            <span class="leica-icon-bubble bubble-financiamiento"><i class="bi bi-gear-fill"></i></span>
+            <span>Mantenimiento</span>
+          </a>
+          {% endif %}
+          {% if user.rol not in 'estudiante,docente' %}
+          <a href="{% url 'reportes' %}"
+            class="leica-nav-item {% if request.resolver_match.url_name == 'reportes' %}active{% endif %}">
+            <span class="leica-icon-bubble bubble-tecnologicos"><i class="bi bi-bar-chart-line-fill"></i></span>
+            <span>Reportes &amp; KPIs</span>
+          </a>
+          {% endif %}
+          {% if user.is_staff %}
+          <a href="{% url 'admin_panel' %}"
+            class="leica-nav-item {% if request.resolver_match.url_name == 'admin_panel' %}active{% endif %}">
+            <span class="leica-icon-bubble bubble-admin"><i class="bi bi-shield-lock-fill"></i></span>
+            <span>Panel Admin</span>
+          </a>
+          {% endif %}
+        </nav>
+      </div>
+    </div>
 
-    <div class="inacap-content-wrapper">
-      <header class="inacap-topbar">
-        <div class="inacap-topbar-left">
-          <div class="inacap-user-avatar" title="{{ user.get_full_name|default:user.username }}">
-            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-              <path stroke-linecap="round" stroke-linejoin="round"
-                d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-            </svg>
+    <div class="flex-grow-1 d-flex flex-column leica-content-wrapper">
+      <header class="leica-topbar mb-3">
+        <div class="d-flex align-items-center gap-2">
+          <button class="btn btn-link text-white d-lg-none p-0 me-2" type="button"
+            data-bs-toggle="offcanvas" data-bs-target="#mobileSidebar" aria-label="Menú">
+            <i class="bi bi-list fs-4"></i>
+          </button>
+
+          <div class="leica-user-avatar">
+            <i class="bi bi-person-fill"></i>
           </div>
-          <span class="inacap-user-name">
+          <span class="leica-user-name d-none d-sm-inline">
             {% if user.get_full_name %}
             {{ user.get_full_name|upper }}
             {% elif user.first_name %}
@@ -125,101 +165,309 @@
             {{ user.username|upper }}
             {% endif %}
           </span>
-          <span class="inacap-role-badge">{{ user.get_rol_display|upper }}</span>
+          <span class="badge leica-role-badge">{{ user.get_rol_display|upper }}</span>
         </div>
 
-        <div class="inacap-topbar-right">
+        <div class="d-flex align-items-center gap-2">
           {% if user.is_staff %}
-          <a href="{% url 'admin_panel' %}" class="inacap-topbar-btn inacap-admin-btn">
-            Panel Admin
+          <a href="{% url 'admin_panel' %}" class="btn btn-danger btn-sm fw-semibold">
+            <i class="bi bi-shield-lock me-1"></i>Panel Admin
           </a>
           {% endif %}
-          <form method="post" action="{% url 'logout' %}" style="display:inline; margin:0;">
+          <form method="post" action="{% url 'logout' %}" class="d-inline m-0">
             {% csrf_token %}
-            <button type="submit" class="inacap-topbar-btn">
-              <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round"
-                  d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-              </svg>
-              Cerrar Sesión
+            <button type="submit" class="btn btn-outline-light btn-sm fw-semibold">
+              <i class="bi bi-box-arrow-right me-1"></i>Cerrar Sesión
             </button>
           </form>
         </div>
       </header>
-
-      <main id="app" class="app">
+      <main id="app" class="flex-grow-1">
         {% if messages %}
-        <ul class="messages">
+        <div class="mb-3">
           {% for message in messages %}
-          <li{% if message.tags %} class="{{ message.tags }}" {% endif %}>{{ message }}</li>
-            {% endfor %}
-        </ul>
+          <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show border-0 shadow-sm" role="alert">
+            <i class="bi {% if message.tags == 'success' %}bi-check-circle-fill{% elif message.tags == 'error' %}bi-exclamation-triangle-fill{% elif message.tags == 'warning' %}bi-exclamation-circle-fill{% else %}bi-info-circle-fill{% endif %} me-2"></i>
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
+          </div>
+          {% endfor %}
+        </div>
         {% endif %}
 
         {% block content %}{% endblock %}
       </main>
 
-      <footer class="footer">
+      <footer class="text-center text-muted py-3 mt-auto" style="font-size: 0.75rem;">
         Sistema de Gestión de Inventario y Préstamo de Equipos de Laboratorio con IA · LEICA, INACAP Valdivia &copy;
         2026
       </footer>
     </div>
   </div>
+
   {% else %}
-  <div style="min-height: 100vh; background: var(--inacap-bg); display: flex; flex-direction: column;">
-    <header
-      style="background: var(--inacap-wine); padding: 14px 28px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 2px 8px rgba(0,0,0,0.15);">
-      <div
-        style="display: flex; align-items: center; gap: 14px; background: white; padding: 6px 14px; border-radius: 6px;">
+  <div class="min-vh-100 d-flex flex-column" style="background: var(--leica-bg);">
+    <header class="leica-login-header">
+      <div class="d-flex align-items-center gap-3 bg-white px-3 py-1 rounded-2">
         {% include 'inventario/inacap_logo.html' %}
       </div>
-      <div style="color: white; font-size: 0.88rem; font-weight: 600; letter-spacing: 0.5px;">
+      <div class="text-white fw-semibold" style="font-size: 0.88rem; letter-spacing: 0.5px;">
         PORTAL INSTITUCIONAL LEICA
       </div>
     </header>
 
-    <main class="app" style="flex: 1; display: flex; align-items: center; justify-content: center;">
-      {% if messages %}
-      <ul class="messages" style="width: 100%; max-width: 420px; margin: 0 auto 16px;">
-        {% for message in messages %}
-        <li{% if message.tags %} class="{{ message.tags }}" {% endif %}>{{ message }}</li>
+    <main class="flex-grow-1 d-flex align-items-center justify-content-center px-3">
+      <div style="width: 100%; max-width: 460px;">
+        {% if messages %}
+        <div class="mb-3">
+          {% for message in messages %}
+          <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show border-0" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
+          </div>
           {% endfor %}
-      </ul>
-      {% endif %}
+        </div>
+        {% endif %}
 
-      {% block login_content %}{% endblock %}
+        {% block login_content %}{% endblock %}
+      </div>
     </main>
 
-    <footer class="footer">
+    <footer class="text-center text-muted py-3" style="font-size: 0.75rem;">
       Sistema de Gestión de Inventario LEICA · INACAP Sede Valdivia &copy; 2026
     </footer>
   </div>
   {% endif %}
+  <!-- Modal Confirmación Global Leica -->
+  <div class="modal fade" id="leicaConfirmModal" tabindex="-1" aria-labelledby="leicaConfirmModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+      <div class="modal-content shadow border-0" style="border-radius: 16px;">
+        <div class="modal-body text-center p-4">
+          <div class="mb-3">
+            <span class="d-inline-flex align-items-center justify-content-center rounded-circle bg-danger-subtle text-danger" style="width: 58px; height: 58px;">
+              <i class="bi bi-exclamation-triangle-fill fs-3" id="leicaConfirmIcon"></i>
+            </span>
+          </div>
+          <h5 class="fw-bold mb-2 text-dark" id="leicaConfirmTitle">¿Confirmar acción?</h5>
+          <p class="text-muted small mb-4" id="leicaConfirmMessage">¿Estás seguro de que deseas realizar esta operación?</p>
+          <div class="d-flex justify-content-center gap-2">
+            <button type="button" class="btn btn-outline-secondary btn-sm px-3" data-bs-dismiss="modal">
+              Cancelar
+            </button>
+            <button type="button" class="btn btn-danger btn-sm px-3 fw-semibold" id="leicaConfirmBtn">
+              Confirmar
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
   {% block scripts %}{% endblock %}
 
   <script>
     (function () {
-      var scrollKey = 'leica_scroll_' + window.location.pathname;
-      var savedPos = sessionStorage.getItem(scrollKey);
-      if (savedPos !== null) {
-        window.scrollTo(0, parseInt(savedPos, 10));
-        sessionStorage.removeItem(scrollKey);
-      }
-      document.addEventListener('click', function (e) {
-        var target = e.target.closest('a, button');
-        if (target) {
-          sessionStorage.setItem(scrollKey, window.scrollY);
+      // Prevención de acceso tras cierre de sesión vía botón Atrás del navegador (BFCache):
+      // Si la página se recupera de la memoria caché del navegador, fuerza la recarga
+      // para que el servidor verifique la autenticación y redirija al login.
+      window.addEventListener('pageshow', function (event) {
+        var navEntries = window.performance && performance.getEntriesByType && performance.getEntriesByType('navigation');
+        var isBackForward = event.persisted || (navEntries && navEntries[0] && navEntries[0].type === 'back_forward');
+        if (isBackForward) {
+          window.location.reload();
         }
       });
-      document.addEventListener('submit', function () {
+
+      if ('scrollRestoration' in history) {
+        history.scrollRestoration = 'manual';
+      }
+
+      var scrollKey = 'leica_scroll_' + window.location.pathname;
+
+      // Restauración instantánea directa sin animaciones ni retrasos
+      var savedPos = sessionStorage.getItem(scrollKey);
+      if (savedPos !== null) {
+        var pos = parseInt(savedPos, 10);
+        if (!isNaN(pos) && pos > 0) {
+          window.scrollTo({ top: pos, left: 0, behavior: 'instant' });
+        }
+      }
+
+      // Save scroll position continuously and before unload
+      window.addEventListener('scroll', function () {
+        sessionStorage.setItem(scrollKey, window.scrollY);
+      }, { passive: true });
+
+      window.addEventListener('beforeunload', function () {
         sessionStorage.setItem(scrollKey, window.scrollY);
       });
+
+      // Clear destination scroll only when user explicitly clicks a sidebar navigation item
+      document.addEventListener('click', function (e) {
+        var navLink = e.target.closest('.leica-nav-item, .leica-sidebar-brand a');
+        if (navLink) {
+          try {
+            var url = new URL(navLink.href, window.location.origin);
+            sessionStorage.removeItem('leica_scroll_' + url.pathname);
+            sessionStorage.removeItem(scrollKey);
+          } catch (err) {}
+          return;
+        }
+
+        var a = e.target.closest('a');
+        if (a && a.href && !a.getAttribute('href').startsWith('#')) {
+          try {
+            var targetUrl = new URL(a.href, window.location.origin);
+            if (targetUrl.pathname !== window.location.pathname) {
+              sessionStorage.removeItem('leica_scroll_' + targetUrl.pathname);
+            }
+          } catch (err) {}
+        }
+      });
+
+      // Helper global para alertas informativas con modal Bootstrap integrado
+      window.mostrarAlerta = function (mensaje, titulo, opciones) {
+        opciones = opciones || {};
+        var modalEl = document.getElementById('leicaConfirmModal');
+        if (!modalEl) {
+          window.nativeAlert ? window.nativeAlert(mensaje) : alert(mensaje);
+          return;
+        }
+        var bsModal = bootstrap.Modal.getOrCreateInstance(modalEl);
+
+        var titleEl = document.getElementById('leicaConfirmTitle');
+        var msgEl = document.getElementById('leicaConfirmMessage');
+        var btnEl = document.getElementById('leicaConfirmBtn');
+        var cancelBtn = modalEl.querySelector('[data-bs-dismiss="modal"]');
+        var iconEl = document.getElementById('leicaConfirmIcon');
+
+        titleEl.textContent = titulo || 'Aviso';
+        msgEl.textContent = mensaje;
+        btnEl.textContent = opciones.btnText || 'Aceptar';
+        btnEl.className = 'btn btn-sm px-4 fw-semibold ' + (opciones.btnClass || 'btn-leica');
+
+        if (cancelBtn) cancelBtn.style.display = 'none';
+
+        iconEl.className = opciones.iconClass || 'bi bi-info-circle-fill fs-3 text-warning';
+        iconEl.parentElement.className = 'd-inline-flex align-items-center justify-content-center rounded-circle bg-warning-subtle text-warning';
+
+        var newBtn = btnEl.cloneNode(true);
+        btnEl.parentNode.replaceChild(newBtn, btnEl);
+
+        function cleanup() {
+          if (cancelBtn) cancelBtn.style.display = '';
+          iconEl.className = 'bi bi-exclamation-triangle-fill fs-3';
+          iconEl.parentElement.className = 'd-inline-flex align-items-center justify-content-center rounded-circle bg-danger-subtle text-danger';
+        }
+
+        newBtn.addEventListener('click', function () {
+          bsModal.hide();
+          cleanup();
+          if (typeof opciones.onClose === 'function') opciones.onClose();
+        });
+
+        modalEl.addEventListener('hidden.bs.modal', function handler() {
+          cleanup();
+          modalEl.removeEventListener('hidden.bs.modal', handler);
+        });
+
+        bsModal.show();
+      };
+
+      // Redirigir llamadas de alert() nativo hacia el modal integrado
+      window.nativeAlert = window.alert;
+      window.alert = function (mensaje) {
+        window.mostrarAlerta(mensaje, 'Aviso');
+      };
+
+      // Helper global para confirmar acciones con modal Bootstrap integrado
+      window.confirmarAccion = function (options) {
+        var modalEl = document.getElementById('leicaConfirmModal');
+        if (!modalEl) {
+          if (confirm(options.message || '¿Confirmar acción?')) {
+            if (typeof options.onConfirm === 'function') options.onConfirm();
+          }
+          return;
+        }
+        var bsModal = bootstrap.Modal.getOrCreateInstance(modalEl);
+
+        var titleEl = document.getElementById('leicaConfirmTitle');
+        var msgEl = document.getElementById('leicaConfirmMessage');
+        var btnEl = document.getElementById('leicaConfirmBtn');
+        var iconEl = document.getElementById('leicaConfirmIcon');
+
+        titleEl.textContent = options.title || '¿Confirmar acción?';
+        msgEl.textContent = options.message || '¿Estás seguro de continuar?';
+        btnEl.textContent = options.btnText || 'Confirmar';
+        btnEl.className = 'btn btn-sm px-3 fw-semibold ' + (options.btnClass || 'btn-danger');
+
+        if (options.iconClass) {
+          iconEl.className = options.iconClass;
+        } else {
+          iconEl.className = 'bi bi-exclamation-triangle-fill fs-3';
+        }
+
+        var newBtn = btnEl.cloneNode(true);
+        btnEl.parentNode.replaceChild(newBtn, btnEl);
+
+        newBtn.addEventListener('click', function () {
+          bsModal.hide();
+          if (typeof options.onConfirm === 'function') {
+            options.onConfirm();
+          }
+        });
+
+        bsModal.show();
+      };
+
+      // Interceptor de data-confirm para reemplazar el confirm() nativo del navegador
+      document.addEventListener('click', function (e) {
+        var trigger = e.target.closest('[data-confirm]');
+        if (!trigger) return;
+
+        e.preventDefault();
+        e.stopPropagation();
+
+        var message = trigger.getAttribute('data-confirm');
+        var title = trigger.getAttribute('data-confirm-title') || '¿Confirmar acción?';
+        var btnText = trigger.getAttribute('data-confirm-btn') || 'Confirmar';
+        var btnClass = trigger.getAttribute('data-confirm-class') || 'btn-danger';
+
+        window.confirmarAccion({
+          title: title,
+          message: message,
+          btnText: btnText,
+          btnClass: btnClass,
+          onConfirm: function () {
+            var form = trigger.closest('form');
+            if (form) {
+              if (trigger.name) {
+                var hidden = document.createElement('input');
+                hidden.type = 'hidden';
+                hidden.name = trigger.name;
+                hidden.value = trigger.value || '';
+                form.appendChild(hidden);
+              }
+              form.submit();
+            } else if (trigger.tagName === 'A' && trigger.href) {
+              window.location.href = trigger.href;
+            }
+          }
+        });
+      });
+
       document.addEventListener('click', function (e) {
         var campo = e.target.closest('input[type="date"], input[type="datetime-local"], input[type="time"]');
         if (campo && typeof campo.showPicker === 'function') {
           try { campo.showPicker(); } catch (err) {}
         }
+      });
+
+      var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+      tooltipTriggerList.forEach(function (el) {
+        new bootstrap.Tooltip(el);
       });
     })();
   </script>

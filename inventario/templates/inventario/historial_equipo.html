@@ -1,41 +1,93 @@
 {% extends 'inventario/base.html' %}
 
 {% block content %}
-<div class="card">
-  <h2>
-    <span>Historial de cambios: {{ equipo.nombre }} ({{ equipo.codigo_inventario }})</span>
-    <a href="{% url 'inventario' %}?tab=equipos" class="btn chico secundario">Volver al inventario</a>
-  </h2>
-  <p class="hint">
-    Estado actual: <span class="badge {{ equipo.estado }}">{{ equipo.get_estado_display }}</span>
-    · Versión {{ equipo.version }}
-  </p>
+<div class="card mb-4">
+  <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <div class="d-flex align-items-center gap-2">
+      <i class="bi bi-clock-history me-1"></i>
+      <span class="fw-bold">Historial de cambios: {{ equipo.nombre }}</span>
+      <span class="badge bg-light text-dark border">{{ equipo.codigo_inventario }}</span>
+    </div>
+    <a href="{% url 'inventario' %}?tab=equipos" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-arrow-left me-1"></i>Volver al inventario
+    </a>
+  </div>
 
-  <table>
-    <thead><tr><th>Fecha</th><th>Usuario</th><th>Acción</th><th>Cambios</th><th>Origen</th></tr></thead>
-    <tbody>
-      {% for r in registros %}
-      <tr>
-        <td style="white-space: nowrap;">{{ r.fecha|date:"d/m/Y H:i" }}</td>
-        <td>{{ r.usuario.get_full_name|default:r.usuario.email|default:"Sistema" }}</td>
-        <td><span class="badge historial-{{ r.accion }}">{{ r.get_accion_display }}</span></td>
-        <td>
-          <ul class="historial-cambios">
-            {% for campo, antes, despues in r.lista_cambios %}
-            <li><strong>{{ campo }}:</strong> <span class="historial-antes">{{ antes }}</span> → <span class="historial-despues">{{ despues }}</span></li>
-            {% empty %}
-            <li>Sin cambios en los datos</li>
-            {% endfor %}
-          </ul>
-        </td>
-        <td>{{ r.detalle|default:"Inventario" }}</td>
-      </tr>
-      {% empty %}
-      <tr><td colspan="5" style="text-align: center; color: var(--inacap-text-muted); padding: 24px;">
-        Este equipo aún no tiene cambios registrados.
-      </td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
+  <div class="card-body">
+    <div class="d-flex align-items-center gap-3 p-3 mb-3 bg-light rounded-3 border flex-wrap">
+      <div>
+        <span class="text-muted small">Estado actual:</span>
+        <span class="badge {{ equipo.estado }} ms-1">{{ equipo.get_estado_display }}</span>
+      </div>
+      <div class="vr d-none d-sm-block"></div>
+      <div>
+        <span class="text-muted small">Versión:</span>
+        <strong class="ms-1">v{{ equipo.version }}</strong>
+      </div>
+      {% if equipo.ubicacion %}
+      <div class="vr d-none d-sm-block"></div>
+      <div>
+        <span class="text-muted small">Ubicación:</span>
+        <span class="ms-1 fw-medium">{{ equipo.ubicacion }}</span>
+      </div>
+      {% endif %}
+    </div>
+
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead>
+          <tr>
+            <th style="width: 160px;">Fecha</th>
+            <th>Usuario</th>
+            <th style="width: 140px;">Acción</th>
+            <th>Cambios Registrados</th>
+            <th>Origen / Detalle</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in registros %}
+          <tr>
+            <td class="text-nowrap text-muted small">
+              <i class="bi bi-calendar3 me-1"></i>{{ r.fecha|date:"d/m/Y H:i" }}
+            </td>
+            <td>
+              <div class="d-flex align-items-center gap-2">
+                <i class="bi bi-person-circle text-muted"></i>
+                <span class="fw-medium">{{ r.usuario.get_full_name|default:r.usuario.email|default:"Sistema" }}</span>
+              </div>
+            </td>
+            <td>
+              <span class="badge historial-{{ r.accion }}">{{ r.get_accion_display }}</span>
+            </td>
+            <td>
+              <ul class="historial-cambios list-unstyled mb-0">
+                {% for campo, antes, despues in r.lista_cambios %}
+                <li class="py-1">
+                  <span class="badge bg-light text-secondary border me-1">{{ campo }}</span>
+                  <span class="historial-antes">{{ antes }}</span>
+                  <i class="bi bi-arrow-right mx-1 text-muted"></i>
+                  <span class="historial-despues text-dark">{{ despues }}</span>
+                </li>
+                {% empty %}
+                <li class="text-muted small">Sin cambios en los datos</li>
+                {% endfor %}
+              </ul>
+            </td>
+            <td class="text-muted small">
+              {{ r.detalle|default:"Inventario" }}
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="5" class="text-center text-muted py-5">
+              <i class="bi bi-inbox fs-2 d-block mb-2 text-muted"></i>
+              Este equipo aún no tiene cambios registrados en su historial.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
 </div>
 {% endblock %}

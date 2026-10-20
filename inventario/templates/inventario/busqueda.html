@@ -2,16 +2,27 @@
 
 {% block content %}
 <div class="card">
-  <h2>Búsqueda inteligente</h2>
-  <form id="fBusqueda" class="inline" onsubmit="buscarIA(event)">
-    {% csrf_token %}
-    <div class="field" style="flex:1"><label>Describe lo que necesitas</label>
-      <input name="consulta" id="consulta" style="width:100%"
-        placeholder="ej: necesito algo para armar una red con 3 routers para la clase de mañana" required>
-    </div>
-    <button class="btn" type="submit">Buscar con Gemini</button>
-  </form>
-  <div id="resBusqueda"></div>
+  <div class="card-header">
+    <i class="bi bi-stars me-2"></i>Búsqueda inteligente
+  </div>
+  <div class="card-body">
+    <form id="fBusqueda" class="leica-filter-bar" onsubmit="buscarIA(event)">
+      {% csrf_token %}
+      <div class="row g-2 align-items-end">
+        <div class="col">
+          <label class="form-label fw-semibold small">Describe lo que necesitas</label>
+          <input name="consulta" id="consulta" class="form-control"
+            placeholder="ej: necesito algo para armar una red con 3 routers para la clase de mañana" required>
+        </div>
+        <div class="col-auto">
+          <button class="btn btn-leica" type="submit">
+            <i class="bi bi-search me-1"></i>Buscar con Gemini
+          </button>
+        </div>
+      </div>
+    </form>
+    <div id="resBusqueda" class="mt-3"></div>
+  </div>
 </div>
 {% endblock %}
 
@@ -31,7 +42,7 @@
     const csrf = document.querySelector('[name=csrfmiddlewaretoken]').value;
     const res = document.getElementById('resBusqueda');
 
-    res.innerHTML = 'Buscando con Inteligencia Artificial...';
+    res.innerHTML = '<div class="d-flex align-items-center gap-2 text-primary"><div class="spinner-border spinner-border-sm" role="status"></div> Buscando con Inteligencia Artificial...</div>';
 
     try {
       const formData = new FormData();
@@ -46,9 +57,10 @@
       const data = await resp.json();
       if (!resp.ok) throw new Error(data.error || 'Error en la búsqueda');
 
-      res.replaceChildren(el('p', `Fuente: ${data.fuente}`, 'hint'));
+      res.replaceChildren(el('p', `Fuente: ${data.fuente}`, 'hint mb-3'));
       if (data.resultados.length > 0) {
-        const tabla = el('table');
+        const wrapper = el('div', undefined, 'table-responsive');
+        const tabla = el('table', undefined, 'table table-hover align-middle');
         tabla.innerHTML = '<thead><tr><th>Equipo</th><th>Código</th><th>Estado</th></tr></thead>';
         const tbody = el('tbody');
         data.resultados.forEach(r => {
@@ -59,12 +71,18 @@
           tbody.append(tr);
         });
         tabla.append(tbody);
-        res.append(tabla);
+        wrapper.append(tabla);
+        res.append(wrapper);
       } else {
-        res.append(el('p', 'No se encontraron equipos relevantes disponibles.'));
+        const noData = el('div', undefined, 'text-center text-muted py-4');
+        noData.innerHTML = '<i class="bi bi-search fs-3 d-block mb-2"></i>No se encontraron equipos relevantes disponibles.';
+        res.append(noData);
       }
     } catch (err) {
-      res.replaceChildren(el('div', err.message, 'msg error'));
+      res.innerHTML = '';
+      const alertEl = el('div', undefined, 'alert alert-danger border-0');
+      alertEl.innerHTML = '<i class="bi bi-exclamation-triangle-fill me-2"></i>' + err.message;
+      res.append(alertEl);
     }
   }
 </script>

@@ -1,81 +1,106 @@
 {% extends 'inventario/base.html' %}
 
 {% block content %}
-<div class="card">
-  <h2>Equipos más solicitados</h2>
-  <table>
-    <thead>
-      <tr>
-        <th>Equipo</th>
-        <th>Veces solicitado</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for t in top_equipos %}
-      <tr>
-        <td>{{ t.nombre }}</td>
-        <td>{{ t.veces }}</td>
-      </tr>
-      {% empty %}
-      <tr>
-        <td colspan="2">Sin datos aún.</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+<div class="card mb-4">
+  <div class="card-header">
+    <i class="bi bi-trophy-fill me-2"></i>Equipos más solicitados
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead>
+          <tr>
+            <th>Equipo</th>
+            <th>Veces solicitado</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for t in top_equipos %}
+          <tr>
+            <td><i class="bi bi-cpu me-2 text-primary"></i>{{ t.nombre }}</td>
+            <td><span class="badge bg-primary">{{ t.veces }}</span></td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="2" class="text-center text-muted py-4">
+              <i class="bi bi-bar-chart fs-3 d-block mb-2"></i>Sin datos aún.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="card mb-4">
+  <div class="card-header">
+    <i class="bi bi-exclamation-triangle-fill me-2 text-danger"></i>Préstamos vencidos
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead>
+          <tr>
+            <th>Responsable</th>
+            <th>Solicitante</th>
+            <th>Vence</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for v in vencidos %}
+          {% with r=v.en_representacion_de|default:v.solicitante %}
+          <tr>
+            <td>{{ r.get_full_name|default:r.email }}{% if r.seccion %} <small class="text-muted">({{ r.seccion }})</small>{% endif %}</td>
+            <td>{{ v.solicitante.get_full_name|default:v.solicitante.email }}</td>
+            <td style="white-space: nowrap;">{{ v.horario_inicio|date:"d/m/Y H:i" }} → {{ v.horario_fin|date:"d/m/Y H:i" }}</td>
+          </tr>
+          {% endwith %}
+          {% empty %}
+          <tr>
+            <td colspan="3" class="text-center text-muted py-4">
+              <i class="bi bi-check-circle fs-3 d-block mb-2 text-success"></i>Ninguno.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
 </div>
 
 <div class="card">
-  <h2>Préstamos vencidos</h2>
-  <table>
-    <thead>
-      <tr>
-        <th>Responsable</th>
-        <th>Solicitante</th>
-        <th>Vence</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for v in vencidos %}
-      {% with r=v.en_representacion_de|default:v.solicitante %}
-      <tr>
-        <td>{{ r.get_full_name|default:r.email }}{% if r.seccion %} <small>({{ r.seccion }})</small>{% endif %}</td>
-        <td>{{ v.solicitante.get_full_name|default:v.solicitante.email }}</td>
-        <td>{{ v.horario_inicio|date:"d/m/Y H:i" }} → {{ v.horario_fin|date:"d/m/Y H:i" }}</td>
-      </tr>
-      {% endwith %}
-      {% empty %}
-      <tr>
-        <td colspan="3">Ninguno.</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-</div>
-
-<div class="card">
-  <h2>Equipos sin movimiento ({{ dias }} días)</h2>
-  <table>
-    <thead>
-      <tr>
-        <th>Equipo</th>
-        <th>Código</th>
-        <th>Estado</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for e in sin_movimiento %}
-      <tr>
-        <td>{{ e.nombre }}</td>
-        <td>{{ e.codigo_inventario }}</td>
-        <td><span class="badge {{ e.estado }}">{{ e.get_estado_display }}</span></td>
-      </tr>
-      {% empty %}
-      <tr>
-        <td colspan="3">Todos los equipos tienen movimiento reciente.</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+  <div class="card-header">
+    <i class="bi bi-clock-history me-2"></i>Equipos sin movimiento ({{ dias }} días)
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead>
+          <tr>
+            <th>Equipo</th>
+            <th>Código</th>
+            <th>Estado</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for e in sin_movimiento %}
+          <tr>
+            <td>{{ e.nombre }}</td>
+            <td><code>{{ e.codigo_inventario }}</code></td>
+            <td><span class="badge {{ e.estado }}">{{ e.get_estado_display }}</span></td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="3" class="text-center text-muted py-4">
+              <i class="bi bi-arrow-repeat fs-3 d-block mb-2 text-success"></i>
+              Todos los equipos tienen movimiento reciente.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
 </div>
 {% endblock %}

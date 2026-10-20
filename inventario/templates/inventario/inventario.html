@@ -1,265 +1,428 @@
 {% extends 'inventario/base.html' %}
 
 {% block content %}
-<div class="card">
-  <div
-    style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--rojo); padding-bottom: 8px; margin-top: 0; margin-bottom: 20px;">
-    <h2 style="margin: 0; border: none; padding: 0;">Inventario Institucional</h2>
+<div class="card mb-4">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span><i class="bi bi-grid-3x3-gap-fill me-2"></i>Inventario Institucional</span>
     {% if puede_escribir %}
-    <a href="{% url 'exportar_inventario' %}"><button class="btn secundario chico">Exportar Inventario
-        Excel</button></a>
+    <a href="{% url 'exportar_inventario' %}" class="btn btn-leica-secondary btn-sm">
+      <i class="bi bi-file-earmark-excel me-1"></i>Exportar Inventario Excel
+    </a>
     {% endif %}
   </div>
+  <div class="card-body">
+    <!-- Tabs Bootstrap -->
+    <ul class="nav nav-pills mb-3" role="tablist">
+      <li class="nav-item">
+        <a href="?tab=equipos" class="nav-link {% if tab == 'equipos' %}active{% endif %}">
+          <i class="bi bi-cpu me-1"></i>Equipos activos
+        </a>
+      </li>
+      <li class="nav-item">
+        <a href="?tab=insumos" class="nav-link {% if tab == 'insumos' %}active{% endif %}">
+          <i class="bi bi-box-seam me-1"></i>Insumos y Materiales
+        </a>
+      </li>
+    </ul>
 
-  <div class="tabs">
-    <a href="?tab=equipos"><button class="{% if tab == 'equipos' %}active{% endif %}">Equipos activos</button></a>
-    <a href="?tab=insumos"><button class="{% if tab == 'insumos' %}active{% endif %}">Insumos y Materiales</button></a>
-  </div>
-
-  {% if tab == 'equipos' %}
-  <form method="get" class="inline"
-    style="background: #f8fafc; padding: 14px 16px; border-radius: 8px; border: 1px solid var(--inacap-border); margin-bottom: 18px; align-items: flex-end;">
-    <input type="hidden" name="tab" value="equipos">
-
-    <div class="field">
-      <label>Buscar equipo</label>
-      <input type="text" name="q" value="{{ q }}" placeholder="Código, nombre, modelo..." style="min-width: 220px;">
-    </div>
-
-    <div class="field">
-      <label>Estado</label>
-      <select name="estado">
-        <option value="">Todos los estados</option>
-        {% for val, label in estados_choices %}
-        <option value="{{ val }}" {% if filtro_estado == val %}selected{% endif %}>{{ label }}</option>
-        {% endfor %}
-      </select>
-    </div>
-
-    <div class="field">
-      <label>Ubicación</label>
-      <select name="ubicacion">
-        <option value="">Todas las ubicaciones</option>
-        {% for u in ubicaciones %}
-        <option value="{{ u }}" {% if filtro_ubicacion == u %}selected{% endif %}>{{ u }}</option>
-        {% endfor %}
-      </select>
-    </div>
-
-    <div class="field">
-      <label>Ordenar por</label>
-      <select name="orden">
-        <option value="nombre" {% if orden == 'nombre' %}selected{% endif %}>Nombre (A-Z)</option>
-        <option value="-nombre" {% if orden == '-nombre' %}selected{% endif %}>Nombre (Z-A)</option>
-        <option value="codigo" {% if orden == 'codigo' %}selected{% endif %}>Código</option>
-        <option value="estado" {% if orden == 'estado' %}selected{% endif %}>Estado</option>
-        <option value="-valor" {% if orden == '-valor' %}selected{% endif %}>Mayor Valor ($)</option>
-        <option value="valor" {% if orden == 'valor' %}selected{% endif %}>Menor Valor ($)</option>
-        <option value="-recientes" {% if orden == '-recientes' %}selected{% endif %}>Más recientes</option>
-      </select>
-    </div>
-
-    <button type="submit" class="btn chico" style="height: 35px;">Filtrar</button>
-    {% if q or filtro_estado or filtro_ubicacion or orden != 'nombre' %}
-    <a href="?tab=equipos" class="btn chico secundario"
-      style="height: 35px; text-decoration: none; display: inline-flex; align-items: center;">Limpiar</a>
-    {% endif %}
-
-    <span style="font-size: 0.8rem; color: var(--inacap-text-muted); margin-left: auto; align-self: center;">
-      Mostrando <strong>{{ total_equipos_filtrados }}</strong> de {{ total_equipos_general }} equipos
-    </span>
-  </form>
-
-  {% if puede_escribir %}
-  <form class="inline" method="post" style="margin-bottom: 20px;">
-    {% csrf_token %}
-    <div class="field"><label>Código*</label><input name="codigo_inventario" placeholder="Ej: EQ-099" required></div>
-    <div class="field"><label>Nombre*</label><input name="nombre" placeholder="Nombre del equipo" required></div>
-    <div class="field"><label>Modelo</label><input name="modelo" placeholder="Modelo"></div>
-    <div class="field"><label>Ubicación</label><input name="ubicacion" placeholder="Ej: Estante B3"></div>
-    <div class="field"><label>Valor ($)</label><input name="valor_adquisicion" type="number" step="0.01"
-        placeholder="Ej: 150000"></div>
-    <button class="btn" type="submit">+ Agregar Equipo</button>
-  </form>
-  {% endif %}
-
-  <table>
-    <thead>
-      <tr>
-        <th class="sortable-th"><a
-            href="?tab=equipos{% if q %}&q={{ q }}{% endif %}{% if filtro_estado %}&estado={{ filtro_estado }}{% endif %}{% if filtro_ubicacion %}&ubicacion={{ filtro_ubicacion }}{% endif %}&orden={% if orden == 'codigo' %}-codigo{% else %}codigo{% endif %}"
-            class="th-sort-link">Código {% if orden == 'codigo' %}▲{% elif orden == '-codigo' %}▼{% endif %}</a></th>
-        <th class="sortable-th"><a
-            href="?tab=equipos{% if q %}&q={{ q }}{% endif %}{% if filtro_estado %}&estado={{ filtro_estado }}{% endif %}{% if filtro_ubicacion %}&ubicacion={{ filtro_ubicacion }}{% endif %}&orden={% if orden == 'nombre' %}-nombre{% else %}nombre{% endif %}"
-            class="th-sort-link">Nombre {% if orden == 'nombre' %}▲{% elif orden == '-nombre' %}▼{% endif %}</a></th>
-        <th>Modelo</th>
-        <th>Ubicación</th>
-        <th class="sortable-th"><a
-            href="?tab=equipos{% if q %}&q={{ q }}{% endif %}{% if filtro_estado %}&estado={{ filtro_estado }}{% endif %}{% if filtro_ubicacion %}&ubicacion={{ filtro_ubicacion }}{% endif %}&orden={% if orden == 'estado' %}-estado{% else %}estado{% endif %}"
-            class="th-sort-link">Estado {% if orden == 'estado' %}▲{% elif orden == '-estado' %}▼{% endif %}</a></th>
-        <th class="sortable-th"><a
-            href="?tab=equipos{% if q %}&q={{ q }}{% endif %}{% if filtro_estado %}&estado={{ filtro_estado }}{% endif %}{% if filtro_ubicacion %}&ubicacion={{ filtro_ubicacion }}{% endif %}&orden={% if orden == 'valor' %}-valor{% else %}valor{% endif %}"
-            class="th-sort-link">Valor {% if orden == 'valor' %}▲{% elif orden == '-valor' %}▼{% endif %}</a></th>
-        {% if puede_escribir %}<th>Acciones</th>{% endif %}
-      </tr>
-    </thead>
-    <tbody>
-      {% for e in equipos %}
-      <tr>
-        <td><strong>{{ e.codigo_inventario }}</strong></td>
-        <td>{{ e.nombre }}</td>
-        <td>{{ e.modelo|default:"-" }}</td>
-        <td>{{ e.ubicacion|default:"-" }}</td>
-        <td><span class="badge {{ e.estado }}">{{ e.get_estado_display }}</span></td>
-        <td>{% if e.valor_adquisicion %}${{ e.valor_adquisicion|floatformat:'0' }}{% else %}-{% endif %}</td>
-        {% if puede_escribir %}
-        <td>
-          <button class="btn chico" type="button" data-codigo="{{ e.codigo_inventario }}"
-            data-qr="{% url 'qr_equipo' e.id %}" onclick="mostrarQR(this)">QR</button>
-          <a href="{% url 'editar_equipo' e.id %}"><button class="btn chico">Editar</button></a>
-          <a href="{% url 'historial_equipo' e.id %}"><button class="btn chico secundario">Historial</button></a>
-          <form method="post" action="{% url 'eliminar_equipo' e.id %}" style="display:inline;"
-            onsubmit="return confirm('¿Seguro que deseas eliminar este equipo?');">
-            {% csrf_token %}
-            <button class="btn chico secundario" type="submit">Eliminar</button>
-          </form>
-        </td>
-        {% endif %}
-      </tr>
-      {% empty %}
-      <tr>
-        <td colspan="{% if puede_escribir %}7{% else %}6{% endif %}"
-          style="text-align: center; color: var(--inacap-text-muted); padding: 24px;">
-          No se encontraron equipos con los filtros seleccionados.
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-
-  {% else %}
-  <form method="get" class="inline"
-    style="background: #f8fafc; padding: 14px 16px; border-radius: 8px; border: 1px solid var(--inacap-border); margin-bottom: 18px; align-items: flex-end;">
-    <input type="hidden" name="tab" value="insumos">
-
-    <div class="field">
-      <label>Buscar insumo</label>
-      <input type="text" name="q_insumo" value="{{ q_insumo }}" placeholder="Nombre o categoría..."
-        style="min-width: 220px;">
-    </div>
-
-    <div class="field">
-      <label>Categoría</label>
-      <select name="categoria">
-        <option value="">Todas las categorías</option>
-        {% for c in categorias %}
-        <option value="{{ c }}" {% if filtro_categoria == c %}selected{% endif %}>{{ c }}</option>
-        {% endfor %}
-      </select>
-    </div>
-
-    <div class="field">
-      <label>Tipo de Insumo</label>
-      <select name="tipo">
-        <option value="">Todos los tipos</option>
-        {% for val, label in tipos_choices %}
-        <option value="{{ val }}" {% if filtro_tipo == val %}selected{% endif %}>{{ label }}</option>
-        {% endfor %}
-      </select>
-    </div>
-
-    <div class="field">
-      <label>Disponibilidad</label>
-      <select name="stock">
-        <option value="">Todos</option>
-        <option value="disponible" {% if filtro_stock == 'disponible' %}selected{% endif %}>Con stock disponible</option>
-        <option value="bajo" {% if filtro_stock == 'bajo' %}selected{% endif %}>Bajo stock crítico</option>
-        <option value="agotado" {% if filtro_stock == 'agotado' %}selected{% endif %}>Agotados (0)</option>
-      </select>
-    </div>
-
-    <button type="submit" class="btn chico" style="height: 35px;">Filtrar</button>
-    {% if q_insumo or filtro_categoria or filtro_tipo or filtro_stock %}
-    <a href="?tab=insumos" class="btn chico secundario"
-      style="height: 35px; text-decoration: none; display: inline-flex; align-items: center;">Limpiar</a>
-    {% endif %}
-  </form>
-
-  {% if puede_escribir %}
-  <form class="inline" method="post" style="margin-bottom: 20px;">
-    {% csrf_token %}
-    <div class="field"><label>Nombre*</label><input name="nombre" placeholder="Nombre del insumo" required></div>
-    <div class="field"><label>Categoría</label><input name="categoria" placeholder="Ej: Electrónica"></div>
-    <div class="field"><label>Tipo</label>
-      <select name="tipo">
-        <option value="perecible">Perecible</option>
-        <option value="renovable">Renovable</option>
-      </select>
-    </div>
-    <div class="field"><label>Cantidad inicial*</label><input name="cantidad_total" type="number" min="1"
-        placeholder="Ej: 50" required></div>
-    <div class="field"><label>Umbral mínimo</label><input name="umbral_minimo" type="number" min="0" value="5"></div>
-    <button class="btn" type="submit">+ Agregar Insumo</button>
-  </form>
-  {% endif %}
-
-  <table>
-    <thead>
-      <tr>
-        <th>Nombre</th>
-        <th>Categoría</th>
-        <th>Tipo</th>
-        <th>Disponible / Total</th>
-        {% if puede_escribir %}<th>Acciones</th>{% endif %}
-      </tr>
-    </thead>
-    <tbody>
-      {% for i in insumos %}
-      <tr>
-        <td><strong>{{ i.nombre }}</strong></td>
-        <td>{{ i.categoria|default:"-" }}</td>
-        <td>{{ i.get_tipo_display }}</td>
-        <td>
-          <span class="badge {% if i.bajo_stock %}fuera_servicio{% else %}disponible{% endif %}">
-            {{ i.cantidad_disponible }} / {{ i.cantidad_total }}
-          </span>
-          {% if i.bajo_stock %}
-          <small style="color: var(--inacap-red); font-weight: 600;">(Stock bajo)</small>
+    {% if tab == 'equipos' %}
+    <!-- Filtros Equipos -->
+    <form method="get" class="leica-filter-bar mb-3">
+      <input type="hidden" name="tab" value="equipos">
+      <div class="row g-2 align-items-end">
+        <div class="col-md-3">
+          <label class="form-label fw-semibold small">Buscar equipo</label>
+          <input type="text" name="q" value="{{ q }}" class="form-control form-control-sm"
+            placeholder="Código, nombre, modelo...">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label fw-semibold small">Estado</label>
+          <select name="estado" class="form-select form-select-sm">
+            <option value="">Todos los estados</option>
+            {% for val, label in estados_choices %}
+            <option value="{{ val }}" {% if filtro_estado == val %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label fw-semibold small">Ubicación</label>
+          <select name="ubicacion" class="form-select form-select-sm">
+            <option value="">Todas las ubicaciones</option>
+            {% for u in ubicaciones %}
+            <option value="{{ u }}" {% if filtro_ubicacion == u %}selected{% endif %}>{{ u }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label fw-semibold small">Ordenar por</label>
+          <select name="orden" class="form-select form-select-sm">
+            <option value="nombre" {% if orden == 'nombre' %}selected{% endif %}>Nombre (A-Z)</option>
+            <option value="-nombre" {% if orden == '-nombre' %}selected{% endif %}>Nombre (Z-A)</option>
+            <option value="codigo" {% if orden == 'codigo' %}selected{% endif %}>Código</option>
+            <option value="estado" {% if orden == 'estado' %}selected{% endif %}>Estado</option>
+            <option value="-valor" {% if orden == '-valor' %}selected{% endif %}>Mayor Valor ($)</option>
+            <option value="valor" {% if orden == 'valor' %}selected{% endif %}>Menor Valor ($)</option>
+            <option value="-recientes" {% if orden == '-recientes' %}selected{% endif %}>Más recientes</option>
+          </select>
+        </div>
+        <div class="col-md-3 d-flex gap-2 align-items-end">
+          <button type="submit" class="btn btn-leica btn-sm">
+            <i class="bi bi-funnel me-1"></i>Filtrar
+          </button>
+          {% if q or filtro_estado or filtro_ubicacion or orden != 'nombre' %}
+          <a href="?tab=equipos" class="btn btn-outline-secondary btn-sm">Limpiar</a>
           {% endif %}
-        </td>
-        {% if puede_escribir %}
-        <td>
-          <a href="{% url 'editar_insumo' i.id %}"><button class="btn chico">Editar</button></a>
-          <form method="post" action="{% url 'eliminar_insumo' i.id %}" style="display:inline;"
-            onsubmit="return confirm('¿Seguro que deseas eliminar este insumo?');">
-            {% csrf_token %}
-            <button class="btn chico secundario" type="submit">Eliminar</button>
-          </form>
-        </td>
+          <span class="text-muted ms-auto" style="font-size: 0.8rem; white-space: nowrap;">
+            <strong>{{ total_equipos_filtrados }}</strong> de {{ total_equipos_general }}
+          </span>
+        </div>
+      </div>
+    </form>
+
+    {% if puede_escribir %}
+    <!-- Formulario agregar equipo -->
+    <form class="leica-filter-bar mb-3" method="post">
+      {% csrf_token %}
+      <div class="row g-2 align-items-end">
+        <div class="col-md-2">
+          <label class="form-label fw-semibold small">Código*</label>
+          <input name="codigo_inventario" class="form-control form-control-sm" placeholder="Ej: EQ-099" required>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label fw-semibold small">Nombre*</label>
+          <input name="nombre" class="form-control form-control-sm" placeholder="Nombre del equipo" required>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label fw-semibold small">Modelo</label>
+          <input name="modelo" class="form-control form-control-sm" placeholder="Modelo">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label fw-semibold small">Ubicación</label>
+          <input name="ubicacion" class="form-control form-control-sm" placeholder="Ej: Estante B3">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label fw-semibold small">Valor ($)</label>
+          <input name="valor_adquisicion" type="number" step="0.01" class="form-control form-control-sm"
+            placeholder="Ej: 150000">
+        </div>
+        <div class="col-md-2">
+          <button class="btn btn-leica btn-sm w-100" type="submit">
+            <i class="bi bi-plus-lg me-1"></i>Agregar Equipo
+          </button>
+        </div>
+      </div>
+    </form>
+    {% endif %}
+
+    <!-- Tabla equipos -->
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead>
+          <tr>
+            <th class="p-0"><a
+                href="?tab=equipos{% if q %}&q={{ q }}{% endif %}{% if filtro_estado %}&estado={{ filtro_estado }}{% endif %}{% if filtro_ubicacion %}&ubicacion={{ filtro_ubicacion }}{% endif %}&orden={% if orden == 'codigo' %}-codigo{% else %}codigo{% endif %}"
+                class="th-sort-link">Código {% if orden == 'codigo' %}▲{% elif orden == '-codigo' %}▼{% endif %}</a></th>
+            <th class="p-0"><a
+                href="?tab=equipos{% if q %}&q={{ q }}{% endif %}{% if filtro_estado %}&estado={{ filtro_estado }}{% endif %}{% if filtro_ubicacion %}&ubicacion={{ filtro_ubicacion }}{% endif %}&orden={% if orden == 'nombre' %}-nombre{% else %}nombre{% endif %}"
+                class="th-sort-link">Nombre {% if orden == 'nombre' %}▲{% elif orden == '-nombre' %}▼{% endif %}</a></th>
+            <th>Modelo</th>
+            <th>Ubicación</th>
+            <th class="p-0"><a
+                href="?tab=equipos{% if q %}&q={{ q }}{% endif %}{% if filtro_estado %}&estado={{ filtro_estado }}{% endif %}{% if filtro_ubicacion %}&ubicacion={{ filtro_ubicacion }}{% endif %}&orden={% if orden == 'estado' %}-estado{% else %}estado{% endif %}"
+                class="th-sort-link">Estado {% if orden == 'estado' %}▲{% elif orden == '-estado' %}▼{% endif %}</a></th>
+            <th class="p-0"><a
+                href="?tab=equipos{% if q %}&q={{ q }}{% endif %}{% if filtro_estado %}&estado={{ filtro_estado }}{% endif %}{% if filtro_ubicacion %}&ubicacion={{ filtro_ubicacion }}{% endif %}&orden={% if orden == 'valor' %}-valor{% else %}valor{% endif %}"
+                class="th-sort-link">Valor {% if orden == 'valor' %}▲{% elif orden == '-valor' %}▼{% endif %}</a></th>
+            {% if puede_escribir %}<th>Acciones</th>{% endif %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for e in equipos %}
+          <tr>
+            <td><strong>{{ e.codigo_inventario }}</strong></td>
+            <td>{{ e.nombre }}</td>
+            <td>{{ e.modelo|default:"-" }}</td>
+            <td>{{ e.ubicacion|default:"-" }}</td>
+            <td><span class="badge {{ e.estado }}">{{ e.get_estado_display }}</span></td>
+            <td>{% if e.valor_adquisicion %}${{ e.valor_adquisicion|floatformat:'0' }}{% else %}-{% endif %}</td>
+            {% if puede_escribir %}
+            <td>
+              <div class="btn-group btn-group-sm">
+                <button class="btn btn-outline-primary" type="button" data-codigo="{{ e.codigo_inventario }}"
+                  data-qr="{% url 'qr_equipo' e.id %}" onclick="mostrarQR(this)"
+                  data-bs-toggle="tooltip" title="Ver código QR">
+                  <i class="bi bi-qr-code"></i>
+                </button>
+                <a href="{% url 'editar_equipo' e.id %}" class="btn btn-outline-secondary"
+                  data-bs-toggle="tooltip" title="Editar">
+                  <i class="bi bi-pencil"></i>
+                </a>
+                <a href="{% url 'historial_equipo' e.id %}" class="btn btn-outline-info"
+                  data-bs-toggle="tooltip" title="Historial">
+                  <i class="bi bi-clock-history"></i>
+                </a>
+                <form method="post" action="{% url 'eliminar_equipo' e.id %}" class="d-inline">
+                  {% csrf_token %}
+                  <button class="btn btn-outline-danger" type="button"
+                    data-confirm="¿Seguro que deseas eliminar el equipo {{ e.nombre }} ({{ e.codigo_inventario }})?"
+                    data-confirm-title="Eliminar Equipo"
+                    data-confirm-btn="Sí, eliminar"
+                    data-bs-toggle="tooltip" title="Eliminar">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </form>
+              </div>
+            </td>
+            {% endif %}
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="{% if puede_escribir %}7{% else %}6{% endif %}" class="text-center text-muted py-4">
+              <i class="bi bi-inbox fs-3 d-block mb-2"></i>
+              No se encontraron equipos con los filtros seleccionados.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% if page_obj.has_other_pages %}
+    <nav class="mt-3 d-flex justify-content-center" aria-label="Navegación equipos">
+      <ul class="pagination pagination-sm mb-0">
+        {% if page_obj.has_previous %}
+        <li class="page-item">
+          <a class="page-link" href="?tab=equipos&page={{ page_obj.previous_page_number }}{% if q %}&q={{ q }}{% endif %}{% if filtro_estado %}&estado={{ filtro_estado }}{% endif %}{% if filtro_ubicacion %}&ubicacion={{ filtro_ubicacion }}{% endif %}&orden={{ orden }}">
+            <i class="bi bi-chevron-left"></i>
+          </a>
+        </li>
+        {% else %}
+        <li class="page-item disabled"><span class="page-link"><i class="bi bi-chevron-left"></i></span></li>
         {% endif %}
-      </tr>
-      {% empty %}
-      <tr>
-        <td colspan="{% if puede_escribir %}5{% else %}4{% endif %}"
-          style="text-align: center; color: var(--inacap-text-muted); padding: 24px;">
-          No se encontraron insumos con los filtros seleccionados.
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  {% endif %}
+
+        {% for num in page_obj.paginator.page_range %}
+          {% if page_obj.number == num %}
+          <li class="page-item active"><span class="page-link">{{ num }}</span></li>
+          {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+          <li class="page-item">
+            <a class="page-link" href="?tab=equipos&page={{ num }}{% if q %}&q={{ q }}{% endif %}{% if filtro_estado %}&estado={{ filtro_estado }}{% endif %}{% if filtro_ubicacion %}&ubicacion={{ filtro_ubicacion }}{% endif %}&orden={{ orden }}">{{ num }}</a>
+          </li>
+          {% endif %}
+        {% endfor %}
+
+        {% if page_obj.has_next %}
+        <li class="page-item">
+          <a class="page-link" href="?tab=equipos&page={{ page_obj.next_page_number }}{% if q %}&q={{ q }}{% endif %}{% if filtro_estado %}&estado={{ filtro_estado }}{% endif %}{% if filtro_ubicacion %}&ubicacion={{ filtro_ubicacion }}{% endif %}&orden={{ orden }}">
+            <i class="bi bi-chevron-right"></i>
+          </a>
+        </li>
+        {% else %}
+        <li class="page-item disabled"><span class="page-link"><i class="bi bi-chevron-right"></i></span></li>
+        {% endif %}
+      </ul>
+    </nav>
+    {% endif %}
+
+    {% else %}
+    <!-- Tab Insumos -->
+    <form method="get" class="leica-filter-bar mb-3">
+      <input type="hidden" name="tab" value="insumos">
+      <div class="row g-2 align-items-end">
+        <div class="col-md-3">
+          <label class="form-label fw-semibold small">Buscar insumo</label>
+          <input type="text" name="q_insumo" value="{{ q_insumo }}" class="form-control form-control-sm"
+            placeholder="Nombre o categoría...">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label fw-semibold small">Categoría</label>
+          <select name="categoria" class="form-select form-select-sm">
+            <option value="">Todas las categorías</option>
+            {% for c in categorias %}
+            <option value="{{ c }}" {% if filtro_categoria == c %}selected{% endif %}>{{ c }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label fw-semibold small">Tipo de Insumo</label>
+          <select name="tipo" class="form-select form-select-sm">
+            <option value="">Todos los tipos</option>
+            {% for val, label in tipos_choices %}
+            <option value="{{ val }}" {% if filtro_tipo == val %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label fw-semibold small">Disponibilidad</label>
+          <select name="stock" class="form-select form-select-sm">
+            <option value="">Todos</option>
+            <option value="disponible" {% if filtro_stock == 'disponible' %}selected{% endif %}>Con stock disponible</option>
+            <option value="bajo" {% if filtro_stock == 'bajo' %}selected{% endif %}>Bajo stock crítico</option>
+            <option value="agotado" {% if filtro_stock == 'agotado' %}selected{% endif %}>Agotados (0)</option>
+          </select>
+        </div>
+        <div class="col-md-3 d-flex gap-2 align-items-end">
+          <button type="submit" class="btn btn-leica btn-sm">
+            <i class="bi bi-funnel me-1"></i>Filtrar
+          </button>
+          {% if q_insumo or filtro_categoria or filtro_tipo or filtro_stock %}
+          <a href="?tab=insumos" class="btn btn-outline-secondary btn-sm">Limpiar</a>
+          {% endif %}
+        </div>
+      </div>
+    </form>
+
+    {% if puede_escribir %}
+    <form class="leica-filter-bar mb-3" method="post">
+      {% csrf_token %}
+      <div class="row g-2 align-items-end">
+        <div class="col-md-2">
+          <label class="form-label fw-semibold small">Nombre*</label>
+          <input name="nombre" class="form-control form-control-sm" placeholder="Nombre del insumo" required>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label fw-semibold small">Categoría</label>
+          <input name="categoria" class="form-control form-control-sm" placeholder="Ej: Electrónica">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label fw-semibold small">Tipo</label>
+          <select name="tipo" class="form-select form-select-sm">
+            <option value="perecible">Perecible</option>
+            <option value="renovable">Renovable</option>
+          </select>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label fw-semibold small">Cantidad inicial*</label>
+          <input name="cantidad_total" type="number" min="1" class="form-control form-control-sm"
+            placeholder="Ej: 50" required>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label fw-semibold small">Umbral mínimo</label>
+          <input name="umbral_minimo" type="number" min="0" value="5" class="form-control form-control-sm">
+        </div>
+        <div class="col-md-2">
+          <button class="btn btn-leica btn-sm w-100" type="submit">
+            <i class="bi bi-plus-lg me-1"></i>Agregar Insumo
+          </button>
+        </div>
+      </div>
+    </form>
+    {% endif %}
+
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead>
+          <tr>
+            <th>Nombre</th>
+            <th>Categoría</th>
+            <th>Tipo</th>
+            <th>Disponible / Total</th>
+            {% if puede_escribir %}<th>Acciones</th>{% endif %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for i in insumos %}
+          <tr>
+            <td><strong>{{ i.nombre }}</strong></td>
+            <td>{{ i.categoria|default:"-" }}</td>
+            <td>{{ i.get_tipo_display }}</td>
+            <td>
+              <span class="badge {% if i.bajo_stock %}fuera_servicio{% else %}disponible{% endif %}">
+                {{ i.cantidad_disponible }} / {{ i.cantidad_total }}
+              </span>
+              {% if i.bajo_stock %}
+              <small class="text-danger fw-semibold ms-1">
+                <i class="bi bi-exclamation-triangle-fill"></i> Stock bajo
+              </small>
+              {% endif %}
+            </td>
+            {% if puede_escribir %}
+            <td>
+              <div class="btn-group btn-group-sm">
+                <a href="{% url 'editar_insumo' i.id %}" class="btn btn-outline-secondary">
+                  <i class="bi bi-pencil"></i>
+                </a>
+                <form method="post" action="{% url 'eliminar_insumo' i.id %}" class="d-inline">
+                  {% csrf_token %}
+                  <button class="btn btn-outline-danger" type="button"
+                    data-confirm="¿Seguro que deseas eliminar el insumo {{ i.nombre }}?"
+                    data-confirm-title="Eliminar Insumo"
+                    data-confirm-btn="Sí, eliminar"
+                    data-bs-toggle="tooltip" title="Eliminar">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </form>
+              </div>
+            </td>
+            {% endif %}
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="{% if puede_escribir %}5{% else %}4{% endif %}" class="text-center text-muted py-4">
+              <i class="bi bi-inbox fs-3 d-block mb-2"></i>
+              No se encontraron insumos con los filtros seleccionados.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% if page_obj_insumos.has_other_pages %}
+    <nav class="mt-3 d-flex justify-content-center" aria-label="Navegación insumos">
+      <ul class="pagination pagination-sm mb-0">
+        {% if page_obj_insumos.has_previous %}
+        <li class="page-item">
+          <a class="page-link" href="?tab=insumos&page_insumo={{ page_obj_insumos.previous_page_number }}{% if q_insumo %}&q_insumo={{ q_insumo }}{% endif %}{% if filtro_categoria %}&categoria={{ filtro_categoria }}{% endif %}{% if filtro_tipo %}&tipo={{ filtro_tipo }}{% endif %}{% if filtro_stock %}&stock={{ filtro_stock }}{% endif %}">
+            <i class="bi bi-chevron-left"></i>
+          </a>
+        </li>
+        {% else %}
+        <li class="page-item disabled"><span class="page-link"><i class="bi bi-chevron-left"></i></span></li>
+        {% endif %}
+
+        {% for num in page_obj_insumos.paginator.page_range %}
+          {% if page_obj_insumos.number == num %}
+          <li class="page-item active"><span class="page-link">{{ num }}</span></li>
+          {% elif num > page_obj_insumos.number|add:'-3' and num < page_obj_insumos.number|add:'3' %}
+          <li class="page-item">
+            <a class="page-link" href="?tab=insumos&page_insumo={{ num }}{% if q_insumo %}&q_insumo={{ q_insumo }}{% endif %}{% if filtro_categoria %}&categoria={{ filtro_categoria }}{% endif %}{% if filtro_tipo %}&tipo={{ filtro_tipo }}{% endif %}{% if filtro_stock %}&stock={{ filtro_stock }}{% endif %}">{{ num }}</a>
+          </li>
+          {% endif %}
+        {% endfor %}
+
+        {% if page_obj_insumos.has_next %}
+        <li class="page-item">
+          <a class="page-link" href="?tab=insumos&page_insumo={{ page_obj_insumos.next_page_number }}{% if q_insumo %}&q_insumo={{ q_insumo }}{% endif %}{% if filtro_categoria %}&categoria={{ filtro_categoria }}{% endif %}{% if filtro_tipo %}&tipo={{ filtro_tipo }}{% endif %}{% if filtro_stock %}&stock={{ filtro_stock }}{% endif %}">
+            <i class="bi bi-chevron-right"></i>
+          </a>
+        </li>
+        {% else %}
+        <li class="page-item disabled"><span class="page-link"><i class="bi bi-chevron-right"></i></span></li>
+        {% endif %}
+      </ul>
+    </nav>
+    {% endif %}
+    {% endif %}
+  </div>
 </div>
 
-<div id="qrModal"
-  style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:1000; align-items:center; justify-content:center;">
-  <div class="card" style="text-align:center; min-width:300px;">
-    <h3 id="qrTitle" style="margin-top:0;">Código QR</h3>
-    <img id="qrImage" src="" alt="QR"
-      style="margin: 20px 0; border: 1px solid #ccc; padding: 10px; border-radius: 8px; width: 200px; height: 200px;">
-    <div>
-      <a id="qrDescargar" href="#" class="btn" style="text-decoration: none;">Descargar</a>
-      <button class="btn secundario" onclick="document.getElementById('qrModal').style.display='none'">Cerrar</button>
+<!-- Modal QR Bootstrap -->
+<div class="modal fade" id="qrModal" tabindex="-1" aria-labelledby="qrModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-sm">
+    <div class="modal-content text-center">
+      <div class="modal-header">
+        <h5 class="modal-title" id="qrModalLabel">Código QR</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body">
+        <img id="qrImage" src="" alt="QR" class="rounded-3 border p-2" style="width: 200px; height: 200px;">
+      </div>
+      <div class="modal-footer justify-content-center border-0">
+        <a id="qrDescargar" href="#" class="btn btn-leica">
+          <i class="bi bi-download me-1"></i>Descargar
+        </a>
+        <button type="button" class="btn btn-leica-secondary" data-bs-dismiss="modal">Cerrar</button>
+      </div>
     </div>
   </div>
 </div>
@@ -267,11 +430,14 @@
 
 {% block scripts %}
 <script>
+  var qrModalEl = document.getElementById('qrModal');
+  var qrModalInstance = qrModalEl ? new bootstrap.Modal(qrModalEl) : null;
+
   function mostrarQR(boton) {
-    document.getElementById('qrTitle').textContent = `QR: ${boton.dataset.codigo}`;
+    document.getElementById('qrModalLabel').textContent = 'QR: ' + boton.dataset.codigo;
     document.getElementById('qrImage').src = boton.dataset.qr;
-    document.getElementById('qrDescargar').href = `${boton.dataset.qr}?descargar=1`;
-    document.getElementById('qrModal').style.display = 'flex';
+    document.getElementById('qrDescargar').href = boton.dataset.qr + '?descargar=1';
+    if (qrModalInstance) qrModalInstance.show();
   }
 </script>
 {% endblock %}
