@@ -30,6 +30,14 @@ echo "Grupo de recursos: ${RESOURCE_GROUP} (${LOCATION})"
 az group create --name "${RESOURCE_GROUP}" --location "${LOCATION}" --output none
 
 echo "PostgreSQL Flexible Server: ${PG_SERVER}"
+if az postgres flexible-server show --resource-group "${RESOURCE_GROUP}" --name "${PG_SERVER}" --output none 2>/dev/null; then
+  echo "El servidor ya existe: se actualiza la clave del administrador."
+  az postgres flexible-server update \
+    --resource-group "${RESOURCE_GROUP}" \
+    --name "${PG_SERVER}" \
+    --admin-password "${PG_PASSWORD}" \
+    --output none
+else
 az postgres flexible-server create \
   --resource-group "${RESOURCE_GROUP}" \
   --name "${PG_SERVER}" \
@@ -44,11 +52,12 @@ az postgres flexible-server create \
   --public-access 0.0.0.0 \
   --yes \
   --output none
+fi
 
 az postgres flexible-server db create \
   --resource-group "${RESOURCE_GROUP}" \
   --server-name "${PG_SERVER}" \
-  --database-name "${PG_DATABASE}" \
+  --name "${PG_DATABASE}" \
   --output none
 
 echo "App Service: ${APP_NAME} (plan ${PLAN_SKU}, Python ${PYTHON_VERSION})"
