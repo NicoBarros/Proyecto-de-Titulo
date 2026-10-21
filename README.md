@@ -178,7 +178,7 @@ Variables opcionales:
 |---|---|
 | `LOCATION` | `brazilsouth` (usa `chilecentral` si tu suscripción tiene esa región) |
 | `RESOURCE_GROUP` | `rg-leica-inventario` |
-| `PLAN_SKU` | `B1` |
+| `PLAN_SKU` | `B1` (`F1` es gratuito, sin Always On y con 60 minutos de CPU al día) |
 | `PYTHON_VERSION` | `3.14` (usa `3.13` si App Service aún no ofrece 3.14) |
 | `PG_VERSION` | `17` |
 | `GEMINI_API_KEY` | vacío |

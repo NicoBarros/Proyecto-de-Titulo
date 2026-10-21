@@ -87,7 +87,7 @@ az webapp config set \
   --resource-group "${RESOURCE_GROUP}" \
   --name "${APP_NAME}" \
   --startup-file "bash startup.sh" \
-  --always-on true \
+  --always-on "$([ "${PLAN_SKU}" = "F1" ] && echo false || echo true)" \
   --http20-enabled true \
   --min-tls-version 1.2 \
   --ftps-state Disabled \
