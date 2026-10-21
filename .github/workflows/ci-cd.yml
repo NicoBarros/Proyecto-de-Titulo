@@ -1,0 +1,68 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pruebas:
+    name: Pruebas
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: leica
+          POSTGRES_PASSWORD: leica
+          POSTGRES_DB: leica_inventario
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U leica"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      SECRET_KEY: ci-solo-para-pruebas-${{ github.run_id }}
+      DATABASE_URL: postgres://leica:leica@localhost:5432/leica_inventario
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+          cache: pip
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt
+      - name: Verificar migraciones
+        run: python manage.py makemigrations --check --dry-run
+      - name: Verificar configuración de producción
+        env:
+          DEBUG: 'False'
+          WEBSITE_HOSTNAME: ci.azurewebsites.net
+        run: python manage.py check --deploy --fail-level ERROR
+      - name: Ejecutar pruebas
+        run: python manage.py test inventario --noinput
+
+  despliegue:
+    name: Despliegue en Azure
+    needs: pruebas
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && vars.AZURE_WEBAPP_NAME != ''
+    runs-on: ubuntu-latest
+    environment:
+      name: produccion
+      url: ${{ steps.desplegar.outputs.webapp-url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Desplegar en App Service
+        id: desplegar
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ vars.AZURE_WEBAPP_NAME }}
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}

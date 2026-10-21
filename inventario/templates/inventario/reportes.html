@@ -2,6 +2,38 @@
 
 {% block content %}
 <div class="card mb-4">
+  <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+    <span><i class="bi bi-speedometer2 me-2"></i>Indicadores clave (KPI)
+      <span class="badge bg-secondary ms-2">{{ kpis_cumplidos }} de {{ kpis_medidos }} cumplen la meta</span>
+    </span>
+    <div class="btn-group btn-group-sm" role="group" aria-label="Período de los indicadores">
+      {% for p in periodos %}
+      <a href="?periodo={{ p }}&dias={{ dias }}" class="btn {% if p == periodo %}btn-dark{% else %}btn-outline-secondary{% endif %}">{{ p }} días</a>
+      {% endfor %}
+    </div>
+  </div>
+  <div class="card-body">
+    <div class="row row-cols-1 row-cols-md-2 row-cols-xl-4 g-3">
+      {% for k in kpis %}
+      <div class="col">
+        <div class="kpi-tarjeta h-100 {% if k.cumple %}kpi-ok{% elif k.cumple is False %}kpi-alerta{% else %}kpi-sin-datos{% endif %}" data-kpi="{{ k.clave }}">
+          <div class="d-flex justify-content-between align-items-start mb-1">
+            <span class="kpi-nombre"><i class="bi {{ k.icono }} me-1"></i>{{ k.nombre }}</span>
+            {% if k.cumple %}<span class="badge bg-success">Cumple</span>
+            {% elif k.cumple is False %}<span class="badge bg-danger">No cumple</span>
+            {% else %}<span class="badge bg-secondary">Sin datos</span>{% endif %}
+          </div>
+          <div class="kpi-valor">{{ k.texto }}</div>
+          <div class="kpi-meta">Objetivo {{ k.objetivo }}</div>
+          <div class="kpi-detalle">{{ k.detalle }}</div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<div class="card mb-4">
   <div class="card-header">
     <i class="bi bi-trophy-fill me-2"></i>Equipos más solicitados
   </div>

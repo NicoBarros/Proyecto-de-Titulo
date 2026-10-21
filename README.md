@@ -143,39 +143,71 @@ La suite está en `inventario/tests/` y cubre permisos por rol, inventario, el f
 mantenimiento, exportación a Excel, códigos QR, auditoría, búsqueda con IA (Gemini simulado, nunca llama a la API real) y el panel
 de administración.
 
-## Despliegue en Render
+## Despliegue en Azure
 
-El repositorio incluye `render.yaml` (Blueprint) y `build.sh`, que crean el servicio web y una base
-PostgreSQL administrada.
+Arquitectura de producción:
 
-1. En [Render](https://render.com), entra a **New → Blueprint** y conecta este repositorio de GitHub.
-2. Render lee `render.yaml` y propone crear `leica-inventario` (web) y `leica-db` (PostgreSQL).
-   Antes de confirmar, completa las variables marcadas como privadas:
+| Componente | Servicio de Azure |
+|---|---|
+| Aplicación (Django + Gunicorn) | App Service en Linux, plan B1 |
+| Base de datos | Azure Database for PostgreSQL – Flexible Server (Burstable B1ms, respaldos de 7 días) |
+| Archivos estáticos | WhiteNoise, servidos por la misma aplicación |
+| Integración y entrega continua | GitHub Actions (`.github/workflows/ci-cd.yml`) |
+| Monitoreo de disponibilidad | Health check de App Service sobre `/salud/` |
 
-   | Variable | Valor |
-   |---|---|
-   | `ADMIN_EMAIL` | Correo del administrador inicial (ej. `encargado@inacapmail.cl`) |
-   | `ADMIN_PASSWORD` | Contraseña del administrador inicial |
-   | `GEMINI_API_KEY` | Opcional. Sin ella, la búsqueda usa solo palabras clave |
+### 1. Crear la infraestructura
 
-3. Confirma con **Apply**. El primer despliegue tarda unos minutos.
+Abre **Azure Cloud Shell** (ícono `>_` en el portal de Azure, modo Bash), clona el repositorio y ejecuta:
 
-`SECRET_KEY` se genera automáticamente, `DATABASE_URL` se conecta sola a la base creada y el dominio
-`*.onrender.com` se agrega por sí mismo a `ALLOWED_HOSTS` y `CSRF_TRUSTED_ORIGINS`.
+```bash
+git clone https://github.com/NicoBarros/Proyecto-de-Titulo.git
+cd Proyecto-de-Titulo
+export APP_NAME=leica-inventario
+export ADMIN_EMAIL=encargado@inacapmail.cl
+export ADMIN_PASSWORD='una-clave-segura'
+bash azure/crear_infraestructura.sh
+```
 
-En cada despliegue, `build.sh` instala las dependencias, genera los archivos estáticos, aplica las
-migraciones y crea el administrador (solo la primera vez; luego no cambia su contraseña). Para cargar
-los datos de prueba del comando `seed`, cambia `CARGAR_DATOS_DEMO` a `true` y vuelve a desplegar;
-esos usuarios usan la contraseña pública `Leica2026!`, así que no lo actives en un despliegue real.
+`APP_NAME` define la URL (`https://APP_NAME.azurewebsites.net`) y debe ser única en Azure. El script crea
+el grupo de recursos, el servidor PostgreSQL con su base, el plan y la aplicación, y configura las
+variables de entorno, el comando de inicio, HTTPS obligatorio, TLS 1.2 y el health check. Al terminar
+muestra la clave de la base de datos y el perfil de publicación.
 
-El comando `python manage.py marcar_atrasadas` se puede programar como **Cron Job** en Render para
-marcar los préstamos vencidos aunque nadie abra la aplicación.
+Variables opcionales:
 
-### Otro servidor
+| Variable | Valor por defecto |
+|---|---|
+| `LOCATION` | `brazilsouth` (usa `chilecentral` si tu suscripción tiene esa región) |
+| `RESOURCE_GROUP` | `rg-leica-inventario` |
+| `PLAN_SKU` | `B1` |
+| `PYTHON_VERSION` | `3.14` (usa `3.13` si App Service aún no ofrece 3.14) |
+| `PG_VERSION` | `17` |
+| `GEMINI_API_KEY` | vacío |
 
-Define `SECRET_KEY`, `DEBUG=False`, `ALLOWED_HOSTS`, `CSRF_TRUSTED_ORIGINS` y `DATABASE_URL`, ejecuta
-`bash build.sh` como comando de build y `gunicorn leica_project.wsgi:application` como comando de inicio.
-`staticfiles/` no se versiona: `collectstatic` lo genera en cada despliegue.
+### 2. Conectar GitHub Actions
+
+En el repositorio de GitHub, **Settings → Secrets and variables → Actions**:
+
+- **Secrets → New repository secret:** `AZURE_WEBAPP_PUBLISH_PROFILE`, con el XML completo que mostró el script.
+- **Variables → New repository variable:** `AZURE_WEBAPP_NAME`, con el valor de `APP_NAME`.
+
+Desde ese momento, cada push a `main` ejecuta las pruebas contra PostgreSQL y, solo si todas pasan,
+despliega en App Service. Los Pull Requests ejecutan las pruebas sin desplegar. Para el primer
+despliegue, entra a **Actions → CI/CD → Run workflow**.
+
+### 3. Operación
+
+- En cada arranque, `startup.sh` aplica las migraciones, genera los archivos estáticos, crea el
+  administrador (solo si no existe) e inicia Gunicorn.
+- Los logs se ven en el portal, en **App Service → Log stream**.
+- `GET /salud/` responde `{"estado": "ok", "base_de_datos": "ok"}` o un 503 si la base no está disponible.
+- Los respaldos automáticos de la base se restauran desde **PostgreSQL → Backup and restore**.
+
+### Alternativa: Render
+
+El repositorio también incluye `render.yaml` y `build.sh`. En [Render](https://render.com), entra a
+**New → Blueprint**, conecta el repositorio y completa `ADMIN_EMAIL`, `ADMIN_PASSWORD` y, si quieres,
+`GEMINI_API_KEY`.
 
 ## Estructura
 

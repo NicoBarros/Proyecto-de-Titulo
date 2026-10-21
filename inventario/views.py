@@ -26,6 +26,7 @@ from .forms import EquipoForm, InsumoForm, MantenimientoForm
 from .decorators import role_required
 from .exportar import generar_excel_inventario
 from . import auditoria
+from .kpi import PERIODOS, calcular_kpis
 
 logger = logging.getLogger(__name__)
 
@@ -636,8 +637,15 @@ def reportes_view(request):
         solicituditem__solicitud__created_at__gte=fecha_limite
     )
     
+    periodo_str = request.GET.get('periodo', '30')
+    periodo = int(periodo_str) if periodo_str.isdigit() and int(periodo_str) in PERIODOS else 30
+    kpis = calcular_kpis(periodo)
+
     return render(request, 'inventario/reportes.html', {
-        'top_equipos': top_equipos, 'vencidos': vencidos, 'sin_movimiento': sin_movimiento, 'dias': dias
+        'top_equipos': top_equipos, 'vencidos': vencidos, 'sin_movimiento': sin_movimiento, 'dias': dias,
+        'kpis': kpis, 'periodo': periodo, 'periodos': PERIODOS,
+        'kpis_cumplidos': sum(1 for k in kpis if k.cumple),
+        'kpis_medidos': sum(1 for k in kpis if k.cumple is not None),
     })
 
 @login_required

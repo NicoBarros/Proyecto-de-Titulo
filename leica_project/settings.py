@@ -17,6 +17,7 @@ env = environ.Env(
     ALLOWED_HOSTS=(list, ['localhost', '127.0.0.1']),
     CSRF_TRUSTED_ORIGINS=(list, []),
     RENDER_EXTERNAL_HOSTNAME=(str, ''),
+    WEBSITE_HOSTNAME=(str, ''),
     SECURE_SSL_REDIRECT=(bool, True),
     DATABASE_URL=(str, ''),
     DOMINIO_INSTITUCIONAL=(str, 'inacapmail.cl'),
@@ -30,10 +31,10 @@ ALLOWED_HOSTS = env('ALLOWED_HOSTS')
 CSRF_TRUSTED_ORIGINS = env('CSRF_TRUSTED_ORIGINS')
 INTERNAL_IPS = ['127.0.0.1']
 
-RENDER_EXTERNAL_HOSTNAME = env('RENDER_EXTERNAL_HOSTNAME')
-if RENDER_EXTERNAL_HOSTNAME:
-    ALLOWED_HOSTS.append(RENDER_EXTERNAL_HOSTNAME)
-    CSRF_TRUSTED_ORIGINS.append(f'https://{RENDER_EXTERNAL_HOSTNAME}')
+for dominio_plataforma in (env('WEBSITE_HOSTNAME'), env('RENDER_EXTERNAL_HOSTNAME')):
+    if dominio_plataforma:
+        ALLOWED_HOSTS.append(dominio_plataforma)
+        CSRF_TRUSTED_ORIGINS.append(f'https://{dominio_plataforma}')
 
 if not DEBUG:
     SESSION_COOKIE_SECURE = True
@@ -53,6 +54,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    'inventario.middleware.SaludMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',

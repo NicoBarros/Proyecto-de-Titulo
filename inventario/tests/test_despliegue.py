@@ -1,8 +1,14 @@
+import json
 import os
+import subprocess
+import sys
 from io import StringIO
 from unittest.mock import patch
 
+from django.conf import settings
 from django.core.management import call_command
+from django.db import OperationalError
+from django.test import SimpleTestCase, override_settings
 
 from inventario.models import Usuario
 from .base import LeicaTestCase
@@ -45,3 +51,47 @@ class CrearAdminTests(LeicaTestCase):
     def test_username_repetido_recibe_sufijo(self):
         self.ejecutar(ADMIN_EMAIL='estudiante@otro.cl', ADMIN_PASSWORD='ClaveSegura2026')
         self.assertEqual(Usuario.objects.get(email='estudiante@otro.cl').username, 'estudiante_1')
+
+
+class SaludTests(LeicaTestCase):
+
+    def test_responde_ok_con_base_disponible(self):
+        r = self.client.get('/salud/')
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json(), {'estado': 'ok', 'base_de_datos': 'ok'})
+        self.assertIn('no-cache', r['Cache-Control'])
+
+    def test_responde_503_si_la_base_no_responde(self):
+        with patch('inventario.middleware.connection.cursor', side_effect=OperationalError('sin conexión')), \
+                self.assertLogs('inventario.middleware', level='ERROR'):
+            r = self.client.get('/salud/')
+        self.assertEqual(r.status_code, 503)
+        self.assertEqual(r.json()['estado'], 'error')
+
+    @override_settings(SECURE_SSL_REDIRECT=True, ALLOWED_HOSTS=['leica.azurewebsites.net'])
+    def test_sondeos_internos_no_se_redirigen_ni_se_rechazan_por_dominio(self):
+        r = self.client.get('/salud/', HTTP_HOST='10.0.0.4:8000')
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(self.client.get('/login/', HTTP_HOST='leica.azurewebsites.net').status_code, 301)
+
+    def test_no_requiere_sesion(self):
+        self.client.logout()
+        self.assertEqual(self.client.get('/salud/').status_code, 200)
+
+
+class ConfiguracionPlataformaTests(SimpleTestCase):
+
+    def ajustes_con(self, **variables):
+        entorno = {**os.environ, 'DEBUG': 'False', 'SECRET_KEY': 'x' * 50, **variables}
+        codigo = ('import django, json; django.setup(); from django.conf import settings; '
+                  'print(json.dumps([settings.ALLOWED_HOSTS, settings.CSRF_TRUSTED_ORIGINS]))')
+        salida = subprocess.run(
+            [sys.executable, '-c', codigo], env={**entorno, 'DJANGO_SETTINGS_MODULE': 'leica_project.settings'},
+            cwd=settings.BASE_DIR, capture_output=True, text=True, check=True,
+        ).stdout
+        return json.loads(salida)
+
+    def test_reconoce_el_dominio_de_azure(self):
+        hosts, origenes = self.ajustes_con(WEBSITE_HOSTNAME='leica-inventario.azurewebsites.net')
+        self.assertIn('leica-inventario.azurewebsites.net', hosts)
+        self.assertIn('https://leica-inventario.azurewebsites.net', origenes)

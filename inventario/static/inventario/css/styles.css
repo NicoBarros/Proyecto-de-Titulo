@@ -774,3 +774,41 @@ small.representacion {
   border-radius: 12px;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
 }
+
+.kpi-tarjeta {
+  padding: 14px 16px;
+  border: 1px solid var(--leica-border);
+  border-left: 5px solid #9ca3af;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.kpi-tarjeta.kpi-ok { border-left-color: #16a34a; }
+.kpi-tarjeta.kpi-alerta { border-left-color: #dc2626; }
+
+.kpi-nombre {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--leica-text-muted);
+}
+
+.kpi-valor {
+  font-size: 1.9rem;
+  font-weight: 800;
+  line-height: 1.2;
+  color: var(--leica-text-dark);
+}
+
+.kpi-ok .kpi-valor { color: #15803d; }
+.kpi-alerta .kpi-valor { color: #b91c1c; }
+.kpi-sin-datos .kpi-valor { color: #9ca3af; font-size: 1.3rem; }
+
+.kpi-meta {
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.kpi-detalle {
+  font-size: 0.78rem;
+  color: var(--leica-text-muted);
+}

@@ -128,8 +128,7 @@
             <td>
               {{ s.solicitante.get_full_name|default:s.solicitante.email }}
               {% if s.en_representacion_de %}
-              <br><small class="representacion">en representación de {{
-                s.en_representacion_de.get_full_name|default:s.en_representacion_de.email }}</small>
+              <br><small class="representacion">en representación de {{s.en_representacion_de.get_full_name|default:s.en_representacion_de.email }}</small>
               {% endif %}
             </td>
             <td style="white-space: nowrap;">{{ s.horario_inicio|date:"d/m/Y H:i" }} → {{ s.horario_fin|date:"d/m/Y H:i" }}</td>
