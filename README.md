@@ -1,5 +1,5 @@
 # LEICA Inventario
-
+ola
 Sistema de gestión de inventario y préstamo de equipos del laboratorio LEICA, INACAP Sede Valdivia.
 Proyecto de título.
 
