@@ -19,6 +19,13 @@ PG_DATABASE="leica_inventario"
 PG_PASSWORD="${PG_PASSWORD:-$(openssl rand -hex 24)}"
 SECRET_KEY="${SECRET_KEY:-$(openssl rand -base64 48 | tr -d '\n=+/')}"
 
+for proveedor in Microsoft.DBforPostgreSQL Microsoft.Web; do
+  if [ "$(az provider show --namespace "${proveedor}" --query registrationState --output tsv 2>/dev/null)" != "Registered" ]; then
+    echo "Registrando el proveedor ${proveedor} en la suscripción..."
+    az provider register --namespace "${proveedor}" --wait --output none
+  fi
+done
+
 echo "Grupo de recursos: ${RESOURCE_GROUP} (${LOCATION})"
 az group create --name "${RESOURCE_GROUP}" --location "${LOCATION}" --output none
 
