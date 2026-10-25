@@ -5,7 +5,8 @@ from datetime import timedelta
 
 from django.utils import timezone
 
-from inventario.models import Usuario, Equipo, Solicitud
+from inventario.models import Equipo, Solicitud, Usuario
+
 from .base import LeicaTestCase
 
 

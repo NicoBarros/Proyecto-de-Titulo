@@ -5,14 +5,14 @@ Incluye regresiones de bugs ya corregidos (transiciones de estado, atomicidad,
 bloqueo RF-09 y validacion de horario).
 """
 from datetime import timedelta
-
 from io import StringIO
 
 from django.contrib.messages import get_messages
 from django.core.management import call_command
 from django.utils import timezone
 
-from inventario.models import Usuario, Equipo, Insumo, Solicitud, Movimiento, Bloqueo
+from inventario.models import Bloqueo, Equipo, Insumo, Movimiento, Solicitud, Usuario
+
 from .base import LeicaTestCase
 
 
@@ -163,8 +163,10 @@ class EntregaDevolucionTests(LeicaTestCase):
     def test_entregar_presta_equipo_y_descuenta_stock(self):
         s = self.solicitud_aprobada()
         self.accion_solicitud(s, 'entregar')
-        s.refresh_from_db(); self.equipo.refresh_from_db()
-        self.renovable.refresh_from_db(); self.perecible.refresh_from_db()
+        s.refresh_from_db()
+        self.equipo.refresh_from_db()
+        self.renovable.refresh_from_db()
+        self.perecible.refresh_from_db()
         self.assertEqual(s.estado, Solicitud.EstadoSolicitud.ENTREGADA)
         self.assertEqual(self.equipo.estado, Equipo.Estado.PRESTADO)
         self.assertEqual(self.renovable.cantidad_disponible, 7)
@@ -175,8 +177,10 @@ class EntregaDevolucionTests(LeicaTestCase):
         s = self.solicitud_aprobada()
         self.accion_solicitud(s, 'entregar')
         self.accion_solicitud(s, 'devolver', estado_equipo='bueno')
-        s.refresh_from_db(); self.equipo.refresh_from_db()
-        self.renovable.refresh_from_db(); self.perecible.refresh_from_db()
+        s.refresh_from_db()
+        self.equipo.refresh_from_db()
+        self.renovable.refresh_from_db()
+        self.perecible.refresh_from_db()
         self.assertEqual(s.estado, Solicitud.EstadoSolicitud.DEVUELTA)
         self.assertEqual(self.equipo.estado, Equipo.Estado.DISPONIBLE)
         self.assertEqual(self.renovable.cantidad_disponible, 10)
@@ -196,7 +200,8 @@ class EntregaDevolucionTests(LeicaTestCase):
         s = self.solicitud_aprobada(insumos=[], inicio=inicio, fin=inicio + timedelta(hours=2))
         self.accion_solicitud(s, 'entregar')
         self.accion_solicitud(s, 'devolver')
-        s.refresh_from_db(); self.estudiante.refresh_from_db()
+        s.refresh_from_db()
+        self.estudiante.refresh_from_db()
         self.assertEqual(s.estado, Solicitud.EstadoSolicitud.DEVUELTA_ATRASO)
         self.assertTrue(self.estudiante.esta_bloqueado())
         restante = self.estudiante.bloqueado_hasta - timezone.now()
@@ -211,7 +216,8 @@ class EntregaDevolucionTests(LeicaTestCase):
         s.en_representacion_de = self.estudiante
         s.save()
         self.accion_solicitud(s, 'devolver')
-        self.estudiante.refresh_from_db(); self.docente.refresh_from_db()
+        self.estudiante.refresh_from_db()
+        self.docente.refresh_from_db()
         self.assertTrue(self.estudiante.esta_bloqueado())
         self.assertFalse(self.docente.esta_bloqueado())
 

@@ -1,7 +1,20 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
-from .models import Usuario, Equipo, Insumo, Solicitud, SolicitudItem, Movimiento, Bloqueo, Mantenimiento, Migracion, HistorialEquipo, EventoSeguridad
+
 from . import auditoria
+from .models import (
+    Bloqueo,
+    Equipo,
+    EventoSeguridad,
+    HistorialEquipo,
+    Insumo,
+    Mantenimiento,
+    Migracion,
+    Movimiento,
+    Solicitud,
+    SolicitudItem,
+    Usuario,
+)
 
 
 @admin.register(Usuario)
@@ -58,7 +71,7 @@ class InsumoAdmin(admin.ModelAdmin):
     list_display = ('nombre', 'categoria', 'tipo', 'cantidad_disponible', 'cantidad_total', 'bajo_stock')
     list_filter = ('tipo', 'categoria')
     search_fields = ('nombre',)
-    
+
     def bajo_stock(self, obj):
         return obj.bajo_stock
     bajo_stock.boolean = True

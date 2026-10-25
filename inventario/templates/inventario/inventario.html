@@ -1,4 +1,5 @@
 {% extends 'inventario/base.html' %}
+{% load static %}
 
 {% block content %}
 <div class="card mb-4">
@@ -154,7 +155,7 @@
             <td>
               <div class="btn-group btn-group-sm">
                 <button class="btn btn-outline-primary" type="button" data-codigo="{{ e.codigo_inventario }}"
-                  data-qr="{% url 'qr_equipo' e.id %}" onclick="mostrarQR(this)"
+                  data-qr="{% url 'qr_equipo' e.id %}"
                   data-bs-toggle="tooltip" title="Ver código QR">
                   <i class="bi bi-qr-code"></i>
                 </button>
@@ -434,15 +435,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script>
-  var qrModalEl = document.getElementById('qrModal');
-  var qrModalInstance = qrModalEl ? new bootstrap.Modal(qrModalEl) : null;
-
-  function mostrarQR(boton) {
-    document.getElementById('qrModalLabel').textContent = 'QR: ' + boton.dataset.codigo;
-    document.getElementById('qrImage').src = boton.dataset.qr;
-    document.getElementById('qrDescargar').href = boton.dataset.qr + '?descargar=1';
-    if (qrModalInstance) qrModalInstance.show();
-  }
-</script>
+<script src="{% static 'inventario/js/inventario.js' %}?v=2.0"></script>
 {% endblock %}

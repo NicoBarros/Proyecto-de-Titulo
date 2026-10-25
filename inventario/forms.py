@@ -1,5 +1,7 @@
 from django import forms
-from .models import Equipo, Insumo, Solicitud
+
+from .models import Equipo, Insumo
+
 
 class EquipoForm(forms.ModelForm):
     class Meta:

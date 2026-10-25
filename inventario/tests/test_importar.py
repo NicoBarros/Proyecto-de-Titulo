@@ -5,6 +5,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from openpyxl import Workbook, load_workbook
 
 from inventario.models import Equipo, HistorialEquipo, Insumo, Migracion
+
 from .base import LeicaTestCase
 
 

@@ -6,6 +6,7 @@ from django.test import override_settings
 from django.utils import timezone
 
 from inventario.models import Equipo, EventoSeguridad, Mantenimiento, Solicitud
+
 from .base import LeicaTestCase
 
 
@@ -61,7 +62,8 @@ class FichaEquipoTests(LeicaTestCase):
     def test_qr_apunta_a_la_ficha(self):
         e = self.crear_equipo()
         self.client.force_login(self.encargado)
-        with override_settings(URL_SITIO='https://leica.example.cl'),                 patch('inventario.views.qrcode.make', wraps=qrcode.make) as make:
+        with override_settings(URL_SITIO='https://leica.example.cl'), \
+                patch('inventario.views.inventario.qrcode.make', wraps=qrcode.make) as make:
             self.client.get(f'/inventario/equipo/{e.id}/qr/')
         self.assertEqual(make.call_args.args[0], f'https://leica.example.cl/inventario/equipo/{e.id}/')
 

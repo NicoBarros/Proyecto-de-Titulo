@@ -1,8 +1,8 @@
 
+from django.contrib.auth.models import AbstractUser
 from django.core.validators import MinValueValidator
 from django.db import models
 from django.db.models import Q
-from django.contrib.auth.models import AbstractUser
 from django.utils import timezone
 
 
@@ -44,9 +44,7 @@ class Usuario(AbstractUser):
         return f'{self.get_full_name() or self.username} ({self.get_rol_display()})'
 
     def esta_bloqueado(self):
-        if self.bloqueado_hasta and self.bloqueado_hasta > timezone.now():
-            return True
-        return False
+        return bool(self.bloqueado_hasta and self.bloqueado_hasta > timezone.now())
 
     def tiene_atrasos(self):
         return Solicitud.objects.filter(estado=Solicitud.EstadoSolicitud.ATRASADA).filter(
@@ -181,14 +179,14 @@ class Solicitud(models.Model):
         verbose_name_plural = 'Solicitudes'
         ordering = ['-created_at']
 
+    def __str__(self):
+        return f'Solicitud #{self.pk} — {self.get_estado_display()}'
+
     @classmethod
     def marcar_atrasadas(cls):
         return cls.objects.filter(
             estado=cls.EstadoSolicitud.ENTREGADA, horario_fin__lt=timezone.now(),
         ).update(estado=cls.EstadoSolicitud.ATRASADA)
-
-    def __str__(self):
-        return f'Solicitud #{self.pk} — {self.get_estado_display()}'
 
     @property
     def beneficiario(self):
@@ -256,6 +254,9 @@ class Movimiento(models.Model):
         verbose_name_plural = 'Movimientos'
         ordering = ['fecha']
 
+    def __str__(self):
+        return f'{self.get_tipo_display()} — solicitud #{self.solicitud_id}'
+
 class Bloqueo(models.Model):
 
     usuario = models.ForeignKey(
@@ -274,6 +275,9 @@ class Bloqueo(models.Model):
     class Meta:
         verbose_name = 'Bloqueo'
         verbose_name_plural = 'Bloqueos'
+
+    def __str__(self):
+        return f'Bloqueo de {self.usuario} hasta {self.fecha_fin:%d/%m/%Y}'
 
 class Mantenimiento(models.Model):
 
@@ -310,7 +314,7 @@ class Mantenimiento(models.Model):
 
     def __str__(self):
         return f'Mantenimiento #{self.pk} — {self.equipo}'
-        
+
 class Migracion(models.Model):
 
     archivo_origen = models.CharField(max_length=255, blank=True, null=True)

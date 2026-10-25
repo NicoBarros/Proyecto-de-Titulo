@@ -5,6 +5,7 @@ from django.test import override_settings
 from django.utils import timezone
 
 from inventario.models import Solicitud
+
 from .base import LeicaTestCase
 
 

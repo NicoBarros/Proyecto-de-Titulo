@@ -11,6 +11,10 @@ from .models import EventoSeguridad
 
 logger = logging.getLogger('inventario.seguridad')
 
+TIPOS_INFORMATIVOS = (
+    EventoSeguridad.Tipo.INICIO_SESION, EventoSeguridad.Tipo.CIERRE_SESION, EventoSeguridad.Tipo.CAMBIO_CUENTA,
+)
+
 
 def _normalizar_ip(valor):
     valor = valor.strip()
@@ -48,7 +52,7 @@ def registrar_evento(tipo, request=None, usuario=None, identificador='', detalle
         agente=request.META.get('HTTP_USER_AGENT', '')[:255] if request is not None else '',
         detalle=detalle[:255],
     )
-    nivel = logging.INFO if tipo in (EventoSeguridad.Tipo.INICIO_SESION, EventoSeguridad.Tipo.CIERRE_SESION, EventoSeguridad.Tipo.CAMBIO_CUENTA) else logging.WARNING
+    nivel = logging.INFO if tipo in TIPOS_INFORMATIVOS else logging.WARNING
     logger.log(nivel, '%s usuario=%s ip=%s ruta=%s %s', tipo, evento.identificador or '-', evento.ip or '-', evento.ruta or '-', evento.detalle)
     return evento
 
@@ -85,3 +89,9 @@ def acceso_denegado(request, exception=None):
         usuario=getattr(request, 'user', None), detalle=str(exception or ''),
     )
     return permission_denied(request, exception)
+
+
+def registrar_cambio_cuenta(request, objetivo, detalle):
+    return registrar_evento(
+        EventoSeguridad.Tipo.CAMBIO_CUENTA, request, usuario=request.user, detalle=f'{objetivo.email}: {detalle}',
+    )

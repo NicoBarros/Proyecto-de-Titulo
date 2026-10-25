@@ -9,6 +9,7 @@ from django.core.management import call_command
 from django.core.management.base import CommandError
 
 from inventario import respaldos
+
 from .base import LeicaTestCase
 
 LISTADO = '\n'.join([

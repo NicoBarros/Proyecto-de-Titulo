@@ -7,6 +7,7 @@ from django.utils import timezone
 
 from inventario import tareas
 from inventario.models import Equipo, Solicitud, SolicitudItem
+
 from .base import LeicaTestCase
 
 
@@ -97,7 +98,8 @@ class DevolucionPorItemTests(LeicaTestCase):
         item_bueno, item_roto = s.items.order_by('id')
         self.client.force_login(self.encargado)
         self.accion_solicitud(s, 'devolver', **{f'estado_item_{item_bueno.id}': 'bueno', f'estado_item_{item_roto.id}': 'dañado'})
-        bueno.refresh_from_db(); roto.refresh_from_db()
+        bueno.refresh_from_db()
+        roto.refresh_from_db()
         self.assertEqual(bueno.estado, Equipo.Estado.DISPONIBLE)
         self.assertEqual(roto.estado, Equipo.Estado.EN_MANTENIMIENTO)
         self.assertEqual(
@@ -111,5 +113,6 @@ class DevolucionPorItemTests(LeicaTestCase):
         s = self.crear_solicitud(self.estudiante, equipos=[e], estado=Solicitud.EstadoSolicitud.ENTREGADA)
         self.client.force_login(self.encargado)
         self.accion_solicitud(s, 'devolver', **{f'estado_item_{s.items.get().id}': 'perdido'})
-        s.refresh_from_db(); e.refresh_from_db()
+        s.refresh_from_db()
+        e.refresh_from_db()
         self.assertEqual((s.estado, e.estado), (Solicitud.EstadoSolicitud.ENTREGADA, Equipo.Estado.PRESTADO))

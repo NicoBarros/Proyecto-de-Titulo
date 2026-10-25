@@ -3,7 +3,8 @@ from decimal import Decimal
 
 from django.utils import timezone
 
-from inventario.models import Usuario, Equipo, Insumo, Solicitud, Mantenimiento, EventoSeguridad
+from inventario.models import Equipo, EventoSeguridad, Insumo, Mantenimiento, Solicitud, Usuario
+
 from .base import LeicaTestCase
 
 
@@ -67,7 +68,8 @@ class MantenimientoIntegridadTests(LeicaTestCase):
         self.assertIsNone(m.fecha_resolucion)
         self.resolver(m, 'reparar')
         self.resolver(m, 'completar_reparacion')
-        m.refresh_from_db(); e.refresh_from_db()
+        m.refresh_from_db()
+        e.refresh_from_db()
         self.assertEqual(m.decision, Mantenimiento.Decision.COMPLETADO)
         self.assertEqual(e.estado, Equipo.Estado.DISPONIBLE)
 
@@ -83,7 +85,8 @@ class MantenimientoIntegridadTests(LeicaTestCase):
         m = Mantenimiento.objects.create(equipo=e)
         self.resolver(m, 'dar_baja')
         self.resolver(m, 'completar_reparacion')
-        m.refresh_from_db(); e.refresh_from_db()
+        m.refresh_from_db()
+        e.refresh_from_db()
         self.assertEqual(m.decision, Mantenimiento.Decision.DAR_BAJA)
         self.assertEqual(e.estado, Equipo.Estado.FUERA_SERVICIO)
 

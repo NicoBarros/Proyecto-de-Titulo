@@ -1,0 +1,24 @@
+[tool.ruff]
+line-length = 150
+target-version = "py314"
+extend-exclude = ["inventario/migrations"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "DJ", "C4", "SIM"]
+ignore = ["DJ001", "B904"]
+
+[tool.ruff.lint.per-file-ignores]
+"inventario/management/commands/seed.py" = ["E501"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["inventario", "leica_project"]
+
+[tool.coverage.run]
+source = ["inventario", "leica_project"]
+omit = ["*/migrations/*", "*/tests/*", "leica_project/wsgi.py", "manage.py"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+fail_under = 90

@@ -1,4 +1,5 @@
 {% extends 'inventario/base.html' %}
+{% load static %}
 
 {% block content %}
 <div class="card">
@@ -6,7 +7,7 @@
     <i class="bi bi-stars me-2"></i>Búsqueda inteligente
   </div>
   <div class="card-body">
-    <form id="fBusqueda" class="leica-filter-bar" onsubmit="buscarIA(event)">
+    <form id="fBusqueda" class="leica-filter-bar" method="post" action="{% url 'busqueda' %}">
       {% csrf_token %}
       <div class="row g-2 align-items-end">
         <div class="col">
@@ -27,63 +28,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script>
-
-  function el(tag, texto, clase) {
-    const n = document.createElement(tag);
-    if (texto !== undefined) n.textContent = texto;
-    if (clase) n.className = clase;
-    return n;
-  }
-
-  async function buscarIA(e) {
-    e.preventDefault();
-    const consulta = document.getElementById('consulta').value;
-    const csrf = document.querySelector('[name=csrfmiddlewaretoken]').value;
-    const res = document.getElementById('resBusqueda');
-
-    res.innerHTML = '<div class="d-flex align-items-center gap-2 text-primary"><div class="spinner-border spinner-border-sm" role="status"></div> Buscando con Inteligencia Artificial...</div>';
-
-    try {
-      const formData = new FormData();
-      formData.append('consulta', consulta);
-
-      const resp = await fetch('{% url "busqueda" %}', {
-        method: 'POST',
-        headers: { 'X-CSRFToken': csrf },
-        body: formData
-      });
-
-      const data = await resp.json();
-      if (!resp.ok) throw new Error(data.error || 'Error en la búsqueda');
-
-      res.replaceChildren(el('p', `Fuente: ${data.fuente}`, 'hint mb-3'));
-      if (data.resultados.length > 0) {
-        const wrapper = el('div', undefined, 'table-responsive');
-        const tabla = el('table', undefined, 'table table-hover align-middle');
-        tabla.innerHTML = '<thead><tr><th>Equipo</th><th>Código</th><th>Estado</th></tr></thead>';
-        const tbody = el('tbody');
-        data.resultados.forEach(r => {
-          const tr = el('tr');
-          const tdEstado = el('td');
-          tdEstado.append(el('span', r.estado, 'badge ' + r.estado.toLowerCase().replace(/ /g, '_')));
-          tr.append(el('td', r.nombre), el('td', r.codigo_inventario), tdEstado);
-          tbody.append(tr);
-        });
-        tabla.append(tbody);
-        wrapper.append(tabla);
-        res.append(wrapper);
-      } else {
-        const noData = el('div', undefined, 'text-center text-muted py-4');
-        noData.innerHTML = '<i class="bi bi-search fs-3 d-block mb-2"></i>No se encontraron equipos relevantes disponibles.';
-        res.append(noData);
-      }
-    } catch (err) {
-      res.innerHTML = '';
-      const alertEl = el('div', undefined, 'alert alert-danger border-0');
-      alertEl.innerHTML = '<i class="bi bi-exclamation-triangle-fill me-2"></i>' + err.message;
-      res.append(alertEl);
-    }
-  }
-</script>
+<script src="{% static 'inventario/js/busqueda.js' %}?v=2.0"></script>
 {% endblock %}

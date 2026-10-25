@@ -4,6 +4,7 @@ RF-10: Mantenimiento y regla del 70% (costo de reparacion vs valor de adquisicio
 from decimal import Decimal
 
 from inventario.models import Equipo, Mantenimiento
+
 from .base import LeicaTestCase
 
 
@@ -67,7 +68,8 @@ class ResolucionMantenimientoTests(LeicaTestCase):
 
     def resolver(self, accion):
         self.client.post('/mantenimiento/', {'mant_id': self.mant.id, 'accion_mant': accion})
-        self.mant.refresh_from_db(); self.equipo.refresh_from_db()
+        self.mant.refresh_from_db()
+        self.equipo.refresh_from_db()
 
     def test_completar_reparacion_libera_equipo(self):
         self.resolver('completar_reparacion')

@@ -11,6 +11,7 @@ from django.db import OperationalError
 from django.test import SimpleTestCase, override_settings
 
 from inventario.models import Usuario
+
 from .base import LeicaTestCase
 
 

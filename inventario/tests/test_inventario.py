@@ -1,12 +1,13 @@
 """
 CRUD de equipos e insumos (inventario) y exportacion a Excel.
 """
-from io import BytesIO
 from decimal import Decimal
+from io import BytesIO
 
 from openpyxl import load_workbook
 
 from inventario.models import Equipo, Insumo
+
 from .base import LeicaTestCase
 
 

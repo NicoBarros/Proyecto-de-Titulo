@@ -7,8 +7,7 @@ from decimal import Decimal
 from django.test import TestCase, override_settings
 from django.utils import timezone
 
-from inventario.models import Usuario, Equipo, Insumo, Solicitud, SolicitudItem
-
+from inventario.models import Equipo, Insumo, Solicitud, SolicitudItem, Usuario
 
 # Los tests no deben depender de que 'collectstatic' este al dia.
 STORAGES_TEST = {

@@ -5,7 +5,7 @@ from django.db import transaction
 from openpyxl import load_workbook
 from openpyxl.utils.exceptions import InvalidFileException
 
-from . import auditoria
+from . import auditoria, servicios
 from .forms import EquipoForm, InsumoForm
 from .models import Equipo, HistorialEquipo, Insumo, Migracion
 
@@ -51,16 +51,17 @@ def _monto(texto):
     return texto
 
 
-def _filas(ws, columnas, clave):
+def _encabezado(ws, columnas, clave):
     for numero, fila in enumerate(ws.iter_rows(max_row=15, values_only=True), start=1):
         nombres = [_texto(celda).lower() for celda in fila]
         if clave in nombres:
-            indices = {columnas[nombre]: i for i, nombre in enumerate(nombres) if nombre in columnas}
-            break
-    else:
-        raise ValueError(f'La hoja "{ws.title}" no tiene una fila de encabezados reconocible.')
+            return numero, {columnas[nombre]: i for i, nombre in enumerate(nombres) if nombre in columnas}
+    raise ValueError(f'La hoja "{ws.title}" no tiene una fila de encabezados reconocible.')
 
-    for numero, fila in enumerate(ws.iter_rows(min_row=numero + 1, values_only=True), start=numero + 1):
+
+def _filas(ws, columnas, clave):
+    encabezado, indices = _encabezado(ws, columnas, clave)
+    for numero, fila in enumerate(ws.iter_rows(min_row=encabezado + 1, values_only=True), start=encabezado + 1):
         datos = {campo: _texto(fila[i]) if i < len(fila) else '' for campo, i in indices.items()}
         if any(datos.values()):
             yield numero, datos
@@ -109,7 +110,7 @@ def _importar_insumo(datos, usuario):
             raise ValueError(f'Tipo: "{datos["tipo"]}" no es válido (Renovable o Perecible).')
         datos['tipo'] = tipo
     existente = Insumo.objects.select_for_update().filter(nombre=datos.get('nombre', '')).first()
-    en_uso = existente.cantidad_total - existente.cantidad_disponible if existente else 0
+    en_uso = servicios.unidades_entregadas(existente) if existente else 0
     form = InsumoForm(_datos_con_actuales(datos, existente, InsumoForm.Meta.fields), instance=existente)
     if not form.is_valid():
         raise ValueError(_errores_form(form))
@@ -119,9 +120,7 @@ def _importar_insumo(datos, usuario):
         if insumo.cantidad_total < en_uso:
             raise ValueError(f'Total: hay {en_uso} unidades entregadas; el total no puede ser menor.')
         if form.has_changed():
-            insumo.cantidad_disponible = insumo.cantidad_total - en_uso
-            insumo.version += 1
-            insumo.save()
+            servicios.aplicar_total_insumo(insumo, en_uso)
         return
 
     insumo = form.save(commit=False)

@@ -14,3 +14,6 @@ staticfiles/
 *.log
 
 respaldos/
+
+.coverage
+htmlcov/

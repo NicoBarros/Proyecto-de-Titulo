@@ -2,11 +2,12 @@
 RF-11 / RNF-06: Busqueda asistida por IA (Gemini) con respaldo local por palabras clave.
 Gemini se simula con mocks: los tests nunca llaman a la API real.
 """
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 from django.test import override_settings
 
 from inventario.models import Equipo
+
 from .base import LeicaTestCase
 
 

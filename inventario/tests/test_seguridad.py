@@ -9,6 +9,7 @@ from django.test import RequestFactory, SimpleTestCase, override_settings
 
 from inventario.models import EventoSeguridad
 from inventario.seguridad import ip_cliente
+
 from .base import LeicaTestCase
 
 CLAVE = 'Leica2026!'

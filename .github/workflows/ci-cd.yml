@@ -39,7 +39,9 @@ jobs:
           python-version: '3.14'
           cache: pip
       - name: Instalar dependencias
-        run: pip install -r requirements.txt
+        run: pip install -r requirements-dev.txt
+      - name: Revisar estilo y errores comunes
+        run: ruff check . --output-format github
       - name: Auditar dependencias
         run: pip install pip-audit==2.10.1 && pip-audit -r requirements.txt
       - name: Verificar migraciones
@@ -49,8 +51,12 @@ jobs:
           DEBUG: 'False'
           WEBSITE_HOSTNAME: ci.azurewebsites.net
         run: python manage.py check --deploy --fail-level ERROR
-      - name: Ejecutar pruebas
-        run: python manage.py test inventario --noinput
+      - name: Ejecutar pruebas con cobertura
+        run: coverage run manage.py test inventario --noinput
+      - name: Verificar cobertura mínima
+        run: |
+          coverage report
+          coverage report --format=markdown >> "$GITHUB_STEP_SUMMARY"
 
   despliegue:
     name: Despliegue en Azure

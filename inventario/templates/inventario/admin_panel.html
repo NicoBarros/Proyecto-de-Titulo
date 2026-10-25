@@ -1,4 +1,5 @@
 {% extends 'inventario/base.html' %}
+{% load static %}
 
 {% block content %}
 <div class="card mb-4">
@@ -128,7 +129,7 @@
     <form method="get" action="{% url 'admin_panel' %}" class="d-flex gap-2 align-items-center">
       <input type="text" name="q" value="{{ busqueda }}" class="form-control form-control-sm" style="width: 200px;"
         placeholder="Buscar por nombre o correo...">
-      <select name="rol" class="form-select form-select-sm" style="width: auto;" onchange="this.form.submit()">
+      <select name="rol" class="form-select form-select-sm" style="width: auto;" data-autosubmit>
         <option value="">Todos los roles</option>
         {% for val, label in roles_choices %}
         <option value="{{ val }}" {% if filtro_rol == val %}selected{% endif %}>{{ label }}</option>
@@ -169,7 +170,7 @@
                 {% csrf_token %}
                 <input type="hidden" name="accion" value="cambiar_rol">
                 <input type="hidden" name="user_id" value="{{ u.id }}">
-                <select name="nuevo_rol" class="form-select form-select-sm" style="width: auto;" onchange="this.form.submit()">
+                <select name="nuevo_rol" class="form-select form-select-sm" style="width: auto;" data-autosubmit>
                   {% for val, label in roles_choices %}
                   <option value="{{ val }}" {% if u.rol == val %}selected{% endif %}>{{ label }}</option>
                   {% endfor %}
@@ -226,7 +227,7 @@
                 </form>
                 {% endif %}
                 <button type="button" class="btn btn-outline-dark" style="font-size: 0.72rem;"
-                  onclick="resetPasswordModal({{ u.id }}, '{{ u.email }}')"
+                  data-reset-password data-user-id="{{ u.id }}" data-email="{{ u.email }}"
                   data-bs-toggle="tooltip" title="Cambiar contraseña">
                   <i class="bi bi-key"></i>
                 </button>
@@ -284,7 +285,7 @@
     <form method="get" action="{% url 'admin_panel' %}" class="d-flex gap-2 align-items-center">
       <input type="text" name="q_equipo" value="{{ busqueda_equipo }}" class="form-control form-control-sm"
         style="width: 200px;" placeholder="Buscar por código, nombre...">
-      <select name="estado_equipo" class="form-select form-select-sm" style="width: auto;" onchange="this.form.submit()">
+      <select name="estado_equipo" class="form-select form-select-sm" style="width: auto;" data-autosubmit>
         <option value="">Todos los estados</option>
         {% for val, label in estados_equipos_choices %}
         <option value="{{ val }}" {% if filtro_estado_equipo == val %}selected{% endif %}>{{ label }}</option>
@@ -331,7 +332,7 @@
                 <input type="hidden" name="accion" value="cambiar_estado_equipo">
                 <input type="hidden" name="equipo_id" value="{{ eq.id }}">
                 <select name="nuevo_estado" class="form-select form-select-sm fw-semibold" style="width: auto;"
-                  onchange="this.form.submit()"{% if eq.estado == 'prestado' %} disabled{% endif %}>
+                  data-autosubmit{% if eq.estado == 'prestado' %} disabled{% endif %}>
                   {% for val, label in estados_equipos_choices %}
                   {% if val != 'prestado' or eq.estado == 'prestado' %}
                   <option value="{{ val }}" {% if eq.estado == val %}selected{% endif %}>{{ label }}</option>
@@ -406,14 +407,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script>
-  var pwdModalEl = document.getElementById('pwdModal');
-  var pwdModalInstance = pwdModalEl ? new bootstrap.Modal(pwdModalEl) : null;
-
-  function resetPasswordModal(userId, email) {
-    document.getElementById('pwdModalUserId').value = userId;
-    document.getElementById('pwdModalUser').innerText = 'Usuario: ' + email;
-    if (pwdModalInstance) pwdModalInstance.show();
-  }
-</script>
+<script src="{% static 'inventario/js/admin_panel.js' %}?v=2.0"></script>
 {% endblock %}

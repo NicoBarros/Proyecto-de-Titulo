@@ -3,7 +3,8 @@ from datetime import timedelta
 from django.db import IntegrityError
 from django.utils import timezone
 
-from inventario.models import Usuario, Equipo, SolicitudItem
+from inventario.models import Equipo, SolicitudItem, Usuario
+
 from .base import LeicaTestCase
 
 

@@ -1,9 +1,11 @@
 import os
 from datetime import timedelta
 from pathlib import Path
+
+import dj_database_url
 import environ
 from django.core.exceptions import ImproperlyConfigured
-import dj_database_url
+from django.utils.csp import CSP
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -70,6 +72,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'inventario.middleware.SaludMiddleware',
     'django.middleware.security.SecurityMiddleware',
+    'django.middleware.csp.ContentSecurityPolicyMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -80,6 +83,21 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'axes.middleware.AxesMiddleware',
 ]
+
+CDN = 'https://cdn.jsdelivr.net'
+
+SECURE_CSP = {
+    'default-src': [CSP.SELF],
+    'script-src': [CSP.SELF, CDN],
+    'style-src': [CSP.SELF, CSP.UNSAFE_INLINE, CDN, 'https://fonts.googleapis.com'],
+    'font-src': [CSP.SELF, CDN, 'https://fonts.gstatic.com'],
+    'img-src': [CSP.SELF, 'data:'],
+    'connect-src': [CSP.SELF],
+    'object-src': [CSP.NONE],
+    'base-uri': [CSP.SELF],
+    'form-action': [CSP.SELF],
+    'frame-ancestors': [CSP.NONE],
+}
 
 ROOT_URLCONF = 'leica_project.urls'
 

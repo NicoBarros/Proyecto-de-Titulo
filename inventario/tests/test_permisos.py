@@ -2,8 +2,8 @@
 Control de acceso: autenticacion y restricciones por rol (servidor, no solo UI).
 """
 from inventario.models import Equipo
-from .base import LeicaTestCase
 
+from .base import LeicaTestCase
 
 URLS_PROTEGIDAS = [
     '/', '/inventario/', '/solicitudes/', '/mantenimiento/', '/reportes/',

@@ -5,6 +5,7 @@ from django.apps import apps as django_apps
 
 from inventario import auditoria
 from inventario.models import Equipo, HistorialEquipo, Mantenimiento, Movimiento, Solicitud, Usuario
+
 from .base import LeicaTestCase
 
 

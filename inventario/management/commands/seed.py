@@ -2,7 +2,9 @@
 Comando para poblar la base de datos con datos de prueba (usuarios, equipos, insumos).
 """
 from django.core.management.base import BaseCommand
-from inventario.models import Usuario, Equipo, Insumo
+
+from inventario.models import Equipo, Insumo, Usuario
+
 
 class Command(BaseCommand):
     help = 'Poblar la base de datos con datos de prueba (seed).'
@@ -21,7 +23,7 @@ class Command(BaseCommand):
         for u_data in usuarios:
             email = u_data.pop('email')
             if not Usuario.objects.filter(email=email).exists():
-                user = Usuario.objects.create_user(
+                Usuario.objects.create_user(
                     username=email.split('@')[0],
                     email=email,
                     password='Leica2026!',
@@ -54,5 +56,5 @@ class Command(BaseCommand):
             obj, created = Insumo.objects.get_or_create(nombre=i_data['nombre'], defaults=i_data)
             if created:
                 self.stdout.write(self.style.SUCCESS(f'Creado insumo: {obj.nombre}'))
-                
+
         self.stdout.write(self.style.SUCCESS('\nBase de datos poblada exitosamente (Seed completo).'))

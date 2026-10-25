@@ -4,7 +4,8 @@ from decimal import Decimal
 from django.utils import timezone
 
 from inventario.kpi import calcular_kpis
-from inventario.models import Equipo, Mantenimiento, Movimiento, Solicitud
+from inventario.models import Mantenimiento, Movimiento, Solicitud
+
 from .base import LeicaTestCase
 
 

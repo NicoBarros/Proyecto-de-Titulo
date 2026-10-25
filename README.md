@@ -150,6 +150,9 @@ comunes: no puede modificar a otros administradores ni asignar roles con permiso
   (solo lectura) y también se escriben en el log de la aplicación.
 - **Transporte:** HTTPS obligatorio, HSTS de un año, cookies seguras y TLS 1.2 como mínimo.
 - **Recursos externos:** Bootstrap y Bootstrap Icons se cargan con verificación de integridad (SRI).
+- **Política de seguridad de contenido (CSP):** el navegador solo ejecuta scripts del propio sitio y del CDN
+  de Bootstrap; no hay JavaScript inline en ninguna plantilla, lo que bloquea la inyección de scripts (XSS).
+  Tampoco se permite incrustar la aplicación en otros sitios (`frame-ancestors 'none'`).
 - **Base de datos:** en Azure, el firewall solo acepta conexiones desde las IP de salida de la aplicación.
 - **Búsqueda con IA:** cada usuario tiene un máximo de consultas a Gemini por hora (`IA_CONSULTAS_POR_HORA`).
 - **Dependencias:** cada push ejecuta `pip-audit` contra la base de vulnerabilidades conocidas, y Dependabot
@@ -183,15 +186,23 @@ El botón "Exportar Inventario Excel" de la pantalla Inventario descarga `invent
 con tres hojas con formato: **Resumen** (equipos por estado, valor total e insumos con stock bajo),
 **Equipos** e **Insumos**, con colores por estado y filtros en cada columna.
 
-## Tests
+## Tests y calidad del código
+
+Las herramientas de desarrollo están en `requirements-dev.txt` (incluye las de producción):
 
 ```powershell
-python manage.py test inventario
+pip install -r requirements-dev.txt
+python manage.py test inventario       # suite completa
+coverage run manage.py test inventario # suite con medición de cobertura
+coverage report                        # falla si la cobertura baja del 90 %
+ruff check .                           # estilo y errores comunes
 ```
 
 La suite está en `inventario/tests/` y cubre permisos por rol, inventario, el flujo de préstamos,
-mantenimiento, exportación a Excel, códigos QR, auditoría, búsqueda con IA (Gemini simulado, nunca llama a la API real) y el panel
-de administración.
+mantenimiento, importación y exportación a Excel, correos, tareas programadas, códigos QR, auditoría,
+búsqueda con IA (Gemini simulado, nunca llama a la API real), la política de seguridad de contenido y
+el panel de administración. El CI ejecuta `ruff`, las migraciones pendientes, `check --deploy`, la suite
+con cobertura y `pip-audit` en cada push.
 
 ## Despliegue en Azure
 
@@ -265,9 +276,15 @@ despliegue, entra a **Actions → CI/CD → Run workflow**.
 leica_project/        Configuración de Django (settings, urls, wsgi)
 inventario/
   models.py           Usuario, Equipo, Insumo, Solicitud, Movimiento, Bloqueo, Mantenimiento, Migracion
-  views.py            Lógica de negocio de cada pantalla
-  templates/          Plantillas HTML
-  static/             CSS e imágenes
+  servicios.py        Reglas de negocio: solicitudes, devoluciones, sanciones, mantenimiento, estados
+  views/              Una vista por pantalla (inventario, solicitudes, mantenimiento, reportes, panel...)
+  importar.py         Importación desde Excel
+  exportar.py         Exportación a Excel y plantilla de importación
+  notificaciones.py   Correos de aviso
+  tareas.py           Tareas programadas (atrasos y avisos)
+  seguridad.py        Registro de eventos de seguridad
+  templates/          Plantillas HTML (correos en templates/inventario/correos/)
+  static/             CSS, JavaScript e imágenes
   migrations/         Migraciones de la base de datos
   management/commands/ seed, respaldar, restaurar, marcar_atrasadas, tareas_programadas, crear_admin
   tests/              Suite de tests

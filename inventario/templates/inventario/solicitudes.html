@@ -1,4 +1,5 @@
 {% extends 'inventario/base.html' %}
+{% load static %}
 
 {% block content %}
 <div class="card mb-4">
@@ -16,7 +17,7 @@
           <div class="row g-2 align-items-end">
             <div class="col-md-8">
               <label class="form-label fw-semibold small">Ítem</label>
-              <select name="item[]" class="form-select form-select-sm item-select" onchange="actualizarTopeStock(this)">
+              <select name="item[]" class="form-select form-select-sm item-select">
                 <optgroup label="Equipos disponibles">
                   {% for e in equipos %}
                   <option value="equipo:{{ e.id }}" data-tipo="equipo" data-stock="1"{% if equipo_preseleccionado == e.id|stringformat:'s' %} selected{% endif %}>{{ e.nombre }} ({{ e.codigo_inventario }})</option>
@@ -24,7 +25,7 @@
                 </optgroup>
                 <optgroup label="Insumos">
                   {% for i in insumos %}
-                    <option value="insumo:{{ i.id }}" data-tipo="insumo" data-stock="{{ i.cantidad_disponible }}" {% if not i.cantidad_disponible %}disabled{% endif %}>
+                    <option value="insumo:{{ i.id }}" data-tipo="insumo" data-stock="{{ i.cantidad_disponible }}" {% if not i.cantidad_disponible %}data-agotado="1" disabled{% endif %}>
                       {{ i.nombre }} — disp. {{ i.cantidad_disponible }}
                     </option>
                   {% endfor %}
@@ -34,13 +35,12 @@
             <div class="col-9 col-md-3">
               <label class="form-label fw-semibold small">Cantidad</label>
               <div class="input-group input-group-sm">
-                <input name="cantidad[]" type="number" value="1" min="1" max="1" class="form-control cantidad-input"
-                  oninput="validarCantidadInput(this)" aria-label="Cantidad">
+                <input name="cantidad[]" type="number" value="1" min="1" max="1" class="form-control cantidad-input" aria-label="Cantidad">
                 <span class="input-group-text stock-hint"></span>
               </div>
             </div>
             <div class="col-3 col-md-1">
-              <button type="button" class="btn btn-outline-danger btn-sm w-100" onclick="removerItem(this)"
+              <button type="button" class="btn btn-outline-danger btn-sm w-100" data-accion="quitar-item"
                 title="Quitar ítem" aria-label="Quitar ítem">
                 <i class="bi bi-x-lg"></i>
               </button>
@@ -50,7 +50,7 @@
       </div>
 
       <div class="mb-3">
-        <button type="button" class="btn btn-outline-primary btn-sm" onclick="agregarItem()">
+        <button type="button" class="btn btn-outline-primary btn-sm" data-accion="agregar-item">
           <i class="bi bi-plus-circle me-1"></i>Añadir otro ítem al Kit
         </button>
       </div>
@@ -265,102 +265,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script>
-  (function () {
-    const inicio = document.getElementById('horarioInicio');
-    const fin = document.getElementById('horarioFin');
-    const ahora = new Date();
-    ahora.setMinutes(ahora.getMinutes() - ahora.getTimezoneOffset());
-    inicio.min = ahora.toISOString().slice(0, 16);
-    inicio.addEventListener('change', () => {
-      fin.min = inicio.value;
-      if (fin.value && fin.value <= inicio.value) fin.value = '';
-    });
-  })();
-
-  function actualizarTopeStock(selectEl) {
-    const row = selectEl.closest('.item-row');
-    if (!row) return;
-    const inputCantidad = row.querySelector('.cantidad-input');
-    const stockHint = row.querySelector('.stock-hint');
-    const selectedOpt = selectEl.options[selectEl.selectedIndex];
-    if (!selectedOpt) return;
-
-    const tipo = selectedOpt.dataset.tipo;
-    const stock = parseInt(selectedOpt.dataset.stock) || 1;
-
-    if (tipo === 'equipo') {
-      inputCantidad.min = 1;
-      inputCantidad.max = 1;
-      inputCantidad.value = 1;
-      inputCantidad.readOnly = true;
-      if (stockHint) stockHint.innerText = 'máx. 1';
-    } else {
-      inputCantidad.readOnly = false;
-      inputCantidad.min = 1;
-      inputCantidad.max = stock;
-      if (stockHint) stockHint.innerText = `máx. ${stock}`;
-
-      let currentVal = parseInt(inputCantidad.value) || 1;
-      if (currentVal > stock) {
-        inputCantidad.value = stock;
-      } else if (currentVal < 1) {
-        inputCantidad.value = 1;
-      }
-    }
-  }
-
-  function validarCantidadInput(inputEl) {
-    const max = parseInt(inputEl.max);
-    const min = parseInt(inputEl.min) || 1;
-    let val = parseInt(inputEl.value);
-
-    if (max && val > max) {
-      inputEl.value = max;
-      inputEl.classList.add('is-invalid');
-      setTimeout(() => { inputEl.classList.remove('is-invalid'); }, 800);
-    } else if (val < min && inputEl.value !== '') {
-      inputEl.value = min;
-    }
-  }
-
-  function agregarItem() {
-    const container = document.getElementById('items-container');
-    const firstRow = container.querySelector('.item-row');
-    const newRow = firstRow.cloneNode(true);
-    const select = newRow.querySelector('.item-select');
-    const input = newRow.querySelector('.cantidad-input');
-    input.value = 1;
-    container.appendChild(newRow);
-    actualizarTopeStock(select);
-    actualizarContador();
-    container.scrollTop = container.scrollHeight;
-    select.focus();
-  }
-
-  function actualizarContador() {
-    const total = document.querySelectorAll('#items-container .item-row').length;
-    document.getElementById('items-contador').innerText = total;
-  }
-
-  function removerItem(btn) {
-    const container = document.getElementById('items-container');
-    if (container.querySelectorAll('.item-row').length > 1) {
-      btn.closest('.item-row').remove();
-      actualizarContador();
-    } else {
-      if (typeof window.mostrarAlerta === 'function') {
-        window.mostrarAlerta("La solicitud debe tener al menos un ítem.", "Ítem Requerido");
-      } else {
-        alert("La solicitud debe tener al menos un ítem.");
-      }
-    }
-  }
-
-  document.addEventListener('DOMContentLoaded', function () {
-    document.querySelectorAll('.item-select').forEach(function (sel) {
-      actualizarTopeStock(sel);
-    });
-  });
-</script>
+<script src="{% static 'inventario/js/solicitudes.js' %}?v=2.1"></script>
 {% endblock %}
