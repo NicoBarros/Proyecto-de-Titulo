@@ -33,7 +33,7 @@ jobs:
       SECRET_KEY: ci-solo-para-pruebas-${{ github.run_id }}
       DATABASE_URL: postgres://leica:leica@localhost:5432/leica_inventario
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v5
         with:
           python-version: '3.14'
@@ -61,7 +61,7 @@ jobs:
       name: produccion
       url: ${{ steps.desplegar.outputs.webapp-url }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Desplegar en App Service
         id: desplegar
         uses: azure/webapps-deploy@v3
