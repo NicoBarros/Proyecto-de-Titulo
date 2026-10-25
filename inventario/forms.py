@@ -16,4 +16,4 @@ class InsumoForm(forms.ModelForm):
 class MantenimientoForm(forms.Form):
     equipo_id = forms.IntegerField()
     falla_descrita = forms.CharField(required=True)
-    costo_cotizado = forms.DecimalField(required=True, max_digits=12, decimal_places=2)
+    costo_cotizado = forms.DecimalField(required=True, max_digits=12, decimal_places=2, min_value=0)

@@ -2,6 +2,8 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.core.paginator import Paginator
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import login
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError
 from django.contrib import messages
 from decimal import Decimal, ROUND_HALF_UP
 from django.db.models import Count, Q, F, ProtectedError
@@ -20,28 +22,45 @@ import qrcode.image.svg
 
 from .models import (
     Usuario, Equipo, Insumo, Solicitud, SolicitudItem, Movimiento,
-    Bloqueo, Mantenimiento, HistorialEquipo
+    Bloqueo, Mantenimiento, HistorialEquipo, EventoSeguridad
 )
 from .forms import EquipoForm, InsumoForm, MantenimientoForm
 from .decorators import role_required
 from .exportar import generar_excel_inventario
 from . import auditoria
 from .kpi import PERIODOS, calcular_kpis
+from .seguridad import registrar_evento
 
 logger = logging.getLogger(__name__)
+
+
+def _errores_password(password, usuario):
+    try:
+        validate_password(password, user=usuario)
+    except ValidationError as e:
+        return ' '.join(e.messages)
+    return None
+
+
+def _registrar_cambio_cuenta(request, objetivo, detalle):
+    registrar_evento(EventoSeguridad.Tipo.CAMBIO_CUENTA, request, usuario=request.user, detalle=f'{objetivo.email}: {detalle}')
 
 
 @login_required
 def dashboard_view(request):
     Solicitud.marcar_atrasadas()
     totales = {
-        'total_equipos': Equipo.objects.count(),
-        'equipos_disponibles': Equipo.objects.filter(estado=Equipo.Estado.DISPONIBLE).count(),
-        'equipos_prestados': Equipo.objects.filter(estado=Equipo.Estado.PRESTADO).count(),
-        'equipos_mantenimiento': Equipo.objects.filter(estado=Equipo.Estado.EN_MANTENIMIENTO).count(),
-        'solicitudes_pendientes': Solicitud.objects.filter(estado=Solicitud.EstadoSolicitud.PENDIENTE).count(),
-        'solicitudes_atrasadas': Solicitud.objects.filter(estado=Solicitud.EstadoSolicitud.ATRASADA).count(),
-        'insumos_bajo_stock': len([i for i in Insumo.objects.all() if i.bajo_stock]),
+        **Equipo.objects.aggregate(
+            total_equipos=Count('id'),
+            equipos_disponibles=Count('id', filter=Q(estado=Equipo.Estado.DISPONIBLE)),
+            equipos_prestados=Count('id', filter=Q(estado=Equipo.Estado.PRESTADO)),
+            equipos_mantenimiento=Count('id', filter=Q(estado=Equipo.Estado.EN_MANTENIMIENTO)),
+        ),
+        **Solicitud.objects.aggregate(
+            solicitudes_pendientes=Count('id', filter=Q(estado=Solicitud.EstadoSolicitud.PENDIENTE)),
+            solicitudes_atrasadas=Count('id', filter=Q(estado=Solicitud.EstadoSolicitud.ATRASADA)),
+        ),
+        'insumos_bajo_stock': Insumo.objects.filter(cantidad_disponible__lte=F('umbral_minimo')).count(),
     }
     atrasadas = []
     if request.user.rol in Usuario.ROLES_APROBADORES or request.user.is_superuser:
@@ -270,13 +289,21 @@ def eliminar_insumo(request, id):
 def editar_insumo(request, id):
     insumo = get_object_or_404(Insumo, id=id)
     if request.method == 'POST':
-        form = InsumoForm(request.POST, instance=insumo)
-        if form.is_valid():
-            insumo_editado = form.save(commit=False)
-            insumo_editado.version += 1
-            insumo_editado.save()
-            messages.success(request, 'Insumo actualizado exitosamente.')
-            return redirect('/inventario/?tab=insumos')
+        with transaction.atomic():
+            insumo = get_object_or_404(Insumo.objects.select_for_update(), id=id)
+            total_anterior = insumo.cantidad_total
+            form = InsumoForm(request.POST, instance=insumo)
+            if form.is_valid():
+                insumo_editado = form.save(commit=False)
+                en_uso = total_anterior - insumo_editado.cantidad_disponible
+                if insumo_editado.cantidad_total < en_uso:
+                    form.add_error('cantidad_total', f'Hay {en_uso} unidades entregadas; el total no puede ser menor.')
+                else:
+                    insumo_editado.cantidad_disponible = insumo_editado.cantidad_total - en_uso
+                    insumo_editado.version += 1
+                    insumo_editado.save()
+                    messages.success(request, 'Insumo actualizado exitosamente.')
+                    return redirect('/inventario/?tab=insumos')
     else:
         form = InsumoForm(instance=insumo)
     return render(request, 'inventario/editar_insumo.html', {'form': form, 'insumo': insumo})
@@ -295,6 +322,15 @@ TRANSICIONES_SOLICITUD = {
     'rechazar': [Solicitud.EstadoSolicitud.PENDIENTE, Solicitud.EstadoSolicitud.APROBADA],
     'entregar': [Solicitud.EstadoSolicitud.APROBADA],
     'devolver': Solicitud.ESTADOS_EN_PRESTAMO,
+    'cancelar': [Solicitud.EstadoSolicitud.PENDIENTE, Solicitud.EstadoSolicitud.APROBADA],
+}
+
+MENSAJES_ACCION = {
+    'aprobar': 'aprobada',
+    'rechazar': 'rechazada',
+    'entregar': 'entregada',
+    'devolver': 'devuelta',
+    'cancelar': 'cancelada',
 }
 
 ESTADOS_DEVOLUCION = ['excelente', 'bueno', 'dañado', 'inservible']
@@ -305,6 +341,8 @@ def _ejecutar_accion_solicitud(request, solicitud_id, accion):
     solicitud = get_object_or_404(Solicitud.objects.select_for_update(), id=solicitud_id)
     if accion not in TRANSICIONES_SOLICITUD:
         raise ValueError('Acción no válida.')
+    if accion == 'cancelar' and solicitud.solicitante_id != request.user.id:
+        raise ValueError('Solo quien creó la solicitud puede cancelarla.')
     if solicitud.estado not in TRANSICIONES_SOLICITUD[accion]:
         raise ValueError(
             f'No se puede {accion} la solicitud #{solicitud.id} porque está '
@@ -389,8 +427,9 @@ def _ejecutar_accion_solicitud(request, solicitud_id, accion):
         if atrasada:
             usuario = solicitud.en_representacion_de or solicitud.solicitante
             hasta = timezone.now() + timedelta(days=7)
-            usuario.bloqueado_hasta = hasta
-            usuario.save(update_fields=['bloqueado_hasta'])
+            if not usuario.bloqueado_hasta or usuario.bloqueado_hasta < hasta:
+                usuario.bloqueado_hasta = hasta
+                usuario.save(update_fields=['bloqueado_hasta'])
             Bloqueo.objects.create(
                 usuario=usuario, seccion=usuario.seccion, solicitud=solicitud,
                 fecha_fin=hasta, motivo='Devolucion atrasada'
@@ -398,6 +437,10 @@ def _ejecutar_accion_solicitud(request, solicitud_id, accion):
 
     elif accion == 'rechazar':
         solicitud.estado = Solicitud.EstadoSolicitud.RECHAZADA
+        solicitud.save()
+
+    elif accion == 'cancelar':
+        solicitud.estado = Solicitud.EstadoSolicitud.CANCELADA
         solicitud.save()
 
 
@@ -432,6 +475,12 @@ def solicitudes_view(request):
                 if representado.esta_bloqueado():
                     hasta = timezone.localtime(representado.bloqueado_hasta).strftime('%d-%m-%Y %H:%M')
                     raise ValueError(f'{representado.get_full_name() or representado.email} está bloqueado para préstamos hasta el {hasta}.')
+
+            beneficiario = representado or request.user
+            if beneficiario.tiene_atrasos():
+                if representado:
+                    raise ValueError(f'{representado.get_full_name() or representado.email} tiene préstamos atrasados sin devolver.')
+                raise ValueError('Tienes préstamos atrasados sin devolver. Devuélvelos antes de crear una nueva solicitud.')
 
             inicio = _parse_fecha(request.POST.get('horario_inicio'))
             fin = _parse_fecha(request.POST.get('horario_fin'))
@@ -492,14 +541,15 @@ def solicitudes_view(request):
         return redirect('solicitudes')
 
     if request.method == 'POST' and 'accion' in request.POST:
-        if not puede_aprobar:
+        accion = request.POST.get('accion')
+        if not puede_aprobar and accion != 'cancelar':
             messages.error(request, 'No tienes permiso para aprobar solicitudes.')
             return redirect('solicitudes')
-            
+
         try:
             with transaction.atomic():
-                _ejecutar_accion_solicitud(request, request.POST.get('solicitud_id'), request.POST.get('accion'))
-            messages.success(request, f'Solicitud {request.POST.get("accion")} correctamente.')
+                _ejecutar_accion_solicitud(request, request.POST.get('solicitud_id'), accion)
+            messages.success(request, f'Solicitud {MENSAJES_ACCION[accion]} correctamente.')
         except ValueError as e:
             messages.error(request, str(e))
 
@@ -524,98 +574,115 @@ def solicitudes_view(request):
     })
 
 
+ACCIONES_MANTENIMIENTO = {
+    'completar_reparacion': (Mantenimiento.Decision.COMPLETADO, Equipo.Estado.DISPONIBLE, 'reparación completada'),
+    'completado': (Mantenimiento.Decision.COMPLETADO, Equipo.Estado.DISPONIBLE, 'reparación completada'),
+    'dar_baja': (Mantenimiento.Decision.DAR_BAJA, Equipo.Estado.FUERA_SERVICIO, 'dado de baja'),
+    'reparar': (Mantenimiento.Decision.REPARAR, Equipo.Estado.EN_MANTENIMIENTO, 'en reparación'),
+}
+
+ESTADOS_DIAGNOSTICABLES = [Equipo.Estado.DISPONIBLE, Equipo.Estado.EN_MANTENIMIENTO]
+
+
+def _resolver_mantenimiento(request, mant_id, accion):
+    if accion not in ACCIONES_MANTENIMIENTO:
+        raise ValueError('Acción no válida.')
+    mant = get_object_or_404(Mantenimiento.objects.select_for_update(), id=mant_id)
+    equipo = Equipo.objects.select_for_update().get(id=mant.equipo_id)
+    if mant.fecha_resolucion is not None:
+        raise ValueError(f'El mantenimiento #{mant.id} ya fue resuelto.')
+    if accion == 'reparar' and mant.decision == Mantenimiento.Decision.REPARAR:
+        raise ValueError(f'El mantenimiento #{mant.id} ya está en reparación.')
+    if equipo.estado != Equipo.Estado.EN_MANTENIMIENTO:
+        raise ValueError(f'El equipo {equipo.nombre} no está en mantenimiento.')
+
+    decision, estado, detalle = ACCIONES_MANTENIMIENTO[accion]
+    mant.decision = decision
+    if accion != 'reparar':
+        mant.fecha_resolucion = timezone.now()
+    mant.save()
+
+    if equipo.estado != estado:
+        antes = auditoria.foto(equipo)
+        equipo.estado = estado
+        equipo.version += 1
+        equipo.save()
+        auditoria.registrar(equipo, request.user, HistorialEquipo.Accion.ESTADO, antes, f'Mantenimiento #{mant.id}: {detalle}')
+    return mant, equipo
+
+
+def _diagnosticar(request, form):
+    equipo = get_object_or_404(Equipo.objects.select_for_update(), id=form.cleaned_data['equipo_id'])
+    if equipo.estado not in ESTADOS_DIAGNOSTICABLES:
+        raise ValueError(f'El equipo {equipo.nombre} está {equipo.get_estado_display().lower()} y no se puede diagnosticar.')
+    if equipo.mantenimientos.filter(fecha_resolucion__isnull=True).exists():
+        raise ValueError(f'El equipo {equipo.nombre} ya tiene un mantenimiento abierto.')
+
+    costo = Decimal(form.cleaned_data['costo_cotizado'])
+    if equipo.valor_adquisicion:
+        proporcion = costo / Decimal(equipo.valor_adquisicion)
+        porcentaje = proporcion.quantize(Decimal('0.0001'), rounding=ROUND_HALF_UP)
+    else:
+        proporcion = porcentaje = None
+
+    sugerencia = (
+        Mantenimiento.Decision.DAR_BAJA
+        if proporcion is not None and proporcion >= Decimal('0.70')
+        else Mantenimiento.Decision.REPARAR
+    )
+
+    antes = auditoria.foto(equipo)
+    mantenimiento = Mantenimiento.objects.create(
+        equipo=equipo,
+        falla_descrita=form.cleaned_data['falla_descrita'],
+        costo_cotizado=costo,
+        porcentaje_costo=porcentaje,
+        decision=sugerencia,
+        reportado_por=request.user
+    )
+    if equipo.estado != Equipo.Estado.EN_MANTENIMIENTO:
+        equipo.estado = Equipo.Estado.EN_MANTENIMIENTO
+        equipo.version += 1
+        equipo.save()
+        auditoria.registrar(equipo, request.user, HistorialEquipo.Accion.ESTADO, antes, f'Diagnóstico de mantenimiento #{mantenimiento.id}')
+    return sugerencia, porcentaje
+
+
 @login_required
 @role_required(Usuario.Rol.ENCARGADO_LABORATORIO, Usuario.Rol.CONTROL_CALIDAD, Usuario.Rol.DIRECTOR_CARRERA)
 def mantenimiento_view(request):
-    """RF-10: Mantenimiento y regla del 70% con finalización de reparación."""
     if request.method == 'POST':
-        if 'mant_id' in request.POST or 'decision' in request.POST or 'accion_mant' in request.POST:
-            mant_id = request.POST.get('mant_id')
-            accion = request.POST.get('accion_mant') or request.POST.get('decision')
-            mant = get_object_or_404(Mantenimiento, id=mant_id)
-
-            if accion in ['completar_reparacion', 'completado']:
-                mant.decision = Mantenimiento.Decision.COMPLETADO
-                mant.fecha_resolucion = timezone.now()
-                mant.save()
-
-                antes = auditoria.foto(mant.equipo)
-                mant.equipo.estado = Equipo.Estado.DISPONIBLE
-                mant.equipo.version += 1
-                mant.equipo.save()
-                auditoria.registrar(mant.equipo, request.user, HistorialEquipo.Accion.ESTADO, antes, f'Mantenimiento #{mant.id}: reparación completada')
-                messages.success(
-                    request,
-                    f'¡Reparación completada! El equipo "{mant.equipo.nombre}" ({mant.equipo.codigo_inventario}) '
-                    f'ha salido de reparación y su estado en el inventario se actualizó a DISPONIBLE.'
-                )
-            elif accion == 'dar_baja':
-                mant.decision = Mantenimiento.Decision.DAR_BAJA
-                mant.fecha_resolucion = timezone.now()
-                mant.save()
-
-                antes = auditoria.foto(mant.equipo)
-                mant.equipo.estado = Equipo.Estado.FUERA_SERVICIO
-                mant.equipo.version += 1
-                mant.equipo.save()
-                auditoria.registrar(mant.equipo, request.user, HistorialEquipo.Accion.ESTADO, antes, f'Mantenimiento #{mant.id}: dado de baja')
-                messages.warning(request, f'El equipo "{mant.equipo.nombre}" ha sido dado de baja (Fuera de servicio).')
-            elif accion == 'reparar':
-                mant.decision = Mantenimiento.Decision.REPARAR
-                mant.fecha_resolucion = timezone.now()
-                mant.save()
-
-                antes = auditoria.foto(mant.equipo)
-                mant.equipo.estado = Equipo.Estado.EN_MANTENIMIENTO
-                mant.equipo.version += 1
-                mant.equipo.save()
-                auditoria.registrar(mant.equipo, request.user, HistorialEquipo.Accion.ESTADO, antes, f'Mantenimiento #{mant.id}: en reparación')
-                messages.info(request, f'El equipo "{mant.equipo.nombre}" ha sido confirmado en proceso de reparación.')
-        else:
-            form = MantenimientoForm(request.POST)
-            if form.is_valid():
-                equipo = get_object_or_404(Equipo, id=form.cleaned_data['equipo_id'])
-                costo = Decimal(form.cleaned_data['costo_cotizado'])
-
-                if equipo.valor_adquisicion:
-                    proporcion = costo / Decimal(equipo.valor_adquisicion)
-
-                    porcentaje = proporcion.quantize(Decimal('0.0001'), rounding=ROUND_HALF_UP)
+        try:
+            if 'mant_id' in request.POST or 'decision' in request.POST or 'accion_mant' in request.POST:
+                accion = request.POST.get('accion_mant') or request.POST.get('decision')
+                with transaction.atomic():
+                    mant, equipo = _resolver_mantenimiento(request, request.POST.get('mant_id'), accion)
+                if mant.decision == Mantenimiento.Decision.COMPLETADO:
+                    messages.success(request, f'Reparación completada. "{equipo.nombre}" ({equipo.codigo_inventario}) está disponible.')
+                elif mant.decision == Mantenimiento.Decision.DAR_BAJA:
+                    messages.warning(request, f'El equipo "{equipo.nombre}" fue dado de baja (Fuera de servicio).')
                 else:
-                    proporcion = porcentaje = None
-
-                sugerencia = (
-                    Mantenimiento.Decision.DAR_BAJA
-                    if proporcion is not None and proporcion >= Decimal('0.70')
-                    else Mantenimiento.Decision.REPARAR
-                )
-
-                antes = auditoria.foto(equipo)
-                mantenimiento = Mantenimiento.objects.create(
-                    equipo=equipo,
-                    falla_descrita=form.cleaned_data['falla_descrita'],
-                    costo_cotizado=costo,
-                    porcentaje_costo=porcentaje,
-                    decision=sugerencia,
-                    reportado_por=request.user
-                )
-
-                equipo.estado = Equipo.Estado.EN_MANTENIMIENTO
-                equipo.version += 1
-                equipo.save()
-                auditoria.registrar(equipo, request.user, HistorialEquipo.Accion.ESTADO, antes, f'Diagnóstico de mantenimiento #{mantenimiento.id}')
-
-                msg = f"Diagnóstico registrado. Sugerencia del sistema: {sugerencia.upper()} "
+                    messages.info(request, f'El equipo "{equipo.nombre}" quedó en reparación.')
+            else:
+                form = MantenimientoForm(request.POST)
+                if not form.is_valid():
+                    raise ValueError('Revisa los datos del diagnóstico.')
+                with transaction.atomic():
+                    sugerencia, porcentaje = _diagnosticar(request, form)
+                msg = f'Diagnóstico registrado. Sugerencia: {sugerencia.label.upper()}'
                 if porcentaje is not None:
-                    msg += f"(Costo representa {(porcentaje * 100):.1f}% del valor de adquisición)"
+                    msg += f' ({(porcentaje * 100):.1f}% del valor de adquisición).'
                 else:
-                    msg += "(Sin valor de adquisición registrado)"
+                    msg += ' (sin valor de adquisición registrado).'
                 messages.info(request, msg)
-
+        except ValueError as e:
+            messages.error(request, str(e))
         return redirect('mantenimiento')
 
     mantenimientos = Mantenimiento.objects.all().select_related('equipo')
-    equipos = Equipo.objects.all()
+    equipos = Equipo.objects.filter(estado__in=ESTADOS_DIAGNOSTICABLES).exclude(
+        id__in=Mantenimiento.objects.filter(fecha_resolucion__isnull=True).values('equipo_id'),
+    )
     return render(request, 'inventario/mantenimiento.html', {'mantenimientos': mantenimientos, 'equipos': equipos})
 
 
@@ -631,7 +698,7 @@ def reportes_view(request):
     vencidos = Solicitud.objects.filter(estado=Solicitud.EstadoSolicitud.ATRASADA).select_related('solicitante', 'en_representacion_de')
     
     dias_str = request.GET.get('dias', '90')
-    dias = int(dias_str) if dias_str.isdigit() else 90
+    dias = min(int(dias_str), 3650) if dias_str.isdigit() else 90
     fecha_limite = timezone.now() - timedelta(days=dias)
     sin_movimiento = Equipo.objects.exclude(
         solicituditem__solicitud__created_at__gte=fecha_limite
@@ -683,13 +750,13 @@ Responde SOLO con un JSON array de los ids de equipo mas relevantes (maximo 5), 
 
             try:
                 response = client.models.generate_content(
-                    model='gemini-2.5-flash',
+                    model=settings.GEMINI_MODELO,
                     contents=prompt,
                 )
             except APIError as e:
                 if e.code == 503 or "503" in str(e):
                     response = client.models.generate_content(
-                        model='gemini-2.0-flash',
+                        model=settings.GEMINI_MODELO_RESPALDO,
                         contents=prompt,
                     )
                 else:
@@ -796,8 +863,8 @@ def admin_panel_view(request):
                 messages.error(request, 'Rol no válido.')
             elif Usuario.objects.filter(email=email).exists():
                 messages.error(request, f'Ya existe un usuario registrado con el correo {email}.')
-            elif len(password) < 6:
-                messages.error(request, 'La contraseña debe tener al menos 6 caracteres.')
+            elif error_password := _errores_password(password, Usuario(email=email, first_name=nombre, last_name=apellido)):
+                messages.error(request, error_password)
             else:
                 username = email.split('@')[0]
                 base_username = username
@@ -816,6 +883,7 @@ def admin_panel_view(request):
                     password=password,
                     is_staff=es_staff,
                 )
+                _registrar_cambio_cuenta(request, user, f'cuenta creada con rol {user.get_rol_display()}' + (' (staff)' if es_staff else ''))
                 messages.success(request, f'Usuario {user.email} ({user.get_rol_display()}) creado exitosamente.')
 
         elif accion == 'cambiar_rol':
@@ -825,8 +893,10 @@ def admin_panel_view(request):
             if nuevo_rol not in Usuario.Rol.values:
                 messages.error(request, 'Rol no válido.')
             else:
+                rol_anterior = user_obj.get_rol_display()
                 user_obj.rol = nuevo_rol
-                user_obj.save()
+                user_obj.save(update_fields=['rol'])
+                _registrar_cambio_cuenta(request, user_obj, f'rol {rol_anterior} → {user_obj.get_rol_display()}')
                 messages.success(request, f'Rol de {user_obj.email} actualizado a {user_obj.get_rol_display()}.')
 
         elif accion == 'toggle_activo':
@@ -836,26 +906,29 @@ def admin_panel_view(request):
                 messages.error(request, 'No puedes desactivar tu propia cuenta en uso.')
             else:
                 user_obj.is_active = not user_obj.is_active
-                user_obj.save()
+                user_obj.save(update_fields=['is_active'])
                 estado_txt = 'activada' if user_obj.is_active else 'desactivada'
+                _registrar_cambio_cuenta(request, user_obj, f'cuenta {estado_txt}')
                 messages.success(request, f'Cuenta {user_obj.email} {estado_txt}.')
 
         elif accion == 'desbloquear':
             user_id = request.POST.get('user_id')
             user_obj = get_object_or_404(Usuario, id=user_id)
             user_obj.bloqueado_hasta = None
-            user_obj.save()
+            user_obj.save(update_fields=['bloqueado_hasta'])
+            _registrar_cambio_cuenta(request, user_obj, 'sanción removida')
             messages.success(request, f'Sanción removida: {user_obj.email} ahora está desbloqueado.')
 
         elif accion == 'reset_password':
             user_id = request.POST.get('user_id')
             nueva_clave = request.POST.get('nueva_password', '')
             user_obj = get_object_or_404(Usuario, id=user_id)
-            if len(nueva_clave) < 6:
-                messages.error(request, 'La nueva contraseña debe tener al menos 6 caracteres.')
+            if error_password := _errores_password(nueva_clave, user_obj):
+                messages.error(request, error_password)
             else:
                 user_obj.set_password(nueva_clave)
-                user_obj.save()
+                user_obj.save(update_fields=['password'])
+                _registrar_cambio_cuenta(request, user_obj, 'contraseña restablecida')
                 messages.success(request, f'Contraseña de {user_obj.email} restablecida correctamente.')
 
         elif accion == 'cambiar_estado_equipo':
@@ -864,6 +937,8 @@ def admin_panel_view(request):
             equipo_obj = get_object_or_404(Equipo, id=equipo_id)
             if nuevo_estado not in Equipo.Estado.values:
                 messages.error(request, 'Estado de equipo no válido.')
+            elif Equipo.Estado.PRESTADO in (equipo_obj.estado, nuevo_estado):
+                messages.error(request, 'El estado "Prestado" solo cambia mediante la entrega y devolución de solicitudes.')
             else:
                 estado_antiguo = equipo_obj.get_estado_display()
                 antes = auditoria.foto(equipo_obj)
@@ -901,19 +976,23 @@ def admin_panel_view(request):
         qs_equipos = qs_equipos.filter(estado=filtro_estado_equipo)
 
     metricas = {
-        'total_usuarios': Usuario.objects.count(),
-        'estudiantes': Usuario.objects.filter(rol=Usuario.Rol.ESTUDIANTE).count(),
-        'docentes': Usuario.objects.filter(rol=Usuario.Rol.DOCENTE).count(),
-        'directores': Usuario.objects.filter(rol=Usuario.Rol.DIRECTOR_CARRERA).count(),
-        'encargados': Usuario.objects.filter(rol=Usuario.Rol.ENCARGADO_LABORATORIO).count(),
-        'control_calidad': Usuario.objects.filter(rol=Usuario.Rol.CONTROL_CALIDAD).count(),
-        'bloqueados': Usuario.objects.filter(bloqueado_hasta__gt=timezone.now()).count(),
-        'staff': Usuario.objects.filter(is_staff=True).count(),
-        'equipos_total': Equipo.objects.count(),
-        'equipos_disponibles': Equipo.objects.filter(estado=Equipo.Estado.DISPONIBLE).count(),
-        'equipos_mantenimiento': Equipo.objects.filter(estado=Equipo.Estado.EN_MANTENIMIENTO).count(),
-        'equipos_prestados': Equipo.objects.filter(estado=Equipo.Estado.PRESTADO).count(),
-        'equipos_baja': Equipo.objects.filter(estado=Equipo.Estado.FUERA_SERVICIO).count(),
+        **Usuario.objects.aggregate(
+            total_usuarios=Count('id'),
+            estudiantes=Count('id', filter=Q(rol=Usuario.Rol.ESTUDIANTE)),
+            docentes=Count('id', filter=Q(rol=Usuario.Rol.DOCENTE)),
+            directores=Count('id', filter=Q(rol=Usuario.Rol.DIRECTOR_CARRERA)),
+            encargados=Count('id', filter=Q(rol=Usuario.Rol.ENCARGADO_LABORATORIO)),
+            control_calidad=Count('id', filter=Q(rol=Usuario.Rol.CONTROL_CALIDAD)),
+            bloqueados=Count('id', filter=Q(bloqueado_hasta__gt=timezone.now())),
+            staff=Count('id', filter=Q(is_staff=True)),
+        ),
+        **Equipo.objects.aggregate(
+            equipos_total=Count('id'),
+            equipos_disponibles=Count('id', filter=Q(estado=Equipo.Estado.DISPONIBLE)),
+            equipos_mantenimiento=Count('id', filter=Q(estado=Equipo.Estado.EN_MANTENIMIENTO)),
+            equipos_prestados=Count('id', filter=Q(estado=Equipo.Estado.PRESTADO)),
+            equipos_baja=Count('id', filter=Q(estado=Equipo.Estado.FUERA_SERVICIO)),
+        ),
     }
 
     ultimos_movimientos = Movimiento.objects.select_related('solicitud', 'responsable').order_by('-fecha')[:10]

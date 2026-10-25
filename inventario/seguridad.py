@@ -48,7 +48,7 @@ def registrar_evento(tipo, request=None, usuario=None, identificador='', detalle
         agente=request.META.get('HTTP_USER_AGENT', '')[:255] if request is not None else '',
         detalle=detalle[:255],
     )
-    nivel = logging.INFO if tipo in (EventoSeguridad.Tipo.INICIO_SESION, EventoSeguridad.Tipo.CIERRE_SESION) else logging.WARNING
+    nivel = logging.INFO if tipo in (EventoSeguridad.Tipo.INICIO_SESION, EventoSeguridad.Tipo.CIERRE_SESION, EventoSeguridad.Tipo.CAMBIO_CUENTA) else logging.WARNING
     logger.log(nivel, '%s usuario=%s ip=%s ruta=%s %s', tipo, evento.identificador or '-', evento.ip or '-', evento.ruta or '-', evento.detalle)
     return evento
 

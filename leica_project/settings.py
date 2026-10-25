@@ -9,6 +9,7 @@ import os
 from datetime import timedelta
 from pathlib import Path
 import environ
+from django.core.exceptions import ImproperlyConfigured
 import dj_database_url
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -23,6 +24,8 @@ env = environ.Env(
     DATABASE_URL=(str, ''),
     DOMINIO_INSTITUCIONAL=(str, 'inacapmail.cl'),
     GEMINI_API_KEY=(str, ''),
+    GEMINI_MODELO=(str, 'gemini-2.5-flash'),
+    GEMINI_MODELO_RESPALDO=(str, 'gemini-2.5-flash-lite'),
     POSTGRES_BIN=(str, ''),
     SESION_MINUTOS=(int, 60),
     SECURE_HSTS_SECONDS=(int, 31536000),
@@ -102,6 +105,8 @@ if env('DATABASE_URL'):
     DATABASES = {
         'default': dj_database_url.config(default=env('DATABASE_URL'), conn_max_age=600, conn_health_checks=True)
     }
+elif not DEBUG:
+    raise ImproperlyConfigured('DATABASE_URL es obligatoria cuando DEBUG=False.')
 else:
     DATABASES = {
         'default': {
@@ -165,6 +170,8 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 DOMINIO_INSTITUCIONAL = env('DOMINIO_INSTITUCIONAL')
 GEMINI_API_KEY = env('GEMINI_API_KEY')
+GEMINI_MODELO = env('GEMINI_MODELO')
+GEMINI_MODELO_RESPALDO = env('GEMINI_MODELO_RESPALDO')
 
 LOGGING = {
     'version': 1,

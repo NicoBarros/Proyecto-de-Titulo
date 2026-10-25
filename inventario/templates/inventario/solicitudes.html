@@ -177,6 +177,19 @@
                 </div>
                 {% endif %}
               </form>
+              {% elif s.solicitante_id == request.user.id %}
+              {% if s.estado == 'pendiente' or s.estado == 'aprobada' %}
+              <form method="post" action="{% url 'solicitudes' %}" class="d-inline">
+                {% csrf_token %}
+                <input type="hidden" name="solicitud_id" value="{{ s.id }}">
+                <button type="button" name="accion" value="cancelar" class="btn btn-outline-secondary btn-sm"
+                  data-confirm="¿Confirmas cancelar la solicitud #{{ s.id }}?"
+                  data-confirm-title="Cancelar solicitud"
+                  data-confirm-btn="Sí, cancelar">
+                  <i class="bi bi-x-circle me-1"></i>Cancelar
+                </button>
+              </form>
+              {% endif %}
               {% endif %}
             </td>
           </tr>

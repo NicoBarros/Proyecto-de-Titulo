@@ -102,7 +102,7 @@
         </div>
         <div class="col-md-2">
           <label class="form-label fw-semibold small">Contraseña*</label>
-          <input type="password" name="password" class="form-control form-control-sm" placeholder="Mín. 6 caract." required>
+          <input type="password" name="password" class="form-control form-control-sm" placeholder="Mín. 8 caract." minlength="8" required>
         </div>
       </div>
       <div class="row g-2 mt-2 align-items-center">
@@ -263,7 +263,7 @@
           <p id="pwdModalUser" class="text-muted mb-3" style="font-size: 0.85rem;"></p>
           <div class="mb-3">
             <label class="form-label fw-semibold">Nueva Contraseña</label>
-            <input type="password" name="nueva_password" class="form-control" placeholder="Mínimo 6 caracteres" required>
+            <input type="password" name="nueva_password" class="form-control" placeholder="Mínimo 8 caracteres" minlength="8" required>
           </div>
         </div>
         <div class="modal-footer border-0">
@@ -330,9 +330,11 @@
                 <input type="hidden" name="accion" value="cambiar_estado_equipo">
                 <input type="hidden" name="equipo_id" value="{{ eq.id }}">
                 <select name="nuevo_estado" class="form-select form-select-sm fw-semibold" style="width: auto;"
-                  onchange="this.form.submit()">
+                  onchange="this.form.submit()"{% if eq.estado == 'prestado' %} disabled{% endif %}>
                   {% for val, label in estados_equipos_choices %}
+                  {% if val != 'prestado' or eq.estado == 'prestado' %}
                   <option value="{{ val }}" {% if eq.estado == val %}selected{% endif %}>{{ label }}</option>
+                  {% endif %}
                   {% endfor %}
                 </select>
               </form>

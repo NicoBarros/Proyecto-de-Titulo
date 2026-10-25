@@ -62,6 +62,7 @@ copy .env.example .env
 | `DATABASE_URL` | `postgres://leica:una-clave-segura@localhost:5432/leica_inventario` |
 | `DOMINIO_INSTITUCIONAL` | Dominio de correo aceptado al crear usuarios (`inacapmail.cl`) |
 | `GEMINI_API_KEY` | Opcional. Sin ella, la búsqueda usa solo palabras clave |
+| `GEMINI_MODELO` / `GEMINI_MODELO_RESPALDO` | Opcionales. Modelo principal y de respaldo (por defecto `gemini-2.5-flash` y `gemini-2.5-flash-lite`) |
 | `POSTGRES_BIN` | Opcional. Carpeta de `pg_dump` y `pg_restore` si no están en el PATH |
 | `SESION_MINUTOS` | Minutos de inactividad antes de cerrar la sesión. Por defecto `60` |
 

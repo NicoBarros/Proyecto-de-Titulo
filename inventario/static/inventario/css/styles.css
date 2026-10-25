@@ -589,6 +589,11 @@ body {
   color: #166534;
 }
 
+.badge.cancelada {
+  background: #f1f5f9;
+  color: #475569;
+}
+
 /* Historial badges */
 .badge.historial-creado { background: #dcfce7; color: #166534; }
 .badge.historial-editado { background: #dbeafe; color: #1e40af; }

@@ -33,7 +33,8 @@
           <div class="row g-2 mb-4">
             <div class="col-md-6">
               <label class="form-label fw-semibold small">Cantidad Total *</label>
-              <input type="number" name="cantidad_total" class="form-control" value="{{ form.cantidad_total.value }}" required>
+              <input type="number" name="cantidad_total" class="form-control{% if form.cantidad_total.errors %} is-invalid{% endif %}" value="{{ form.cantidad_total.value }}" min="0" required>
+              {% for error in form.cantidad_total.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
               <div class="form-text text-muted" style="font-size: 0.75rem;">Modificar solo tras recuento físico de inventario.</div>
             </div>
             <div class="col-md-6">

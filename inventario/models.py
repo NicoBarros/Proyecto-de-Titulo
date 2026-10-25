@@ -1,5 +1,7 @@
 
+from django.core.validators import MinValueValidator
 from django.db import models
+from django.db.models import Q
 from django.contrib.auth.models import AbstractUser
 from django.utils import timezone
 
@@ -46,6 +48,11 @@ class Usuario(AbstractUser):
             return True
         return False
 
+    def tiene_atrasos(self):
+        return Solicitud.objects.filter(estado=Solicitud.EstadoSolicitud.ATRASADA).filter(
+            Q(en_representacion_de=self) | Q(solicitante=self, en_representacion_de__isnull=True)
+        ).exists()
+
     ROLES_ESCRITURA_INVENTARIO = [Rol.ENCARGADO_LABORATORIO, Rol.CONTROL_CALIDAD]
 
     ROLES_APROBADORES = [Rol.ENCARGADO_LABORATORIO, Rol.CONTROL_CALIDAD, Rol.DIRECTOR_CARRERA]
@@ -73,6 +80,7 @@ class Equipo(models.Model):
     )
     valor_adquisicion = models.DecimalField(
         max_digits=12, decimal_places=2, blank=True, null=True,
+        validators=[MinValueValidator(0)],
         verbose_name='Valor de adquisición ($)',
     )
     version = models.PositiveIntegerField(default=1)
@@ -262,7 +270,7 @@ class Mantenimiento(models.Model):
         max_digits=12, decimal_places=2, blank=True, null=True,
     )
     porcentaje_costo = models.DecimalField(
-        max_digits=5, decimal_places=4, blank=True, null=True,
+        max_digits=10, decimal_places=4, blank=True, null=True,
         help_text='costo_cotizado / valor_adquisicion',
     )
     decision = models.CharField(
@@ -341,6 +349,7 @@ class EventoSeguridad(models.Model):
         INTENTO_FALLIDO = 'intento_fallido', 'Intento de inicio fallido'
         BLOQUEO = 'bloqueo', 'Bloqueo por intentos fallidos'
         ACCESO_DENEGADO = 'acceso_denegado', 'Acceso denegado'
+        CAMBIO_CUENTA = 'cambio_cuenta', 'Cambio de cuenta'
 
     fecha = models.DateTimeField(auto_now_add=True, db_index=True)
     tipo = models.CharField(max_length=20, choices=Tipo.choices, db_index=True)
