@@ -1,0 +1,38 @@
+{% extends 'inventario/base.html' %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-12 col-md-8 col-lg-5">
+    <div class="card shadow-sm">
+      <div class="card-header">
+        <i class="bi bi-key me-2"></i>Cambiar contraseña
+      </div>
+      <div class="card-body p-4">
+        <form method="post" novalidate>
+          {% csrf_token %}
+          {% for field in form %}
+          <div class="mb-3">
+            <label for="{{ field.id_for_label }}" class="form-label fw-semibold small">{{ field.label }}</label>
+            <input type="password" name="{{ field.html_name }}" id="{{ field.id_for_label }}"
+              class="form-control{% if field.errors %} is-invalid{% endif %}"
+              autocomplete="{% if field.name == 'old_password' %}current-password{% else %}new-password{% endif %}" required>
+            {% for error in field.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+            {% if field.name == 'new_password1' %}
+            <div class="form-text">Mínimo 8 caracteres, no solo números ni una contraseña común.</div>
+            {% endif %}
+          </div>
+          {% endfor %}
+          <div class="d-flex justify-content-between align-items-center pt-2 border-top">
+            <a href="{% url 'dashboard' %}" class="btn btn-outline-secondary">
+              <i class="bi bi-arrow-left me-1"></i>Volver
+            </a>
+            <button class="btn btn-leica" type="submit">
+              <i class="bi bi-check-lg me-1"></i>Guardar
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

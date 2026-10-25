@@ -1,0 +1,12 @@
+{% autoescape off %}Hola {{ solicitud.beneficiario.get_full_name|default:solicitud.beneficiario.email }}:
+
+Tu solicitud #{{ solicitud.id }} para el {{ solicitud.horario_inicio|date:"d/m/Y H:i" }} fue rechazada.
+
+Ítems:
+{% include 'inventario/correos/_items.txt' %}
+Para más información, contacta al encargado del laboratorio.
+
+{{ url }}
+
+Laboratorio LEICA · INACAP Sede Valdivia
+{% endautoescape %}

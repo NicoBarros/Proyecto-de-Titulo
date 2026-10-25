@@ -1,0 +1,12 @@
+{% autoescape off %}Hola {{ solicitud.beneficiario.get_full_name|default:solicitud.beneficiario.email }}:
+
+El préstamo de la solicitud #{{ solicitud.id }} venció el {{ solicitud.horario_fin|date:"d/m/Y H:i" }} y aún no se registra su devolución.
+
+Ítems pendientes:
+{% include 'inventario/correos/_items.txt' %}
+Devuélvelos en el laboratorio LEICA a la brevedad. Mientras el préstamo siga atrasado no podrás crear nuevas solicitudes, y al devolverlo se aplicará un bloqueo de 7 días.
+
+{{ url }}
+
+Laboratorio LEICA · INACAP Sede Valdivia
+{% endautoescape %}

@@ -1,0 +1,28 @@
+{% load paginacion %}
+{% if pagina.has_other_pages %}
+<nav class="my-3 d-flex justify-content-center" aria-label="{{ etiqueta }}">
+  <ul class="pagination pagination-sm mb-0">
+    {% if pagina.has_previous %}
+    <li class="page-item">
+      <a class="page-link" href="{% url_pagina parametro pagina.previous_page_number %}" aria-label="Anterior"><i class="bi bi-chevron-left"></i></a>
+    </li>
+    {% else %}
+    <li class="page-item disabled"><span class="page-link"><i class="bi bi-chevron-left"></i></span></li>
+    {% endif %}
+    {% for num in pagina.paginator.page_range %}
+      {% if pagina.number == num %}
+      <li class="page-item active"><span class="page-link">{{ num }}</span></li>
+      {% elif num > pagina.number|add:'-3' and num < pagina.number|add:'3' %}
+      <li class="page-item"><a class="page-link" href="{% url_pagina parametro num %}">{{ num }}</a></li>
+      {% endif %}
+    {% endfor %}
+    {% if pagina.has_next %}
+    <li class="page-item">
+      <a class="page-link" href="{% url_pagina parametro pagina.next_page_number %}" aria-label="Siguiente"><i class="bi bi-chevron-right"></i></a>
+    </li>
+    {% else %}
+    <li class="page-item disabled"><span class="page-link"><i class="bi bi-chevron-right"></i></span></li>
+    {% endif %}
+  </ul>
+</nav>
+{% endif %}

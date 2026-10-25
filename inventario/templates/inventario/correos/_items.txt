@@ -1,0 +1,2 @@
+{% autoescape off %}{% for item in solicitud.items.all %}  - {% if item.equipo %}{{ item.equipo.nombre }} ({{ item.equipo.codigo_inventario }}){% else %}{{ item.insumo.nombre }} x{{ item.cantidad }}{% endif %}
+{% endfor %}{% endautoescape %}

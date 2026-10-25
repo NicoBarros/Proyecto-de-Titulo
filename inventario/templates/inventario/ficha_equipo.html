@@ -1,0 +1,150 @@
+{% extends 'inventario/base.html' %}
+
+{% block content %}
+<div class="card mb-4">
+  <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+      <i class="bi bi-cpu me-1"></i>
+      <span class="fw-bold">{{ equipo.nombre }}</span>
+      <span class="badge bg-light text-dark border">{{ equipo.codigo_inventario }}</span>
+      <span class="badge {{ equipo.estado }}">{{ equipo.get_estado_display }}</span>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+      {% if puede_solicitar %}
+      <a href="{% url 'solicitudes' %}?equipo={{ equipo.id }}" class="btn btn-leica btn-sm">
+        <i class="bi bi-send-plus me-1"></i>Solicitar
+      </a>
+      {% endif %}
+      {% if gestiona %}
+      <a href="{% url 'editar_equipo' equipo.id %}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-pencil me-1"></i>Editar
+      </a>
+      <a href="{% url 'historial_equipo' equipo.id %}" class="btn btn-outline-info btn-sm">
+        <i class="bi bi-clock-history me-1"></i>Historial
+      </a>
+      <a href="{% url 'qr_equipo' equipo.id %}?descargar=1" class="btn btn-outline-primary btn-sm">
+        <i class="bi bi-qr-code me-1"></i>Descargar QR
+      </a>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="card-body">
+    <div class="row g-4">
+      <div class="col-lg-{% if gestiona %}8{% else %}12{% endif %}">
+        <dl class="row mb-0 ficha-datos">
+          <dt class="col-sm-4">Modelo</dt>
+          <dd class="col-sm-8">{{ equipo.modelo|default:"—" }}</dd>
+          <dt class="col-sm-4">Ubicación</dt>
+          <dd class="col-sm-8">{{ equipo.ubicacion|default:"—" }}</dd>
+          <dt class="col-sm-4">Especificaciones</dt>
+          <dd class="col-sm-8">{{ equipo.especificaciones|default:"—"|linebreaksbr }}</dd>
+          {% if ve_tecnico %}
+          <dt class="col-sm-4">Valor de adquisición</dt>
+          <dd class="col-sm-8">{% if equipo.valor_adquisicion %}${{ equipo.valor_adquisicion|floatformat:'0' }}{% else %}—{% endif %}</dd>
+          {% endif %}
+        </dl>
+      </div>
+      {% if gestiona %}
+      <div class="col-lg-4 text-center">
+        <img src="{% url 'qr_equipo' equipo.id %}" alt="Código QR de {{ equipo.codigo_inventario }}" class="ficha-qr">
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<div class="card mb-4">
+  <div class="card-header">
+    <i class="bi bi-calendar-week me-2"></i>Próximas reservas
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table align-middle mb-0">
+        <thead>
+          <tr>
+            <th>Desde</th>
+            <th>Hasta</th>
+            <th>Estado</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in reservas %}
+          <tr>
+            <td>{{ r.solicitud.horario_inicio|date:"d/m/Y H:i" }}</td>
+            <td>{{ r.solicitud.horario_fin|date:"d/m/Y H:i" }}</td>
+            <td><span class="badge {{ r.solicitud.estado }}">{{ r.solicitud.get_estado_display }}</span></td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="3" class="text-center text-muted py-4">Sin reservas próximas.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+{% if ve_tecnico %}
+<div class="row g-4">
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header">
+        <i class="bi bi-tools me-2"></i>Mantenimientos
+      </div>
+      <ul class="list-group list-group-flush">
+        {% for m in mantenimientos %}
+        <li class="list-group-item d-flex justify-content-between align-items-start gap-2">
+          <div class="small">
+            <strong>{{ m.fecha_diagnostico|date:"d/m/Y" }}</strong> · {{ m.falla_descrita|default:"Sin descripción" }}
+            {% if m.porcentaje_costo is not None %}<br><span class="text-muted">Costo: {% widthratio m.porcentaje_costo 1 100 %}% del valor</span>{% endif %}
+          </div>
+          <span class="badge {{ m.decision }}">{{ m.get_decision_display }}</span>
+        </li>
+        {% empty %}
+        <li class="list-group-item text-center text-muted py-4">Sin mantenimientos registrados.</li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header">
+        <i class="bi bi-arrow-return-left me-2"></i>Últimas devoluciones
+      </div>
+      <ul class="list-group list-group-flush">
+        {% for d in devoluciones %}
+        <li class="list-group-item d-flex justify-content-between align-items-center small">
+          <span>Solicitud #{{ d.solicitud.id }} · {{ d.solicitud.horario_fin|date:"d/m/Y" }}</span>
+          <span class="badge {% if d.estado_devolucion == 'dañado' or d.estado_devolucion == 'inservible' %}dar_baja{% else %}disponible{% endif %}">{{ d.get_estado_devolucion_display }}</span>
+        </li>
+        {% empty %}
+        <li class="list-group-item text-center text-muted py-4">Sin devoluciones registradas.</li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% if gestiona and historial %}
+<div class="card mt-4">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span><i class="bi bi-clock-history me-2"></i>Cambios recientes</span>
+    <a href="{% url 'historial_equipo' equipo.id %}" class="btn btn-outline-secondary btn-sm">Ver todo</a>
+  </div>
+  <ul class="list-group list-group-flush">
+    {% for h in historial %}
+    <li class="list-group-item d-flex justify-content-between align-items-center small">
+      <span>
+        <span class="badge historial-{{ h.accion }} me-1">{{ h.get_accion_display }}</span>
+        {{ h.detalle|default:"" }}
+      </span>
+      <span class="text-muted">{{ h.fecha|date:"d/m/Y H:i" }} · {{ h.usuario.get_full_name|default:h.usuario.email|default:"Sistema" }}</span>
+    </li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
+{% endblock %}

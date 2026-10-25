@@ -1,0 +1,12 @@
+{% autoescape off %}Hola {{ solicitud.beneficiario.get_full_name|default:solicitud.beneficiario.email }}:
+
+El préstamo de la solicitud #{{ solicitud.id }} vence el {{ solicitud.horario_fin|date:"d/m/Y" }} a las {{ solicitud.horario_fin|date:"H:i" }}.
+
+Ítems por devolver:
+{% include 'inventario/correos/_items.txt' %}
+Una devolución atrasada bloquea nuevas solicitudes por 7 días.
+
+{{ url }}
+
+Laboratorio LEICA · INACAP Sede Valdivia
+{% endautoescape %}

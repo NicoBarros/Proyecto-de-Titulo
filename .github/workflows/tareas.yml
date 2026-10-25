@@ -1,0 +1,20 @@
+name: Tareas programadas
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+jobs:
+  ejecutar:
+    name: Marcar atrasos y enviar avisos
+    if: vars.AZURE_WEBAPP_NAME != ''
+    runs-on: ubuntu-latest
+    steps:
+      - name: Llamar al endpoint de tareas
+        env:
+          TAREAS_TOKEN: ${{ secrets.TAREAS_TOKEN }}
+        run: |
+          curl --fail-with-body --silent --show-error --max-time 60 --retry 2 \
+            -X POST -H "Authorization: Bearer ${TAREAS_TOKEN}" \
+            "https://${{ vars.AZURE_WEBAPP_NAME }}.azurewebsites.net/tareas/"

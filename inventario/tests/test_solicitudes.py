@@ -295,7 +295,7 @@ class EntregaDevolucionTests(LeicaTestCase):
         self.assertIn('value="rechazar"', html)
         self.accion_solicitud(aprobada, 'entregar')
         html = self.client.get('/solicitudes/').content.decode()
-        self.assertIn('<select name="estado_equipo"', html)
+        self.assertIn('<select name="estado_item_', html)
         self.assertNotIn('prompt(', html)
 
 

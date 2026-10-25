@@ -1,0 +1,15 @@
+{% autoescape off %}Hola {{ solicitud.beneficiario.get_full_name|default:solicitud.beneficiario.email }}:
+
+Tu solicitud #{{ solicitud.id }} fue aprobada.
+
+Horario: {{ solicitud.horario_inicio|date:"d/m/Y H:i" }} a {{ solicitud.horario_fin|date:"d/m/Y H:i" }}
+Lugar de uso: {{ solicitud.get_lugar_uso_display }}
+
+Ítems:
+{% include 'inventario/correos/_items.txt' %}
+Retira los ítems en el laboratorio LEICA dentro del horario indicado.
+
+{{ url }}
+
+Laboratorio LEICA · INACAP Sede Valdivia
+{% endautoescape %}

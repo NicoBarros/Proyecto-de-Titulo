@@ -5,6 +5,7 @@ from openpyxl import Workbook
 from openpyxl.cell.cell import ILLEGAL_CHARACTERS_RE
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
+from openpyxl.worksheet.datavalidation import DataValidation
 from openpyxl.worksheet.table import Table, TableStyleInfo
 
 from .models import Equipo, Insumo
@@ -167,6 +168,28 @@ def generar_excel_inventario():
     _hoja_equipos(wb.create_sheet('Equipos'), equipos)
     _hoja_insumos(wb.create_sheet('Insumos'), insumos)
     for ws in wb.worksheets:
+        ws.sheet_view.showGridLines = False
+        ws.sheet_properties.tabColor = ROJO_INACAP
+    salida = BytesIO()
+    wb.save(salida)
+    return salida.getvalue()
+
+
+def generar_plantilla_importacion():
+    wb = Workbook()
+    hojas = (
+        (wb.active, 'Equipos', ['Código', 'Nombre', 'Modelo', 'Especificaciones', 'Ubicación', 'Estado', 'Valor de adquisición'],
+         [14, 30, 22, 38, 18, 20, 20], 'F', [etiqueta for valor, etiqueta in Equipo.Estado.choices if valor != Equipo.Estado.PRESTADO]),
+        (wb.create_sheet(), 'Insumos', ['Nombre', 'Categoría', 'Tipo', 'Total', 'Umbral mínimo'],
+         [32, 20, 14, 11, 15], 'C', [etiqueta for _, etiqueta in Insumo.Tipo.choices]),
+    )
+    for ws, nombre, encabezados, anchos, columna_lista, opciones in hojas:
+        ws.title = nombre
+        _encabezado_hoja(ws, f'Inventario LEICA — {nombre}', len(encabezados))
+        _tabla(ws, nombre, encabezados, [], anchos)
+        validacion = DataValidation(type='list', formula1=f'"{",".join(opciones)}"', allow_blank=True)
+        ws.add_data_validation(validacion)
+        validacion.add(f'{columna_lista}5:{columna_lista}1000')
         ws.sheet_view.showGridLines = False
         ws.sheet_properties.tabColor = ROJO_INACAP
     salida = BytesIO()

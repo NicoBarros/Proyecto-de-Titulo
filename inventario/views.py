@@ -2,6 +2,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.core.paginator import Paginator
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import login
+from django.contrib.auth.views import PasswordChangeView
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from django.contrib import messages
@@ -10,24 +11,31 @@ from django.db.models import Count, Q, F, ProtectedError
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from django.conf import settings
+from django.core.cache import cache
 from django.http import JsonResponse, HttpResponse
 from django.db import transaction
+from django.urls import reverse, reverse_lazy
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_POST
 from datetime import timedelta
+import hmac
 import json
 import io
 import logging
+import re
 
 import qrcode
 import qrcode.image.svg
 
 from .models import (
     Usuario, Equipo, Insumo, Solicitud, SolicitudItem, Movimiento,
-    Bloqueo, Mantenimiento, HistorialEquipo, EventoSeguridad
+    Bloqueo, Mantenimiento, HistorialEquipo, EventoSeguridad, Migracion
 )
 from .forms import EquipoForm, InsumoForm, MantenimientoForm
 from .decorators import role_required
-from .exportar import generar_excel_inventario
-from . import auditoria
+from .exportar import generar_excel_inventario, generar_plantilla_importacion
+from .importar import importar_inventario
+from . import auditoria, notificaciones, tareas
 from .kpi import PERIODOS, calcular_kpis
 from .seguridad import registrar_evento
 
@@ -256,11 +264,42 @@ def historial_equipo(request, id):
 
 
 @login_required
+def ficha_equipo(request, id):
+    equipo = get_object_or_404(Equipo, id=id)
+    gestiona = request.user.rol in Usuario.ROLES_ESCRITURA_INVENTARIO
+    ve_tecnico = gestiona or request.user.rol in Usuario.ROLES_APROBADORES
+    reservas = (
+        SolicitudItem.objects.filter(
+            equipo=equipo, solicitud__horario_fin__gte=timezone.now(),
+            solicitud__estado__in=[Solicitud.EstadoSolicitud.APROBADA, *Solicitud.ESTADOS_EN_PRESTAMO],
+        )
+        .select_related('solicitud')
+        .order_by('solicitud__horario_inicio')[:10]
+    )
+    contexto = {
+        'equipo': equipo,
+        'reservas': reservas,
+        'gestiona': gestiona,
+        've_tecnico': ve_tecnico,
+        'puede_solicitar': equipo.estado == Equipo.Estado.DISPONIBLE,
+    }
+    if ve_tecnico:
+        contexto['mantenimientos'] = equipo.mantenimientos.select_related('reportado_por')[:5]
+        contexto['devoluciones'] = (
+            SolicitudItem.objects.filter(equipo=equipo).exclude(estado_devolucion='')
+            .select_related('solicitud').order_by('-solicitud__horario_fin')[:5]
+        )
+    if gestiona:
+        contexto['historial'] = equipo.historial.select_related('usuario')[:5]
+    return render(request, 'inventario/ficha_equipo.html', contexto)
+
+
+@login_required
 @role_required(Usuario.Rol.ENCARGADO_LABORATORIO, Usuario.Rol.CONTROL_CALIDAD)
 def qr_equipo(request, id):
     equipo = get_object_or_404(Equipo, id=id)
     imagen = qrcode.make(
-        f'LEICA_INVENTARIO:{equipo.codigo_inventario}',
+        f"{settings.URL_SITIO}{reverse('ficha_equipo', args=[equipo.id])}",
         image_factory=qrcode.image.svg.SvgPathImage, box_size=10, border=2,
     )
     salida = io.BytesIO()
@@ -333,7 +372,7 @@ MENSAJES_ACCION = {
     'cancelar': 'cancelada',
 }
 
-ESTADOS_DEVOLUCION = ['excelente', 'bueno', 'dañado', 'inservible']
+ESTADOS_DEVOLUCION = SolicitudItem.EstadoDevolucion.values
 
 
 def _ejecutar_accion_solicitud(request, solicitud_id, accion):
@@ -372,6 +411,7 @@ def _ejecutar_accion_solicitud(request, solicitud_id, accion):
         solicitud.aprobado_por = request.user
         solicitud.fecha_aprobacion = timezone.now()
         solicitud.save()
+        notificaciones.notificar('aprobada', solicitud)
 
     elif accion == 'entregar':
         for equipo in equipos:
@@ -395,20 +435,32 @@ def _ejecutar_accion_solicitud(request, solicitud_id, accion):
         Movimiento.objects.create(solicitud=solicitud, tipo=Movimiento.TipoMovimiento.ENTREGA, responsable=request.user)
 
     elif accion == 'devolver':
-        estado_equipo = request.POST.get('estado_equipo') or 'bueno'
-        if estado_equipo not in ESTADOS_DEVOLUCION:
+        estado_general = request.POST.get('estado_equipo') or SolicitudItem.EstadoDevolucion.BUENO
+        if estado_general not in ESTADOS_DEVOLUCION:
             raise ValueError('Estado de devolución no válido.')
         atrasada = timezone.now() > solicitud.horario_fin
 
+        estados = {}
+        for item in items:
+            if item.equipo_id:
+                estado = request.POST.get(f'estado_item_{item.id}') or estado_general
+                if estado not in ESTADOS_DEVOLUCION:
+                    raise ValueError('Estado de devolución no válido.')
+                item.estado_devolucion = estado
+                item.save(update_fields=['estado_devolucion'])
+                estados[item.equipo_id] = estado
+
         for equipo in equipos:
             if equipo.estado == Equipo.Estado.PRESTADO:
+                estado = estados[equipo.id]
                 antes = auditoria.foto(equipo)
-                equipo.estado = (Equipo.Estado.EN_MANTENIMIENTO if estado_equipo in ('dañado', 'inservible')
+                equipo.estado = (Equipo.Estado.EN_MANTENIMIENTO if estado in SolicitudItem.ESTADOS_CON_FALLA
                                  else Equipo.Estado.DISPONIBLE)
                 equipo.version += 1
                 equipo.save(update_fields=['estado', 'version', 'updated_at'])
                 auditoria.registrar(equipo, request.user, HistorialEquipo.Accion.ESTADO, antes,
-                                    f'Devolución de la solicitud #{solicitud.id} (estado: {estado_equipo})')
+                                    f'Devolución de la solicitud #{solicitud.id} (estado: {estado})')
+        estado_equipo = max(estados.values(), key=ESTADOS_DEVOLUCION.index, default=estado_general)
         for item in items:
             if item.insumo_id and item.insumo.tipo == Insumo.Tipo.RENOVABLE:
                 Insumo.objects.filter(id=item.insumo_id).update(
@@ -438,6 +490,7 @@ def _ejecutar_accion_solicitud(request, solicitud_id, accion):
     elif accion == 'rechazar':
         solicitud.estado = Solicitud.EstadoSolicitud.RECHAZADA
         solicitud.save()
+        notificaciones.notificar('rechazada', solicitud)
 
     elif accion == 'cancelar':
         solicitud.estado = Solicitud.EstadoSolicitud.CANCELADA
@@ -562,6 +615,7 @@ def solicitudes_view(request):
     )
     if not puede_aprobar:
         solicitudes = solicitudes.filter(Q(solicitante=request.user) | Q(en_representacion_de=request.user))
+    solicitudes = Paginator(solicitudes, 20).get_page(request.GET.get('page'))
     equipos = Equipo.objects.filter(estado=Equipo.Estado.DISPONIBLE)
     insumos = Insumo.objects.all()
     estudiantes = []
@@ -570,6 +624,7 @@ def solicitudes_view(request):
 
     return render(request, 'inventario/solicitudes.html', {
         'solicitudes': solicitudes, 'equipos': equipos, 'insumos': insumos, 'puede_aprobar': puede_aprobar,
+        'equipo_preseleccionado': request.GET.get('equipo', ''),
         'estudiantes': estudiantes, 'ahora': timezone.now(),
     })
 
@@ -715,12 +770,14 @@ def reportes_view(request):
         'kpis_medidos': sum(1 for k in kpis if k.cumple is not None),
     })
 
+def _cupo_ia_disponible(usuario):
+    clave = f'ia_consultas:{usuario.pk}:{timezone.now():%Y%m%d%H}'
+    cache.add(clave, 0, 3600)
+    return cache.incr(clave) <= settings.IA_CONSULTAS_POR_HORA
+
+
 @login_required
 def busqueda_view(request):
-    """
-    RF-11 / RNF-06: Busqueda por IA.
-    Actualizado a Google Gemini con tolerancia a fallos (Error 503).
-    """
     if request.method == 'GET':
         return render(request, 'inventario/busqueda.html')
         
@@ -733,7 +790,7 @@ def busqueda_view(request):
     resultados = []
     fuente = 'palabras_clave_local'
     
-    if getattr(settings, 'GEMINI_API_KEY', None):
+    if settings.GEMINI_API_KEY and _cupo_ia_disponible(request.user):
         try:
             from google import genai
             from google.genai.errors import APIError
@@ -763,7 +820,6 @@ Responde SOLO con un JSON array de los ids de equipo mas relevantes (maximo 5), 
                     raise e  
 
             text = response.text.replace('```json', '').replace('```', '').strip()
-            import re
             match = re.search(r'\[[\d,\s]*\]', text)
             if match:
                 text = match.group(0)
@@ -804,6 +860,54 @@ Responde SOLO con un JSON array de los ids de equipo mas relevantes (maximo 5), 
             })
             
     return JsonResponse({'fuente': fuente, 'resultados': resultados})
+
+
+@login_required
+@role_required(Usuario.Rol.ENCARGADO_LABORATORIO, Usuario.Rol.CONTROL_CALIDAD)
+def importar_inventario_view(request):
+    if request.method == 'POST':
+        archivo = request.FILES.get('archivo')
+        if not archivo or not archivo.name.lower().endswith('.xlsx'):
+            messages.error(request, 'Selecciona un archivo Excel (.xlsx).')
+        elif archivo.size > 5 * 1024 * 1024:
+            messages.error(request, 'El archivo supera el máximo de 5 MB.')
+        else:
+            try:
+                migracion = importar_inventario(archivo, request.user)
+            except ValueError as e:
+                messages.error(request, str(e))
+            else:
+                if migracion.filas_con_error:
+                    messages.warning(
+                        request,
+                        f'Se importaron {migracion.filas_importadas} de {migracion.filas_totales} filas. '
+                        f'{migracion.filas_con_error} con errores.',
+                    )
+                else:
+                    messages.success(request, f'Se importaron {migracion.filas_importadas} filas correctamente.')
+                return redirect(f"{reverse('importar_inventario')}?detalle={migracion.id}")
+        return redirect('importar_inventario')
+
+    importaciones = Migracion.objects.select_related('ejecutado_por')[:10]
+    detalle = None
+    if request.GET.get('detalle', '').isdigit():
+        detalle = Migracion.objects.filter(id=request.GET['detalle']).first()
+    return render(request, 'inventario/importar.html', {
+        'importaciones': importaciones,
+        'detalle': detalle,
+        'errores': detalle.detalle_errores.splitlines() if detalle and detalle.detalle_errores else [],
+    })
+
+
+@login_required
+@role_required(Usuario.Rol.ENCARGADO_LABORATORIO, Usuario.Rol.CONTROL_CALIDAD)
+def plantilla_importacion(request):
+    response = HttpResponse(
+        generar_plantilla_importacion(),
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    )
+    response['Content-Disposition'] = 'attachment; filename="plantilla_inventario_leica.xlsx"'
+    return response
 
 
 @login_required
@@ -998,8 +1102,8 @@ def admin_panel_view(request):
     ultimos_movimientos = Movimiento.objects.select_related('solicitud', 'responsable').order_by('-fecha')[:10]
 
     return render(request, 'inventario/admin_panel.html', {
-        'usuarios': qs,
-        'equipos_admin': qs_equipos,
+        'usuarios': Paginator(qs, 25).get_page(request.GET.get('page_usuarios')),
+        'equipos_admin': Paginator(qs_equipos, 25).get_page(request.GET.get('page_equipos')),
         'metricas': metricas,
         'roles_choices': Usuario.Rol.choices,
         'estados_equipos_choices': Equipo.Estado.choices,
@@ -1010,3 +1114,22 @@ def admin_panel_view(request):
         'ultimos_movimientos': ultimos_movimientos,
     })
 
+
+@csrf_exempt
+@require_POST
+def tareas_view(request):
+    recibido = request.headers.get('Authorization', '').removeprefix('Bearer ')
+    if not settings.TAREAS_TOKEN or not hmac.compare_digest(recibido, settings.TAREAS_TOKEN):
+        return JsonResponse({'error': 'No autorizado'}, status=401)
+    return JsonResponse(tareas.ejecutar())
+
+
+class CambiarContrasenaView(PasswordChangeView):
+    template_name = 'inventario/cambiar_contrasena.html'
+    success_url = reverse_lazy('dashboard')
+
+    def form_valid(self, form):
+        respuesta = super().form_valid(form)
+        _registrar_cambio_cuenta(self.request, self.request.user, 'contraseña cambiada por el titular')
+        messages.success(self.request, 'Tu contraseña se actualizó correctamente.')
+        return respuesta

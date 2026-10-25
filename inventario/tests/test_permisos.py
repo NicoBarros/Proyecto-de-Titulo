@@ -60,9 +60,13 @@ class PermisosPorRolTests(LeicaTestCase):
 
     def test_importacion_csv_ya_no_existe(self):
         self.client.force_login(self.encargado)
-        for url in ('/inventario/importar/', '/migracion/'):
-            with self.subTest(url=url):
-                self.assertEqual(self.client.post(url, {}).status_code, 404)
+        self.assertEqual(self.client.post('/migracion/', {}).status_code, 404)
+
+    def test_importar_excel_solo_para_quienes_editan_inventario(self):
+        for u, ok in [(self.encargado, True), (self.calidad, True), (self.director, False),
+                      (self.docente, False), (self.estudiante, False)]:
+            with self.subTest(rol=u.rol):
+                self.assertAcceso(u, '/inventario/importar/', ok)
 
     def test_reportes_bloqueado_a_estudiantes_y_docentes(self):
         for u, ok in [(self.encargado, True), (self.calidad, True), (self.director, True),

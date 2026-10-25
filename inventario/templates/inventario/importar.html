@@ -1,0 +1,93 @@
+{% extends 'inventario/base.html' %}
+
+{% block content %}
+<div class="card mb-4">
+  <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <span><i class="bi bi-upload me-2"></i>Importar inventario desde Excel</span>
+    <div class="d-flex gap-2">
+      <a href="{% url 'plantilla_importacion' %}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-file-earmark-arrow-down me-1"></i>Descargar plantilla
+      </a>
+      <a href="{% url 'inventario' %}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left me-1"></i>Volver al inventario
+      </a>
+    </div>
+  </div>
+  <div class="card-body">
+    <form method="post" enctype="multipart/form-data" class="leica-filter-bar">
+      {% csrf_token %}
+      <div class="row g-2 align-items-end">
+        <div class="col-md-9">
+          <label for="archivo" class="form-label fw-semibold small">Archivo (.xlsx, hojas «Equipos» y/o «Insumos»)</label>
+          <input type="file" name="archivo" id="archivo" accept=".xlsx" class="form-control form-control-sm" required>
+        </div>
+        <div class="col-md-3">
+          <button class="btn btn-leica btn-sm w-100" type="submit">
+            <i class="bi bi-upload me-1"></i>Importar
+          </button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% if detalle %}
+<div class="card mb-4">
+  <div class="card-header">
+    <i class="bi bi-clipboard-check me-2"></i>Resultado: {{ detalle.archivo_origen }}
+  </div>
+  <div class="card-body">
+    <div class="d-flex gap-3 flex-wrap mb-3">
+      <span class="badge bg-light text-dark border fs-6">{{ detalle.filas_totales }} filas</span>
+      <span class="badge disponible fs-6">{{ detalle.filas_importadas }} importadas</span>
+      {% if detalle.filas_con_error %}<span class="badge dar_baja fs-6">{{ detalle.filas_con_error }} con errores</span>{% endif %}
+    </div>
+    {% if errores %}
+    <ul class="list-group importar-errores">
+      {% for error in errores %}
+      <li class="list-group-item small text-danger">{{ error }}</li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
+<div class="card">
+  <div class="card-header">
+    <i class="bi bi-clock-history me-2"></i>Importaciones recientes
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>Archivo</th>
+            <th>Usuario</th>
+            <th class="text-center">Importadas</th>
+            <th class="text-center">Errores</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for m in importaciones %}
+          <tr>
+            <td>{{ m.fecha|date:"d/m/Y H:i" }}</td>
+            <td>{{ m.archivo_origen }}</td>
+            <td>{{ m.ejecutado_por.get_full_name|default:m.ejecutado_por.email|default:"—" }}</td>
+            <td class="text-center">{{ m.filas_importadas }} / {{ m.filas_totales }}</td>
+            <td class="text-center">{% if m.filas_con_error %}<span class="badge dar_baja">{{ m.filas_con_error }}</span>{% else %}—{% endif %}</td>
+            <td class="text-end"><a href="?detalle={{ m.id }}" class="btn btn-outline-secondary btn-sm">Detalle</a></td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="6" class="text-center text-muted py-4">Aún no hay importaciones.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

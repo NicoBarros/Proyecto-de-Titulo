@@ -244,6 +244,7 @@
         </tbody>
       </table>
     </div>
+    {% include 'inventario/_paginacion.html' with pagina=usuarios parametro='page_usuarios' etiqueta='Navegación usuarios' %}
   </div>
 </div>
 <div class="modal fade" id="pwdModal" tabindex="-1" aria-labelledby="pwdModalLabel" aria-hidden="true">
@@ -351,6 +352,7 @@
         </tbody>
       </table>
     </div>
+    {% include 'inventario/_paginacion.html' with pagina=equipos_admin parametro='page_equipos' etiqueta='Navegación equipos' %}
   </div>
 </div>
 

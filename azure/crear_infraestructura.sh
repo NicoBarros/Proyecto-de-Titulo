@@ -18,6 +18,7 @@ PG_ADMIN="${PG_ADMIN:-leicaadmin}"
 PG_DATABASE="leica_inventario"
 PG_PASSWORD="${PG_PASSWORD:-$(openssl rand -hex 24)}"
 SECRET_KEY="${SECRET_KEY:-$(openssl rand -base64 48 | tr -d '\n=+/')}"
+TAREAS_TOKEN="${TAREAS_TOKEN:-$(openssl rand -hex 32)}"
 
 for proveedor in Microsoft.DBforPostgreSQL Microsoft.Web; do
   if [ "$(az provider show --namespace "${proveedor}" --query registrationState --output tsv 2>/dev/null)" != "Registered" ]; then
@@ -112,6 +113,7 @@ az webapp config appsettings set \
     ADMIN_EMAIL="${ADMIN_EMAIL}" \
     ADMIN_PASSWORD="${ADMIN_PASSWORD}" \
     GEMINI_API_KEY="${GEMINI_API_KEY:-}" \
+    TAREAS_TOKEN="${TAREAS_TOKEN}" \
   --output none
 
 az webapp config set \
@@ -145,6 +147,9 @@ echo "  Usuario de base:  ${PG_ADMIN}"
 echo "  Clave de base:    ${PG_PASSWORD}"
 echo
 echo "Guarda la clave de la base en un lugar seguro: no se vuelve a mostrar."
+echo
+echo "Token de tareas programadas (secreto TAREAS_TOKEN en GitHub Actions):"
+echo "  ${TAREAS_TOKEN}"
 echo
 echo "Perfil de publicación para GitHub Actions (secreto AZURE_WEBAPP_PUBLISH_PROFILE):"
 az webapp deployment list-publishing-profiles \

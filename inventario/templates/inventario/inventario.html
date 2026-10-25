@@ -5,9 +5,14 @@
   <div class="card-header d-flex justify-content-between align-items-center">
     <span><i class="bi bi-grid-3x3-gap-fill me-2"></i>Inventario Institucional</span>
     {% if puede_escribir %}
-    <a href="{% url 'exportar_inventario' %}" class="btn btn-leica-secondary btn-sm">
-      <i class="bi bi-file-earmark-excel me-1"></i>Exportar Inventario Excel
-    </a>
+    <div class="d-flex gap-2 flex-wrap">
+      <a href="{% url 'importar_inventario' %}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-upload me-1"></i>Importar desde Excel
+      </a>
+      <a href="{% url 'exportar_inventario' %}" class="btn btn-leica-secondary btn-sm">
+        <i class="bi bi-file-earmark-excel me-1"></i>Exportar Inventario Excel
+      </a>
+    </div>
     {% endif %}
   </div>
   <div class="card-body">
@@ -140,7 +145,7 @@
           {% for e in equipos %}
           <tr>
             <td><strong>{{ e.codigo_inventario }}</strong></td>
-            <td>{{ e.nombre }}</td>
+            <td><a href="{% url 'ficha_equipo' e.id %}" class="link-equipo">{{ e.nombre }}</a></td>
             <td>{{ e.modelo|default:"-" }}</td>
             <td>{{ e.ubicacion|default:"-" }}</td>
             <td><span class="badge {{ e.estado }}">{{ e.get_estado_display }}</span></td>

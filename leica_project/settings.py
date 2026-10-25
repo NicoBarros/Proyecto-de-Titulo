@@ -1,10 +1,3 @@
-"""
-Configuracion Django — Sistema de Gestion de Inventario LEICA
-INACAP Sede Valdivia
-
-Arquitectura: Django 5.x + PostgreSQL (SQLite en desarrollo local).
-Cubre RF-01 a RF-14 segun Formulacion de Proyecto de Titulo.
-"""
 import os
 from datetime import timedelta
 from pathlib import Path
@@ -18,14 +11,22 @@ env = environ.Env(
     DEBUG=(bool, False),
     ALLOWED_HOSTS=(list, ['localhost', '127.0.0.1']),
     CSRF_TRUSTED_ORIGINS=(list, []),
-    RENDER_EXTERNAL_HOSTNAME=(str, ''),
     WEBSITE_HOSTNAME=(str, ''),
     SECURE_SSL_REDIRECT=(bool, True),
-    DATABASE_URL=(str, ''),
     DOMINIO_INSTITUCIONAL=(str, 'inacapmail.cl'),
     GEMINI_API_KEY=(str, ''),
     GEMINI_MODELO=(str, 'gemini-2.5-flash'),
     GEMINI_MODELO_RESPALDO=(str, 'gemini-2.5-flash-lite'),
+    IA_CONSULTAS_POR_HORA=(int, 20),
+    TAREAS_TOKEN=(str, ''),
+    URL_SITIO=(str, ''),
+    EMAIL_HOST=(str, ''),
+    EMAIL_PORT=(int, 587),
+    EMAIL_HOST_USER=(str, ''),
+    EMAIL_HOST_PASSWORD=(str, ''),
+    EMAIL_USE_TLS=(bool, True),
+    DEFAULT_FROM_EMAIL=(str, 'LEICA Inventario <no-responder@inacapmail.cl>'),
+    HORAS_RECORDATORIO=(int, 24),
     POSTGRES_BIN=(str, ''),
     SESION_MINUTOS=(int, 60),
     SECURE_HSTS_SECONDS=(int, 31536000),
@@ -39,12 +40,11 @@ ALLOWED_HOSTS = env('ALLOWED_HOSTS')
 CSRF_TRUSTED_ORIGINS = env('CSRF_TRUSTED_ORIGINS')
 INTERNAL_IPS = ['127.0.0.1']
 
-for dominio_plataforma in (env('WEBSITE_HOSTNAME'), env('RENDER_EXTERNAL_HOSTNAME')):
-    if dominio_plataforma:
-        ALLOWED_HOSTS.append(dominio_plataforma)
-        CSRF_TRUSTED_ORIGINS.append(f'https://{dominio_plataforma}')
+if env('WEBSITE_HOSTNAME'):
+    ALLOWED_HOSTS.append(env('WEBSITE_HOSTNAME'))
+    CSRF_TRUSTED_ORIGINS.append(f"https://{env('WEBSITE_HOSTNAME')}")
 
-PROXY_CONFIABLE = bool(env('WEBSITE_HOSTNAME') or env('RENDER_EXTERNAL_HOSTNAME'))
+PROXY_CONFIABLE = bool(env('WEBSITE_HOSTNAME'))
 
 if not DEBUG:
     SESSION_COOKIE_SECURE = True
@@ -101,19 +101,19 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'leica_project.wsgi.application'
 
-if env('DATABASE_URL'):
-    DATABASES = {
-        'default': dj_database_url.config(default=env('DATABASE_URL'), conn_max_age=600, conn_health_checks=True)
+if not env.str('DATABASE_URL', default=''):
+    raise ImproperlyConfigured('Define DATABASE_URL con la conexión a PostgreSQL.')
+
+DATABASES = {
+    'default': dj_database_url.parse(env('DATABASE_URL'), conn_max_age=600, conn_health_checks=True)
+}
+
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.db.DatabaseCache',
+        'LOCATION': 'cache_leica',
     }
-elif not DEBUG:
-    raise ImproperlyConfigured('DATABASE_URL es obligatoria cuando DEBUG=False.')
-else:
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': BASE_DIR / 'db.sqlite3',
-        }
-    }
+}
 
 POSTGRES_BIN = env('POSTGRES_BIN')
 RESPALDOS_DIR = env('RESPALDOS_DIR')
@@ -172,6 +172,28 @@ DOMINIO_INSTITUCIONAL = env('DOMINIO_INSTITUCIONAL')
 GEMINI_API_KEY = env('GEMINI_API_KEY')
 GEMINI_MODELO = env('GEMINI_MODELO')
 GEMINI_MODELO_RESPALDO = env('GEMINI_MODELO_RESPALDO')
+IA_CONSULTAS_POR_HORA = env('IA_CONSULTAS_POR_HORA')
+TAREAS_TOKEN = env('TAREAS_TOKEN')
+HORAS_RECORDATORIO = env('HORAS_RECORDATORIO')
+
+if env('URL_SITIO'):
+    URL_SITIO = env('URL_SITIO').rstrip('/')
+elif env('WEBSITE_HOSTNAME'):
+    URL_SITIO = f"https://{env('WEBSITE_HOSTNAME')}"
+else:
+    URL_SITIO = 'http://127.0.0.1:8000'
+
+EMAIL_HOST = env('EMAIL_HOST')
+EMAIL_PORT = env('EMAIL_PORT')
+EMAIL_HOST_USER = env('EMAIL_HOST_USER')
+EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD')
+EMAIL_USE_TLS = env('EMAIL_USE_TLS')
+EMAIL_TIMEOUT = 15
+DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL')
+EMAIL_BACKEND = (
+    'django.core.mail.backends.smtp.EmailBackend' if EMAIL_HOST
+    else 'django.core.mail.backends.console.EmailBackend'
+)
 
 LOGGING = {
     'version': 1,

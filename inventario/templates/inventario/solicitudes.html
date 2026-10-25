@@ -8,15 +8,18 @@
   <div class="card-body">
     <form method="post" action="{% url 'solicitudes' %}">
       {% csrf_token %}
-      <div id="items-container">
-        <div class="item-row leica-filter-bar mb-2 p-3">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <span class="fw-semibold small">Ítems del kit <span class="badge bg-secondary" id="items-contador">1</span></span>
+      </div>
+      <div id="items-container" class="items-kit mb-2">
+        <div class="item-row leica-filter-bar">
           <div class="row g-2 align-items-end">
-            <div class="col-md-7">
+            <div class="col-md-8">
               <label class="form-label fw-semibold small">Ítem</label>
               <select name="item[]" class="form-select form-select-sm item-select" onchange="actualizarTopeStock(this)">
                 <optgroup label="Equipos disponibles">
                   {% for e in equipos %}
-                  <option value="equipo:{{ e.id }}" data-tipo="equipo" data-stock="1">{{ e.nombre }} ({{ e.codigo_inventario }})</option>
+                  <option value="equipo:{{ e.id }}" data-tipo="equipo" data-stock="1"{% if equipo_preseleccionado == e.id|stringformat:'s' %} selected{% endif %}>{{ e.nombre }} ({{ e.codigo_inventario }})</option>
                   {% endfor %}
                 </optgroup>
                 <optgroup label="Insumos">
@@ -28,14 +31,18 @@
                 </optgroup>
               </select>
             </div>
-            <div class="col-md-3">
-              <label class="form-label fw-semibold small">Cantidad <small class="stock-hint text-muted fw-normal"></small></label>
-              <input name="cantidad[]" type="number" value="1" min="1" max="1" class="form-control form-control-sm cantidad-input"
-                oninput="validarCantidadInput(this)">
+            <div class="col-9 col-md-3">
+              <label class="form-label fw-semibold small">Cantidad</label>
+              <div class="input-group input-group-sm">
+                <input name="cantidad[]" type="number" value="1" min="1" max="1" class="form-control cantidad-input"
+                  oninput="validarCantidadInput(this)" aria-label="Cantidad">
+                <span class="input-group-text stock-hint"></span>
+              </div>
             </div>
-            <div class="col-md-2">
-              <button type="button" class="btn btn-outline-danger btn-sm w-100" onclick="removerItem(this)">
-                <i class="bi bi-x-lg"></i> Quitar
+            <div class="col-3 col-md-1">
+              <button type="button" class="btn btn-outline-danger btn-sm w-100" onclick="removerItem(this)"
+                title="Quitar ítem" aria-label="Quitar ítem">
+                <i class="bi bi-x-lg"></i>
               </button>
             </div>
           </div>
@@ -115,15 +122,16 @@
           {% for s in solicitudes %}
           <tr>
             <td>{{ s.id }}</td>
-            <td>
-              {% for item in s.items.all %}
-              {% if item.equipo %}
-              {{ item.equipo.nombre }}
-              {% else %}
-              {{ item.insumo.nombre }}
-              {% endif %}
-              {% if not forloop.last %}, {% endif %}
+            <td class="items-celda">
+              {% with items=s.items.all %}
+              {% for item in items %}
+              {% if forloop.counter == 4 %}<details class="items-mas"><summary>+{{ items|length|add:'-3' }} más</summary>{% endif %}
+              <div class="item-linea">
+                {% if item.equipo %}<a href="{% url 'ficha_equipo' item.equipo.id %}" class="link-equipo">{{ item.equipo.nombre }}</a>{% if item.estado_devolucion == 'dañado' or item.estado_devolucion == 'inservible' %} <span class="badge dar_baja">{{ item.get_estado_devolucion_display }}</span>{% endif %}{% else %}{{ item.insumo.nombre }} <span class="text-muted">×{{ item.cantidad }}</span>{% endif %}
+              </div>
+              {% if forloop.last and forloop.counter > 3 %}</details>{% endif %}
               {% endfor %}
+              {% endwith %}
             </td>
             <td>
               {{ s.solicitante.get_full_name|default:s.solicitante.email }}
@@ -163,18 +171,9 @@
                   </button>
                 </div>
                 {% elif s.estado == 'entregada' or s.estado == 'atrasada' %}
-                <div class="d-flex gap-2 align-items-center">
-                  <select name="estado_equipo" class="form-select form-select-sm" style="width: auto;"
-                    aria-label="Estado del equipo al devolver">
-                    <option value="excelente">Excelente</option>
-                    <option value="bueno" selected>Bueno</option>
-                    <option value="dañado">Dañado</option>
-                    <option value="inservible">Inservible</option>
-                  </select>
-                  <button type="submit" name="accion" value="devolver" class="btn btn-success btn-sm">
-                    <i class="bi bi-arrow-return-left me-1"></i>Devolución
-                  </button>
-                </div>
+                <button type="button" class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#devolucion-{{ s.id }}">
+                  <i class="bi bi-arrow-return-left me-1"></i>Devolución
+                </button>
                 {% endif %}
               </form>
               {% elif s.solicitante_id == request.user.id %}
@@ -193,12 +192,76 @@
               {% endif %}
             </td>
           </tr>
+          {% empty %}
+          <tr>
+            <td colspan="7" class="text-center text-muted py-4">
+              <i class="bi bi-inbox fs-3 d-block mb-2"></i>
+              No hay solicitudes registradas.
+            </td>
+          </tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
+    {% include 'inventario/_paginacion.html' with pagina=solicitudes parametro='page' etiqueta='Navegación solicitudes' %}
   </div>
 </div>
+
+{% if puede_aprobar %}
+{% for s in solicitudes %}
+{% if s.estado == 'entregada' or s.estado == 'atrasada' %}
+<div class="modal fade" id="devolucion-{{ s.id }}" tabindex="-1" aria-labelledby="devolucion-titulo-{{ s.id }}" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-scrollable">
+    <form method="post" action="{% url 'solicitudes' %}" class="modal-content">
+      {% csrf_token %}
+      <input type="hidden" name="solicitud_id" value="{{ s.id }}">
+      <div class="modal-header">
+        <h5 class="modal-title" id="devolucion-titulo-{{ s.id }}">
+          <i class="bi bi-arrow-return-left me-2"></i>Devolución solicitud #{{ s.id }}
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body">
+        {% for item in s.items.all %}
+        {% if item.equipo %}
+        <div class="d-flex justify-content-between align-items-center gap-2 py-2 border-bottom">
+          <label for="estado-item-{{ item.id }}" class="small mb-0">
+            <strong>{{ item.equipo.nombre }}</strong><br>
+            <span class="text-muted">{{ item.equipo.codigo_inventario }}</span>
+          </label>
+          <select name="estado_item_{{ item.id }}" id="estado-item-{{ item.id }}" class="form-select form-select-sm" style="width: auto;">
+            <option value="excelente">Excelente</option>
+            <option value="bueno" selected>Bueno</option>
+            <option value="dañado">Dañado</option>
+            <option value="inservible">Inservible</option>
+          </select>
+        </div>
+        {% else %}
+        <div class="d-flex justify-content-between align-items-center gap-2 py-2 border-bottom small">
+          <span><strong>{{ item.insumo.nombre }}</strong> ×{{ item.cantidad }}</span>
+          <span class="text-muted">{% if item.insumo.tipo == 'renovable' %}Vuelve al stock{% else %}Consumido{% endif %}</span>
+        </div>
+        {% endif %}
+        {% endfor %}
+        {% if s.estado == 'atrasada' %}
+        <div class="alert alert-warning small mt-3 mb-0">
+          <i class="bi bi-exclamation-triangle-fill me-1"></i>Devolución atrasada: se bloqueará a
+          {{ s.beneficiario.get_full_name|default:s.beneficiario.email }} por 7 días.
+        </div>
+        {% endif %}
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+        <button type="submit" name="accion" value="devolver" class="btn btn-success btn-sm">
+          <i class="bi bi-check-lg me-1"></i>Registrar devolución
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endif %}
+{% endfor %}
+{% endif %}
 {% endblock %}
 
 {% block scripts %}
@@ -231,12 +294,12 @@
       inputCantidad.max = 1;
       inputCantidad.value = 1;
       inputCantidad.readOnly = true;
-      if (stockHint) stockHint.innerText = '(Máx. 1)';
+      if (stockHint) stockHint.innerText = 'máx. 1';
     } else {
       inputCantidad.readOnly = false;
       inputCantidad.min = 1;
       inputCantidad.max = stock;
-      if (stockHint) stockHint.innerText = `(Máx. ${stock} disponibles)`;
+      if (stockHint) stockHint.innerText = `máx. ${stock}`;
 
       let currentVal = parseInt(inputCantidad.value) || 1;
       if (currentVal > stock) {
@@ -270,12 +333,21 @@
     input.value = 1;
     container.appendChild(newRow);
     actualizarTopeStock(select);
+    actualizarContador();
+    container.scrollTop = container.scrollHeight;
+    select.focus();
+  }
+
+  function actualizarContador() {
+    const total = document.querySelectorAll('#items-container .item-row').length;
+    document.getElementById('items-contador').innerText = total;
   }
 
   function removerItem(btn) {
     const container = document.getElementById('items-container');
     if (container.querySelectorAll('.item-row').length > 1) {
       btn.closest('.item-row').remove();
+      actualizarContador();
     } else {
       if (typeof window.mostrarAlerta === 'function') {
         window.mostrarAlerta("La solicitud debe tener al menos un ítem.", "Ítem Requerido");

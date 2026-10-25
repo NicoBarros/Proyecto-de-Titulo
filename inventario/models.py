@@ -170,6 +170,8 @@ class Solicitud(models.Model):
         related_name='solicitudes_aprobadas',
     )
     fecha_aprobacion = models.DateTimeField(blank=True, null=True)
+    recordatorio_enviado = models.DateTimeField(blank=True, null=True)
+    aviso_atraso_enviado = models.DateTimeField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     ESTADOS_EN_PRESTAMO = [EstadoSolicitud.ENTREGADA, EstadoSolicitud.ATRASADA]
@@ -188,8 +190,23 @@ class Solicitud(models.Model):
     def __str__(self):
         return f'Solicitud #{self.pk} — {self.get_estado_display()}'
 
+    @property
+    def beneficiario(self):
+        return self.en_representacion_de or self.solicitante
+
+    def destinatarios(self):
+        return sorted({u.email for u in (self.solicitante, self.en_representacion_de) if u and u.email})
+
 
 class SolicitudItem(models.Model):
+
+    class EstadoDevolucion(models.TextChoices):
+        EXCELENTE = 'excelente', 'Excelente'
+        BUENO = 'bueno', 'Bueno'
+        DANADO = 'dañado', 'Dañado'
+        INSERVIBLE = 'inservible', 'Inservible'
+
+    ESTADOS_CON_FALLA = [EstadoDevolucion.DANADO, EstadoDevolucion.INSERVIBLE]
 
     solicitud = models.ForeignKey(
         Solicitud, on_delete=models.CASCADE, related_name='items',
@@ -201,6 +218,10 @@ class SolicitudItem(models.Model):
         Insumo, on_delete=models.PROTECT, blank=True, null=True,
     )
     cantidad = models.PositiveIntegerField(default=1)
+    estado_devolucion = models.CharField(
+        max_length=20, choices=EstadoDevolucion.choices, blank=True, default='',
+        verbose_name='Estado al devolver',
+    )
 
     class Meta:
         verbose_name = 'Ítem de solicitud'

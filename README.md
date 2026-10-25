@@ -3,9 +3,10 @@ Sistema de gestión de inventario y préstamo de equipos del laboratorio LEICA, 
 Proyecto de título.
 
 Permite administrar equipos e insumos, solicitar préstamos (kits), aprobarlos, entregarlos y
-registrar su devolución, sancionar atrasos, gestionar mantenimientos con la regla del 70 %,
-generar reportes, exportar el inventario a Excel, registrar el historial de cambios de cada equipo,
-generar códigos QR y buscar equipos en lenguaje natural con IA (Google Gemini).
+registrar su devolución equipo por equipo, sancionar atrasos, avisar por correo, gestionar
+mantenimientos con la regla del 70 %, generar reportes, importar y exportar el inventario en Excel,
+registrar el historial de cambios de cada equipo, generar códigos QR que abren la ficha del equipo
+y buscar equipos en lenguaje natural con IA (Google Gemini).
 
 ## Stack
 
@@ -65,11 +66,18 @@ copy .env.example .env
 | `GEMINI_MODELO` / `GEMINI_MODELO_RESPALDO` | Opcionales. Modelo principal y de respaldo (por defecto `gemini-2.5-flash` y `gemini-2.5-flash-lite`) |
 | `POSTGRES_BIN` | Opcional. Carpeta de `pg_dump` y `pg_restore` si no están en el PATH |
 | `SESION_MINUTOS` | Minutos de inactividad antes de cerrar la sesión. Por defecto `60` |
+| `IA_CONSULTAS_POR_HORA` | Consultas a Gemini por usuario y hora; al superarlas se usa la búsqueda local. Por defecto `20` |
+| `URL_SITIO` | URL pública usada en los correos y en los códigos QR. En Azure se toma de `WEBSITE_HOSTNAME` |
+| `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `EMAIL_USE_TLS` | Servidor SMTP para los avisos. Sin `EMAIL_HOST`, los correos se muestran en la consola |
+| `DEFAULT_FROM_EMAIL` | Remitente de los correos |
+| `HORAS_RECORDATORIO` | Horas antes del vencimiento en que se envía el recordatorio de devolución. Por defecto `24` |
+| `TAREAS_TOKEN` | Token que autoriza `POST /tareas/` (tareas programadas). Vacío deshabilita el endpoint |
 
 **4. Tablas, datos de prueba y servidor**
 
 ```powershell
 python manage.py migrate
+python manage.py createcachetable
 python manage.py seed
 python manage.py runserver
 ```
@@ -119,6 +127,9 @@ comunes: no puede modificar a otros administradores ni asignar roles con permiso
   atraso". El comando `python manage.py marcar_atrasadas` permite programar esta revisión.
 - **Representación:** docentes, directores, encargados y Control de Calidad pueden pedir un préstamo
   a nombre de un estudiante; en ese caso la sanción por atraso se aplica al estudiante.
+- **Devolución:** se registra el estado de cada equipo del kit; los que vuelven dañados o inservibles
+  pasan a mantenimiento y el resto queda disponible.
+- **Cancelación:** quien creó una solicitud puede cancelarla mientras esté pendiente o aprobada.
 - **Insumos:** los renovables vuelven al stock al devolverse; los perecibles se consumen.
 - **Sanciones (RF-09):** una devolución atrasada bloquea al estudiante por 7 días para pedir préstamos.
 - **Mantenimiento (RF-10):** si el costo de reparación es igual o mayor al 70 % del valor de
@@ -140,8 +151,31 @@ comunes: no puede modificar a otros administradores ni asignar roles con permiso
 - **Transporte:** HTTPS obligatorio, HSTS de un año, cookies seguras y TLS 1.2 como mínimo.
 - **Recursos externos:** Bootstrap y Bootstrap Icons se cargan con verificación de integridad (SRI).
 - **Base de datos:** en Azure, el firewall solo acepta conexiones desde las IP de salida de la aplicación.
+- **Búsqueda con IA:** cada usuario tiene un máximo de consultas a Gemini por hora (`IA_CONSULTAS_POR_HORA`).
 - **Dependencias:** cada push ejecuta `pip-audit` contra la base de vulnerabilidades conocidas, y Dependabot
   propone actualizaciones semanales.
+
+## Avisos por correo
+
+- Al aprobar o rechazar una solicitud se avisa al solicitante y, si corresponde, al estudiante representado.
+- Las tareas programadas envían un recordatorio antes del vencimiento (`HORAS_RECORDATORIO`) y un aviso
+  cuando el préstamo pasa a atrasado. Cada aviso se envía una sola vez; si el servidor de correo falla,
+  se reintenta en la siguiente ejecución.
+
+## Ficha de equipo y códigos QR
+
+Cada equipo tiene una ficha en `/inventario/equipo/<id>/` con su estado, ubicación, especificaciones y
+próximas reservas, y un botón para solicitarlo si está disponible. Quienes aprueban ven además sus
+mantenimientos y devoluciones; el encargado y Control de Calidad, su historial y su código QR. El QR
+contiene la URL de la ficha, así que al escanearlo con el celular se abre directamente.
+
+## Importar inventario desde Excel
+
+En **Inventario → Importar desde Excel** se sube un `.xlsx` con hojas «Equipos» y/o «Insumos». Sirve la
+plantilla descargable o el mismo archivo que genera la exportación. Los equipos se identifican por su
+código y los insumos por su nombre: si existen se actualizan (sin tocar las columnas ausentes ni el
+estado de equipos ya registrados) y si no, se crean. Las filas con errores se informan con su número y
+el resto se importa. Cada importación queda registrada con su resultado.
 
 ## Exportar inventario a Excel
 
@@ -205,6 +239,7 @@ Variables opcionales:
 En el repositorio de GitHub, **Settings → Secrets and variables → Actions**:
 
 - **Secrets → New repository secret:** `AZURE_WEBAPP_PUBLISH_PROFILE`, con el XML completo que mostró el script.
+- **Secrets → New repository secret:** `TAREAS_TOKEN`, con el token que mostró el script.
 - **Variables → New repository variable:** `AZURE_WEBAPP_NAME`, con el valor de `APP_NAME`.
 
 Desde ese momento, cada push a `main` ejecuta las pruebas contra PostgreSQL y, solo si todas pasan,
@@ -216,16 +251,13 @@ despliegue, entra a **Actions → CI/CD → Run workflow**.
 - En cada arranque, `startup.sh` aplica las migraciones, genera los archivos estáticos, crea el
   administrador (solo si no existe) e inicia Gunicorn.
 - Los logs se ven en el portal, en **App Service → Log stream**.
+- Cada 15 minutos, el workflow `.github/workflows/tareas.yml` llama a `POST /tareas/` con el token
+  `TAREAS_TOKEN`: marca los préstamos vencidos como atrasados y envía los avisos pendientes. Localmente,
+  lo mismo se ejecuta con `python manage.py tareas_programadas`.
 - `GET /salud/` responde `{"estado": "ok", "base_de_datos": "ok"}` o un 503 si la base no está disponible.
 - Azure respalda la base automáticamente (7 días, restauración a cualquier minuto). Además,
   `python manage.py respaldar` y `python manage.py restaurar` generan y restauran respaldos propios
   verificados con SHA-256. La política y los procedimientos están en [docs/respaldos.md](docs/respaldos.md).
-
-### Alternativa: Render
-
-El repositorio también incluye `render.yaml` y `build.sh`. En [Render](https://render.com), entra a
-**New → Blueprint**, conecta el repositorio y completa `ADMIN_EMAIL`, `ADMIN_PASSWORD` y, si quieres,
-`GEMINI_API_KEY`.
 
 ## Estructura
 
@@ -237,7 +269,7 @@ inventario/
   templates/          Plantillas HTML
   static/             CSS e imágenes
   migrations/         Migraciones de la base de datos
-  management/commands/ seed, respaldar, restaurar, marcar_atrasadas, crear_admin
+  management/commands/ seed, respaldar, restaurar, marcar_atrasadas, tareas_programadas, crear_admin
   tests/              Suite de tests
 azure/                Script de infraestructura
 docs/respaldos.md     Política y procedimientos de respaldo
