@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
-from .models import Usuario, Equipo, Insumo, Solicitud, SolicitudItem, Movimiento, Bloqueo, Mantenimiento, Migracion, HistorialEquipo
+from .models import Usuario, Equipo, Insumo, Solicitud, SolicitudItem, Movimiento, Bloqueo, Mantenimiento, Migracion, HistorialEquipo, EventoSeguridad
 from . import auditoria
 
 
@@ -99,3 +99,20 @@ class MantenimientoAdmin(admin.ModelAdmin):
 @admin.register(Migracion)
 class MigracionAdmin(admin.ModelAdmin):
     list_display = ('fecha', 'archivo_origen', 'filas_importadas', 'filas_con_error')
+
+
+@admin.register(EventoSeguridad)
+class EventoSeguridadAdmin(admin.ModelAdmin):
+    list_display = ('fecha', 'tipo', 'identificador', 'ip', 'ruta', 'detalle')
+    list_filter = ('tipo',)
+    search_fields = ('identificador', 'ip', 'ruta')
+    date_hierarchy = 'fecha'
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False

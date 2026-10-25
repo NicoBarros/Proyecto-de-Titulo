@@ -76,6 +76,28 @@ az webapp create \
   --runtime "PYTHON:${PYTHON_VERSION}" \
   --output none
 
+echo "Firewall de PostgreSQL: solo las IP de salida de ${APP_NAME}"
+for ip in $(az webapp show --resource-group "${RESOURCE_GROUP}" --name "${APP_NAME}" \
+    --query possibleOutboundIpAddresses --output tsv | tr ',' ' '); do
+  az postgres flexible-server firewall-rule create \
+    --resource-group "${RESOURCE_GROUP}" \
+    --name "${PG_SERVER}" \
+    --rule-name "app-${ip//./-}" \
+    --start-ip-address "${ip}" \
+    --end-ip-address "${ip}" \
+    --output none
+done
+for regla in $(az postgres flexible-server firewall-rule list \
+    --resource-group "${RESOURCE_GROUP}" --name "${PG_SERVER}" \
+    --query "[?startIpAddress=='0.0.0.0'].name" --output tsv); do
+  az postgres flexible-server firewall-rule delete \
+    --resource-group "${RESOURCE_GROUP}" \
+    --name "${PG_SERVER}" \
+    --rule-name "${regla}" \
+    --yes \
+    --output none
+done
+
 DATABASE_URL="postgres://${PG_ADMIN}:${PG_PASSWORD}@${PG_SERVER}.postgres.database.azure.com:5432/${PG_DATABASE}?sslmode=require"
 
 az webapp config appsettings set \

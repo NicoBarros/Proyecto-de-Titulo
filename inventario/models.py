@@ -331,3 +331,32 @@ class HistorialEquipo(models.Model):
 
     def __str__(self):
         return f'{self.codigo_inventario} — {self.get_accion_display()} ({self.fecha:%d/%m/%Y %H:%M})'
+
+
+class EventoSeguridad(models.Model):
+
+    class Tipo(models.TextChoices):
+        INICIO_SESION = 'inicio_sesion', 'Inicio de sesión'
+        CIERRE_SESION = 'cierre_sesion', 'Cierre de sesión'
+        INTENTO_FALLIDO = 'intento_fallido', 'Intento de inicio fallido'
+        BLOQUEO = 'bloqueo', 'Bloqueo por intentos fallidos'
+        ACCESO_DENEGADO = 'acceso_denegado', 'Acceso denegado'
+
+    fecha = models.DateTimeField(auto_now_add=True, db_index=True)
+    tipo = models.CharField(max_length=20, choices=Tipo.choices, db_index=True)
+    usuario = models.ForeignKey(
+        Usuario, on_delete=models.SET_NULL, blank=True, null=True, related_name='eventos_seguridad',
+    )
+    identificador = models.CharField(max_length=254, blank=True, default='')
+    ip = models.GenericIPAddressField(blank=True, null=True)
+    ruta = models.CharField(max_length=255, blank=True, default='')
+    agente = models.CharField(max_length=255, blank=True, default='')
+    detalle = models.CharField(max_length=255, blank=True, default='')
+
+    class Meta:
+        verbose_name = 'Evento de seguridad'
+        verbose_name_plural = 'Eventos de seguridad'
+        ordering = ['-fecha', '-id']
+
+    def __str__(self):
+        return f'{self.get_tipo_display()} — {self.identificador or "anónimo"} ({self.fecha:%d/%m/%Y %H:%M})'

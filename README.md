@@ -62,6 +62,8 @@ copy .env.example .env
 | `DATABASE_URL` | `postgres://leica:una-clave-segura@localhost:5432/leica_inventario` |
 | `DOMINIO_INSTITUCIONAL` | Dominio de correo aceptado al crear usuarios (`inacapmail.cl`) |
 | `GEMINI_API_KEY` | Opcional. Sin ella, la búsqueda usa solo palabras clave |
+| `POSTGRES_BIN` | Opcional. Carpeta de `pg_dump` y `pg_restore` si no están en el PATH |
+| `SESION_MINUTOS` | Minutos de inactividad antes de cerrar la sesión. Por defecto `60` |
 
 **4. Tablas, datos de prueba y servidor**
 
@@ -125,6 +127,20 @@ comunes: no puede modificar a otros administradores ni asignar roles con permiso
 - **Auditoría:** cada creación, edición, cambio de estado o eliminación de un equipo queda registrada
   con usuario, fecha, valores anteriores y nuevos, y origen (inventario, préstamo, mantenimiento,
   panel o admin). Se consulta con el botón "Historial" de cada equipo.
+
+## Seguridad
+
+- **Inicio de sesión:** después de 5 intentos fallidos con un mismo correo desde un mismo equipo, el acceso
+  se bloquea por 15 minutos (`django-axes`). Un inicio exitoso reinicia el contador.
+- **Sesiones:** expiran tras 60 minutos sin actividad y al cerrar el navegador.
+- **Registro de seguridad:** inicios y cierres de sesión, intentos fallidos, bloqueos y accesos denegados
+  quedan registrados con fecha, usuario, IP y ruta. Se consultan en `/admin/` → **Eventos de seguridad**
+  (solo lectura) y también se escriben en el log de la aplicación.
+- **Transporte:** HTTPS obligatorio, HSTS de un año, cookies seguras y TLS 1.2 como mínimo.
+- **Recursos externos:** Bootstrap y Bootstrap Icons se cargan con verificación de integridad (SRI).
+- **Base de datos:** en Azure, el firewall solo acepta conexiones desde las IP de salida de la aplicación.
+- **Dependencias:** cada push ejecuta `pip-audit` contra la base de vulnerabilidades conocidas, y Dependabot
+  propone actualizaciones semanales.
 
 ## Exportar inventario a Excel
 
@@ -200,7 +216,9 @@ despliegue, entra a **Actions → CI/CD → Run workflow**.
   administrador (solo si no existe) e inicia Gunicorn.
 - Los logs se ven en el portal, en **App Service → Log stream**.
 - `GET /salud/` responde `{"estado": "ok", "base_de_datos": "ok"}` o un 503 si la base no está disponible.
-- Los respaldos automáticos de la base se restauran desde **PostgreSQL → Backup and restore**.
+- Azure respalda la base automáticamente (7 días, restauración a cualquier minuto). Además,
+  `python manage.py respaldar` y `python manage.py restaurar` generan y restauran respaldos propios
+  verificados con SHA-256. La política y los procedimientos están en [docs/respaldos.md](docs/respaldos.md).
 
 ### Alternativa: Render
 
@@ -218,8 +236,10 @@ inventario/
   templates/          Plantillas HTML
   static/             CSS e imágenes
   migrations/         Migraciones de la base de datos
-  management/commands/seed.py   Datos de prueba
+  management/commands/ seed, respaldar, restaurar, marcar_atrasadas, crear_admin
   tests/              Suite de tests
+azure/                Script de infraestructura
+docs/respaldos.md     Política y procedimientos de respaldo
 ```
 
 Hubo un prototipo anterior en Node/Express. Ya no forma parte del proyecto y se conserva en la

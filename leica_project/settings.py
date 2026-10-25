@@ -6,6 +6,7 @@ Arquitectura: Django 5.x + PostgreSQL (SQLite en desarrollo local).
 Cubre RF-01 a RF-14 segun Formulacion de Proyecto de Titulo.
 """
 import os
+from datetime import timedelta
 from pathlib import Path
 import environ
 import dj_database_url
@@ -22,6 +23,10 @@ env = environ.Env(
     DATABASE_URL=(str, ''),
     DOMINIO_INSTITUCIONAL=(str, 'inacapmail.cl'),
     GEMINI_API_KEY=(str, ''),
+    POSTGRES_BIN=(str, ''),
+    SESION_MINUTOS=(int, 60),
+    SECURE_HSTS_SECONDS=(int, 31536000),
+    RESPALDOS_DIR=(str, str(BASE_DIR / 'respaldos')),
 )
 environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
 
@@ -36,12 +41,17 @@ for dominio_plataforma in (env('WEBSITE_HOSTNAME'), env('RENDER_EXTERNAL_HOSTNAM
         ALLOWED_HOSTS.append(dominio_plataforma)
         CSRF_TRUSTED_ORIGINS.append(f'https://{dominio_plataforma}')
 
+PROXY_CONFIABLE = bool(env('WEBSITE_HOSTNAME') or env('RENDER_EXTERNAL_HOSTNAME'))
+
 if not DEBUG:
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
     SECURE_CONTENT_TYPE_NOSNIFF = True
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
     SECURE_SSL_REDIRECT = env('SECURE_SSL_REDIRECT')
+    SECURE_HSTS_SECONDS = env('SECURE_HSTS_SECONDS')
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SILENCED_SYSTEM_CHECKS = ['security.W021']
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -50,6 +60,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'axes',
     'inventario',
 ]
 
@@ -64,6 +75,7 @@ MIDDLEWARE = [
     'inventario.middleware.NoCacheForAuthenticatedMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'axes.middleware.AxesMiddleware',
 ]
 
 ROOT_URLCONF = 'leica_project.urls'
@@ -98,11 +110,33 @@ else:
         }
     }
 
+POSTGRES_BIN = env('POSTGRES_BIN')
+RESPALDOS_DIR = env('RESPALDOS_DIR')
+
 AUTH_USER_MODEL = 'inventario.Usuario'
 
 LOGIN_URL = '/login/'
 LOGIN_REDIRECT_URL = '/'
 LOGOUT_REDIRECT_URL = '/login/'
+
+AUTHENTICATION_BACKENDS = [
+    'axes.backends.AxesStandaloneBackend',
+    'django.contrib.auth.backends.ModelBackend',
+]
+
+SESSION_COOKIE_AGE = env('SESION_MINUTOS') * 60
+SESSION_SAVE_EVERY_REQUEST = True
+SESSION_EXPIRE_AT_BROWSER_CLOSE = True
+
+AXES_FAILURE_LIMIT = 5
+AXES_COOLOFF_TIME = timedelta(minutes=15)
+AXES_LOCKOUT_PARAMETERS = [['username', 'ip_address']]
+AXES_RESET_ON_SUCCESS = True
+AXES_DISABLE_ACCESS_LOG = True
+AXES_USERNAME_FORM_FIELD = 'username'
+AXES_USERNAME_CALLABLE = 'inventario.seguridad.usuario_intento'
+AXES_CLIENT_IP_CALLABLE = 'inventario.seguridad.ip_cliente'
+AXES_LOCKOUT_TEMPLATE = 'inventario/bloqueo.html'
 
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
@@ -137,4 +171,5 @@ LOGGING = {
     'disable_existing_loggers': False,
     'handlers': {'console': {'class': 'logging.StreamHandler'}},
     'root': {'handlers': ['console'], 'level': 'WARNING'},
+    'loggers': {'inventario.seguridad': {'level': 'INFO'}},
 }
