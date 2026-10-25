@@ -66,13 +66,14 @@ class RespaldarTests(RespaldosTestCase):
         self.assertNotIn('.parcial', ' '.join(p.name for p in self.directorio.iterdir()))
 
     def test_usa_formato_comprimido_y_no_expone_la_clave(self):
-        self.respaldar()
+        clave = 'clave-de-prueba-9f3a1c'
+        with patch.dict(settings.DATABASES['default'], {'PASSWORD': clave}):
+            self.respaldar()
         argumentos, entorno = self.llamadas[0]
         self.assertIn('--format=custom', argumentos)
-        self.assertEqual(entorno['PGPASSWORD'], settings.DATABASES['default']['PASSWORD'] or '')
+        self.assertEqual(entorno['PGPASSWORD'], clave)
         self.assertEqual(entorno['PGDATABASE'], settings.DATABASES['default']['NAME'])
-        if settings.DATABASES['default']['PASSWORD']:
-            self.assertNotIn(settings.DATABASES['default']['PASSWORD'], ' '.join(argumentos))
+        self.assertNotIn(clave, ' '.join(argumentos))
 
     def test_conserva_solo_los_mas_recientes(self):
         for fecha in ('20260101_000000', '20260102_000000', '20260103_000000'):
