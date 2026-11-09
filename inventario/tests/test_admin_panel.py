@@ -134,9 +134,19 @@ class ReportesTests(LeicaTestCase):
                              estado=Solicitud.EstadoSolicitud.ENTREGADA)
         self.client.force_login(self.director)
         r = self.client.get('/reportes/', {'dias': '30'})
-        self.assertEqual(r.context['top_equipos'][0].codigo_inventario, 'R-1')
-        self.assertEqual(r.context['vencidos'].count(), 1)
+        self.assertEqual([(t['nombre'], t['veces']) for t in r.context['top_equipos']], [('Usado', 1)])
+        self.assertEqual(len(r.context['vencidos']), 1)
         self.assertEqual([e.codigo_inventario for e in r.context['sin_movimiento']], ['R-2'])
+
+    def test_reportes_agrupan_modelos_y_omiten_dados_de_baja(self):
+        for codigo in ('R-1', 'R-2'):
+            self.crear_solicitud(self.estudiante, equipos=[self.crear_equipo(codigo, 'Router', modelo='ISR 4321')])
+        self.crear_equipo('R-3', 'Viejo', estado=Equipo.Estado.FUERA_SERVICIO)
+        self.client.force_login(self.director)
+        r = self.client.get('/reportes/')
+        self.assertEqual([(t['nombre'], t['modelo'], t['veces']) for t in r.context['top_equipos']], [('Router', 'ISR 4321', 2)])
+        self.assertNotIn('R-3', [e.codigo_inventario for e in r.context['sin_movimiento']])
+        self.assertContains(r, 'tabla-scroll', count=3)
 
     def test_docente_staff_no_ve_reportes(self):
         self.client.force_login(self.crear_usuario('docstaff', Usuario.Rol.DOCENTE, is_staff=True))

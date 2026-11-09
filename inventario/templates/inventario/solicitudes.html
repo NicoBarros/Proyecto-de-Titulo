@@ -17,7 +17,9 @@
           <div class="row g-2 align-items-end">
             <div class="col-md-8">
               <label class="form-label fw-semibold small">Ítem</label>
-              <select name="item[]" class="form-select form-select-sm item-select">
+              <div class="input-group input-group-sm filtro-grupo">
+              <input type="search" class="form-control filtro-opciones" placeholder="Filtrar…" aria-label="Filtrar ítems">
+              <select name="item[]" class="form-select form-select-sm item-select" aria-label="Ítem">
                 <optgroup label="Equipos disponibles">
                   {% for e in equipos %}
                   <option value="equipo:{{ e.id }}" data-tipo="equipo" data-stock="1"{% if equipo_preseleccionado == e.id|stringformat:'s' %} selected{% endif %}>{{ e.nombre }} ({{ e.codigo_inventario }})</option>
@@ -31,6 +33,7 @@
                   {% endfor %}
                 </optgroup>
               </select>
+              </div>
             </div>
             <div class="col-9 col-md-3">
               <label class="form-label fw-semibold small">Cantidad</label>
@@ -265,5 +268,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{% static 'inventario/js/solicitudes.js' %}?v=2.1"></script>
+<script src="{% static 'inventario/js/solicitudes.js' %}?v=2.2"></script>
 {% endblock %}

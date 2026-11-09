@@ -17,15 +17,22 @@ def reportes_view(request):
         messages.error(request, 'Acceso denegado: Los estudiantes y docentes no tienen autorización para ver Reportes y KPIs.')
         return redirect('dashboard')
 
-    top_equipos = Equipo.objects.annotate(veces=Count('solicituditem')).order_by('-veces')[:20]
+    top_equipos = (
+        Equipo.objects.values('nombre', 'modelo').annotate(veces=Count('solicituditem'))
+        .filter(veces__gt=0).order_by('-veces', 'nombre')[:10]
+    )
     Solicitud.marcar_atrasadas()
-    vencidos = Solicitud.objects.filter(estado=Solicitud.EstadoSolicitud.ATRASADA).select_related('solicitante', 'en_representacion_de')
+    vencidos = list(
+        Solicitud.objects.filter(estado=Solicitud.EstadoSolicitud.ATRASADA)
+        .select_related('solicitante', 'en_representacion_de').order_by('horario_fin')
+    )
 
     dias_str = request.GET.get('dias', '90')
     dias = min(int(dias_str), 3650) if dias_str.isdigit() else 90
     fecha_limite = timezone.now() - timedelta(days=dias)
-    sin_movimiento = Equipo.objects.exclude(
-        solicituditem__solicitud__created_at__gte=fecha_limite
+    sin_movimiento = list(
+        Equipo.objects.exclude(solicituditem__solicitud__created_at__gte=fecha_limite)
+        .exclude(estado=Equipo.Estado.FUERA_SERVICIO).order_by('nombre', 'codigo_inventario')
     )
 
     periodo_str = request.GET.get('periodo', '30')

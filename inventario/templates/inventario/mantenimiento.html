@@ -12,12 +12,14 @@
       <div class="row g-2 align-items-end">
         <div class="col-md-4">
           <label class="form-label fw-semibold small">Equipo a diagnosticar</label>
-          <select name="equipo_id" class="form-select form-select-sm" required>
-            {% for e in equipos %}
-            <option value="{{ e.id }}">{{ e.nombre }} ({{ e.codigo_inventario }}) — Estado: {{ e.get_estado_display }}
-            </option>
-            {% endfor %}
-          </select>
+          <div class="input-group input-group-sm filtro-grupo">
+            <input type="search" class="form-control filtro-opciones" placeholder="Filtrar…" aria-label="Filtrar equipos">
+            <select name="equipo_id" class="form-select form-select-sm" required aria-label="Equipo a diagnosticar">
+              {% for e in equipos %}
+              <option value="{{ e.id }}">{{ e.nombre }} ({{ e.codigo_inventario }}) — {{ e.get_estado_display }}</option>
+              {% endfor %}
+            </select>
+          </div>
         </div>
         <div class="col-md-4">
           <label class="form-label fw-semibold small">Falla descrita</label>
@@ -36,7 +38,7 @@
     </form>
 
     <!-- Tabla mantenimientos -->
-    <div class="table-responsive">
+    <div class="table-responsive tabla-scroll">
       <table class="table table-hover align-middle mb-0">
         <thead>
           <tr>

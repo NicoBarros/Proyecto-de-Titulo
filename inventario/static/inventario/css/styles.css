@@ -899,3 +899,18 @@ small.representacion {
   max-height: 20rem;
   overflow-y: auto;
 }
+
+.tabla-scroll {
+  max-height: 28rem;
+  overflow-y: auto;
+}
+
+.tabla-scroll > .table > thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.filtro-grupo .filtro-opciones {
+  max-width: 10rem;
+}
