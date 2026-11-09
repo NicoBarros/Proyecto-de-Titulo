@@ -1,7 +1,9 @@
 import hashlib
 import logging
+import re
 import threading
 import time
+from itertools import zip_longest
 
 import numpy as np
 from django.conf import settings
@@ -15,6 +17,9 @@ PREFIJO_CONSULTA = 'task: search result | query: '
 PREFIJO_DOCUMENTO = 'title: none | text: '
 SIMILITUD_MINIMA = 0.15
 MARGEN = 0.1
+MARGEN_POR_PARTE = 0.05
+RESULTADOS_POR_PARTE = 2
+SEPARADORES = re.compile(r',|;|\b(?:y|e|con|además|junto a|conectad[oa]s? a)\b', re.IGNORECASE)
 ESPERA_TRAS_FALLO = 600
 
 _modelo = None
@@ -84,10 +89,33 @@ def indexar(equipos):
     return vectores, len(pendientes)
 
 
+def clave_grupo(equipo):
+    return equipo.nombre, equipo.modelo or ''
+
+
+def partes_consulta(consulta):
+    partes = [p.strip() for p in SEPARADORES.split(consulta) if len(p.strip()) > 2]
+    return partes or [consulta]
+
+
+def _mejores(similitudes, margen, maximo):
+    corte = max(SIMILITUD_MINIMA, float(similitudes.max()) - margen)
+    return [int(i) for i in np.argsort(-similitudes)[:maximo] if similitudes[i] >= corte]
+
+
 def buscar(consulta, disponibles, maximo):
-    if not disponibles:
+    grupos = {}
+    for equipo in disponibles:
+        grupos.setdefault(clave_grupo(equipo), equipo)
+    representantes = list(grupos.values())
+    if not representantes:
         return []
-    vectores, _ = indexar(disponibles)
-    similitudes = np.stack([vectores[e.id] for e in disponibles]) @ vectorizar_consulta(consulta)
-    corte = max(SIMILITUD_MINIMA, float(similitudes.max()) - MARGEN)
-    return [disponibles[i] for i in np.argsort(-similitudes)[:maximo] if similitudes[i] >= corte]
+    vectores, _ = indexar(representantes)
+    matriz = np.stack([vectores[e.id] for e in representantes])
+    partes = partes_consulta(consulta)
+    if len(partes) == 1:
+        elegidos = _mejores(matriz @ vectorizar_consulta(consulta), MARGEN, maximo)
+    else:
+        por_parte = [_mejores(matriz @ vectorizar_consulta(p), MARGEN_POR_PARTE, RESULTADOS_POR_PARTE) for p in partes]
+        elegidos = list(dict.fromkeys(i for ronda in zip_longest(*por_parte) for i in ronda if i is not None))[:maximo]
+    return [representantes[i] for i in elegidos]

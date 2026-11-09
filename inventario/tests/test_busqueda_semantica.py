@@ -65,8 +65,25 @@ class BusquedaSemanticaTests(LeicaTestCase):
         self.assertEqual(self.documentos.call_args.args[0], ['Router Cisco'])
 
     def test_descarta_resultados_lejanos_al_mejor(self):
-        self.crear_equipo('S-4', 'Kit osciloscopio y multimetro')
-        self.assertEqual(self.codigos(self.buscar('osciloscopio y multimetro')), ['S-4'])
+        self.crear_equipo('S-4', 'Kit osciloscopio multimetro')
+        self.assertEqual(self.codigos(self.buscar('osciloscopio multimetro')), ['S-4'])
+
+    def test_consulta_con_varias_necesidades_cubre_cada_una(self):
+        self.crear_equipo('S-5', 'Router Cisco')
+        data = self.buscar('un osciloscopio, un multimetro y un router')
+        self.assertEqual(self.codigos(data), ['S-1', 'S-2', 'S-5'])
+
+    def test_agrupa_unidades_del_mismo_modelo(self):
+        for i in range(3):
+            self.crear_equipo(f'S-O{i}', 'Osciloscopio', especificaciones='50 MHz')
+        resultado, = self.buscar('osciloscopio')['resultados']
+        self.assertEqual((resultado['nombre'], resultado['disponibles']), ('Osciloscopio', 4))
+
+    def test_divide_la_consulta_en_partes(self):
+        self.assertEqual(busqueda_semantica.partes_consulta('switches y routers con wifi, conectados a cámaras'),
+                         ['switches', 'routers', 'wifi', 'cámaras'])
+        self.assertEqual(busqueda_semantica.partes_consulta('medir voltaje'), ['medir voltaje'])
+        self.assertEqual(busqueda_semantica.partes_consulta('y'), ['y'])
 
     def test_sin_coincidencias_usa_palabras_clave(self):
         data = self.buscar('silla')

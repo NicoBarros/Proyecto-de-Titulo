@@ -32,7 +32,7 @@
     const wrapper = el('div', undefined, 'table-responsive');
     const tabla = el('table', undefined, 'table table-hover align-middle');
     const encabezado = el('tr');
-    ['Equipo', 'Código', 'Estado'].forEach((t) => encabezado.append(el('th', t)));
+    ['Equipo', 'Modelo', 'Disponibles'].forEach((t) => encabezado.append(el('th', t)));
     const thead = el('thead');
     thead.append(encabezado);
     const tbody = el('tbody');
@@ -42,9 +42,9 @@
       const enlace = el('a', r.nombre, 'link-equipo');
       enlace.href = r.url;
       tdNombre.append(enlace);
-      const tdEstado = el('td');
-      tdEstado.append(el('span', r.estado, 'badge ' + r.estado.toLowerCase().replace(/ /g, '_')));
-      tr.append(tdNombre, el('td', r.codigo_inventario), tdEstado);
+      const tdDisponibles = el('td');
+      tdDisponibles.append(el('span', String(r.disponibles), 'badge disponible'));
+      tr.append(tdNombre, el('td', r.modelo || '—', 'text-muted'), tdDisponibles);
       tbody.append(tr);
     });
     tabla.append(thead, tbody);

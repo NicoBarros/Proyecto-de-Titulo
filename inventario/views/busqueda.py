@@ -1,6 +1,7 @@
 import json
 import logging
 import re
+from collections import Counter
 
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
@@ -15,7 +16,7 @@ from ..models import Equipo
 
 logger = logging.getLogger(__name__)
 
-MAX_RESULTADOS = 5
+MAX_RESULTADOS = 8
 
 PROMPT = """Eres un asistente que ayuda a un encargado de laboratorio a encontrar equipos.
 Catalogo de equipos disponibles:
@@ -32,13 +33,23 @@ def _cupo_ia_disponible(usuario):
     return cache.incr(clave) <= settings.IA_CONSULTAS_POR_HORA
 
 
-def _resultado(equipo):
+def _resultado(equipo, disponibles):
     return {
         'nombre': equipo.nombre,
+        'modelo': equipo.modelo or '',
         'codigo_inventario': equipo.codigo_inventario,
         'estado': equipo.get_estado_display(),
+        'disponibles': disponibles,
         'url': reverse('ficha_equipo', args=[equipo.id]),
     }
+
+
+def _agrupar(encontrados, disponibles):
+    cantidades = Counter(busqueda_semantica.clave_grupo(e) for e in disponibles)
+    grupos = {}
+    for equipo in encontrados:
+        grupos.setdefault(busqueda_semantica.clave_grupo(equipo), equipo)
+    return [_resultado(e, cantidades[clave]) for clave, e in grupos.items()]
 
 
 def _buscar_con_gemini(consulta, disponibles):
@@ -105,4 +116,4 @@ def busqueda_view(request):
 
     if not encontrados:
         encontrados = _buscar_local(consulta, disponibles)
-    return JsonResponse({'fuente': fuente, 'resultados': [_resultado(e) for e in encontrados]})
+    return JsonResponse({'fuente': fuente, 'resultados': _agrupar(encontrados, disponibles)})
