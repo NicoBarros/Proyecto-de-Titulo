@@ -20,6 +20,7 @@ from .models import (
 
 DIAS_SANCION = 7
 UMBRAL_BAJA = Decimal('0.70')
+DETALLE_VIDA_UTIL = f'Supera {Equipo.AÑOS_VIDA_UTIL} años de antigüedad'
 
 TRANSICIONES_SOLICITUD = {
     'aprobar': [Solicitud.EstadoSolicitud.PENDIENTE],
@@ -50,6 +51,9 @@ ESTADOS_DIAGNOSTICABLES = [Equipo.Estado.DISPONIBLE, Equipo.Estado.EN_MANTENIMIE
 
 
 def cambiar_estado_equipo(equipo, usuario, estado, detalle):
+    por_antiguedad = estado == Equipo.Estado.DISPONIBLE and equipo.supera_vida_util()
+    if por_antiguedad:
+        estado, detalle = Equipo.Estado.PENDIENTE_BAJA, f'{detalle}. {DETALLE_VIDA_UTIL}'
     if equipo.estado == estado:
         return
     antes = auditoria.foto(equipo)
@@ -57,6 +61,30 @@ def cambiar_estado_equipo(equipo, usuario, estado, detalle):
     equipo.version += 1
     equipo.save(update_fields=['estado', 'version', 'updated_at'])
     auditoria.registrar(equipo, usuario, HistorialEquipo.Accion.ESTADO, antes, detalle)
+    if por_antiguedad:
+        notificaciones.notificar_pendientes_baja([equipo])
+
+
+def aplicar_vida_util(equipo, usuario):
+    if equipo.estado == Equipo.Estado.DISPONIBLE and equipo.supera_vida_util():
+        cambiar_estado_equipo(equipo, usuario, Equipo.Estado.PENDIENTE_BAJA, DETALLE_VIDA_UTIL)
+        notificaciones.notificar_pendientes_baja([equipo])
+        return True
+    if equipo.estado == Equipo.Estado.PENDIENTE_BAJA and not equipo.supera_vida_util():
+        cambiar_estado_equipo(equipo, usuario, Equipo.Estado.DISPONIBLE, 'Fecha de adquisición corregida')
+    return False
+
+
+@transaction.atomic
+def marcar_pendientes_baja():
+    equipos = list(Equipo.objects.select_for_update().filter(
+        estado=Equipo.Estado.DISPONIBLE, fecha_adquisicion__lt=Equipo.limite_vida_util(),
+    ))
+    for equipo in equipos:
+        cambiar_estado_equipo(equipo, None, Equipo.Estado.PENDIENTE_BAJA, DETALLE_VIDA_UTIL)
+    if equipos:
+        notificaciones.notificar_pendientes_baja(equipos)
+    return len(equipos)
 
 
 def _fecha_texto(fecha):
@@ -344,6 +372,10 @@ def cambiar_estado_manual(equipo, usuario, nuevo_estado, detalle):
         raise ValueError('Estado de equipo no válido.')
     if Equipo.Estado.PRESTADO in (equipo.estado, nuevo_estado):
         raise ValueError('El estado "Prestado" solo cambia mediante la entrega y devolución de solicitudes.')
+    if nuevo_estado == Equipo.Estado.DISPONIBLE and equipo.supera_vida_util():
+        raise ValueError(
+            f'El equipo supera {Equipo.AÑOS_VIDA_UTIL} años de antigüedad: corrige su fecha de adquisición o dalo de baja.'
+        )
     cambiar_estado_equipo(equipo, usuario, nuevo_estado, detalle)
 
 

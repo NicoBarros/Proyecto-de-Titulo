@@ -87,9 +87,13 @@ def inventario_view(request):
         if puede_escribir and request.method == 'POST' and 'codigo_inventario' in request.POST:
             form = EquipoForm(request.POST)
             if form.is_valid():
-                equipo = form.save()
-                auditoria.registrar(equipo, request.user, HistorialEquipo.Accion.CREADO)
+                with transaction.atomic():
+                    equipo = form.save()
+                    auditoria.registrar(equipo, request.user, HistorialEquipo.Accion.CREADO)
+                    pendiente = servicios.aplicar_vida_util(equipo, request.user)
                 messages.success(request, 'Equipo agregado exitosamente.')
+                if pendiente:
+                    messages.warning(request, f'{servicios.DETALLE_VIDA_UTIL}: quedó pendiente de baja.')
                 return redirect('/inventario/?tab=equipos')
             else:
                 messages.error(request, 'Error al agregar equipo.')
@@ -157,7 +161,7 @@ def inventario_view(request):
 def eliminar_equipo(request, id):
     equipo = get_object_or_404(Equipo, id=id)
     if request.method == 'POST':
-        if equipo.estado not in [Equipo.Estado.DISPONIBLE, Equipo.Estado.FUERA_SERVICIO]:
+        if equipo.estado not in [Equipo.Estado.DISPONIBLE, Equipo.Estado.FUERA_SERVICIO, Equipo.Estado.PENDIENTE_BAJA]:
             messages.error(request, 'No puedes eliminar un equipo que está prestado o en mantenimiento.')
         else:
             try:
@@ -179,11 +183,15 @@ def editar_equipo(request, id):
         antes = auditoria.foto(equipo)
         form = EquipoForm(request.POST, instance=equipo)
         if form.is_valid():
-            equipo = form.save(commit=False)
-            equipo.version += 1
-            equipo.save()
-            auditoria.registrar(equipo, request.user, HistorialEquipo.Accion.EDITADO, antes)
+            with transaction.atomic():
+                equipo = form.save(commit=False)
+                equipo.version += 1
+                equipo.save()
+                auditoria.registrar(equipo, request.user, HistorialEquipo.Accion.EDITADO, antes)
+                pendiente = servicios.aplicar_vida_util(equipo, request.user)
             messages.success(request, 'Equipo actualizado exitosamente.')
+            if pendiente:
+                messages.warning(request, f'{servicios.DETALLE_VIDA_UTIL}: quedó pendiente de baja.')
             return redirect('/inventario/?tab=equipos')
     else:
         form = EquipoForm(instance=equipo)

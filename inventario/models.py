@@ -64,6 +64,9 @@ class Equipo(models.Model):
         PRESTADO = 'prestado', 'Prestado'
         EN_MANTENIMIENTO = 'en_mantenimiento', 'En mantenimiento'
         FUERA_SERVICIO = 'fuera_servicio', 'Fuera de servicio'
+        PENDIENTE_BAJA = 'pendiente_baja', 'Pendiente de baja'
+
+    AÑOS_VIDA_UTIL = 4
 
     codigo_inventario = models.CharField(
         max_length=50, unique=True,
@@ -81,6 +84,7 @@ class Equipo(models.Model):
         validators=[MinValueValidator(0)],
         verbose_name='Valor de adquisición ($)',
     )
+    fecha_adquisicion = models.DateField(blank=True, null=True, verbose_name='Fecha de adquisición')
     version = models.PositiveIntegerField(default=1)
 
     created_at = models.DateTimeField(auto_now_add=True)
@@ -93,6 +97,17 @@ class Equipo(models.Model):
 
     def __str__(self):
         return f'{self.codigo_inventario} — {self.nombre}'
+
+    @classmethod
+    def limite_vida_util(cls):
+        hoy = timezone.localdate()
+        try:
+            return hoy.replace(year=hoy.year - cls.AÑOS_VIDA_UTIL)
+        except ValueError:
+            return hoy.replace(year=hoy.year - cls.AÑOS_VIDA_UTIL, day=28)
+
+    def supera_vida_util(self):
+        return bool(self.fecha_adquisicion and self.fecha_adquisicion < self.limite_vida_util())
 
 class Insumo(models.Model):
 

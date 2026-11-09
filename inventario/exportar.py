@@ -19,12 +19,16 @@ COLORES_ESTADO = {
     Equipo.Estado.PRESTADO: ('FEF3C7', '92400E'),
     Equipo.Estado.EN_MANTENIMIENTO: ('F3E8FF', '6B21A8'),
     Equipo.Estado.FUERA_SERVICIO: ('FEE2E2', 'B91C1C'),
+    Equipo.Estado.PENDIENTE_BAJA: ('FFEDD5', '9A3412'),
 }
 COLOR_OK = ('E3F6E3', '1E6B1E')
 COLOR_ALERTA = ('FEE2E2', 'B91C1C')
 
 BORDE = Border(bottom=Side(style='thin', color='E5E7EB'))
 FORMATO_PESOS = '"$"#,##0'
+FORMATO_FECHA = 'DD/MM/YYYY'
+COLUMNAS_EQUIPOS = ['Código', 'Nombre', 'Modelo', 'Especificaciones', 'Ubicación', 'Estado', 'Valor de adquisición', 'Fecha de adquisición']
+ANCHOS_EQUIPOS = [14, 30, 22, 38, 18, 20, 20, 20]
 
 
 def _escribir(ws, fila, col, valor):
@@ -128,18 +132,19 @@ def _hoja_resumen(ws, equipos, insumos):
 
 
 def _hoja_equipos(ws, equipos):
-    encabezados = ['Código', 'Nombre', 'Modelo', 'Especificaciones', 'Ubicación', 'Estado', 'Valor de adquisición']
-    _encabezado_hoja(ws, 'Inventario LEICA — Equipos', len(encabezados))
+    _encabezado_hoja(ws, 'Inventario LEICA — Equipos', len(COLUMNAS_EQUIPOS))
     filas = [
         [e.codigo_inventario, e.nombre, e.modelo or '', e.especificaciones or '', e.ubicacion or '',
-         e.get_estado_display(), float(e.valor_adquisicion) if e.valor_adquisicion is not None else None]
+         e.get_estado_display(), float(e.valor_adquisicion) if e.valor_adquisicion is not None else None,
+         e.fecha_adquisicion]
         for e in equipos
     ]
-    primera = _tabla(ws, 'Equipos', encabezados, filas, [14, 30, 22, 38, 18, 18, 20])
+    primera = _tabla(ws, 'Equipos', COLUMNAS_EQUIPOS, filas, ANCHOS_EQUIPOS)
     for i, e in enumerate(equipos, start=primera):
         ws.cell(row=i, column=1).font = Font(bold=True)
         _pintar(ws.cell(row=i, column=6), COLORES_ESTADO.get(e.estado, COLOR_OK))
         ws.cell(row=i, column=7).number_format = FORMATO_PESOS
+        ws.cell(row=i, column=8).number_format = FORMATO_FECHA
 
 
 def _hoja_insumos(ws, insumos):
@@ -178,8 +183,8 @@ def generar_excel_inventario():
 def generar_plantilla_importacion():
     wb = Workbook()
     hojas = (
-        (wb.active, 'Equipos', ['Código', 'Nombre', 'Modelo', 'Especificaciones', 'Ubicación', 'Estado', 'Valor de adquisición'],
-         [14, 30, 22, 38, 18, 20, 20], 'F', [etiqueta for valor, etiqueta in Equipo.Estado.choices if valor != Equipo.Estado.PRESTADO]),
+        (wb.active, 'Equipos', COLUMNAS_EQUIPOS, ANCHOS_EQUIPOS, 'F',
+         [etiqueta for valor, etiqueta in Equipo.Estado.choices if valor != Equipo.Estado.PRESTADO]),
         (wb.create_sheet(), 'Insumos', ['Nombre', 'Categoría', 'Tipo', 'Total', 'Umbral mínimo'],
          [32, 20, 14, 11, 15], 'C', [etiqueta for _, etiqueta in Insumo.Tipo.choices]),
     )

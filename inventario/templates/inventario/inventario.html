@@ -112,6 +112,10 @@
             placeholder="Ej: 150000">
         </div>
         <div class="col-md-2">
+          <label class="form-label fw-semibold small">Fecha de adquisición</label>
+          <input name="fecha_adquisicion" type="date" class="form-control form-control-sm" max="{% now 'Y-m-d' %}">
+        </div>
+        <div class="col-md-2 ms-md-auto">
           <button class="btn btn-leica btn-sm w-100" type="submit">
             <i class="bi bi-plus-lg me-1"></i>Agregar Equipo
           </button>

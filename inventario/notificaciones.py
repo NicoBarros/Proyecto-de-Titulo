@@ -6,6 +6,8 @@ from django.db import transaction
 from django.template.loader import render_to_string
 from django.urls import reverse
 
+from .models import Equipo, Usuario
+
 logger = logging.getLogger(__name__)
 
 ASUNTOS = {
@@ -36,3 +38,32 @@ def enviar(tipo, solicitud):
 
 def notificar(tipo, solicitud):
     transaction.on_commit(lambda: enviar(tipo, solicitud))
+
+
+def enviar_pendientes_baja(equipos):
+    destinatarios = sorted(
+        Usuario.objects.filter(rol=Usuario.Rol.CONTROL_CALIDAD, is_active=True).exclude(email='').values_list('email', flat=True)
+    )
+    if not destinatarios:
+        return True
+    contexto = {
+        'equipos': equipos,
+        'años': Equipo.AÑOS_VIDA_UTIL,
+        'url': f"{settings.URL_SITIO}{reverse('inventario')}?estado={Equipo.Estado.PENDIENTE_BAJA}",
+    }
+    try:
+        send_mail(
+            f'Equipos pendientes de baja ({len(equipos)})',
+            render_to_string('inventario/correos/pendiente_baja.txt', contexto),
+            None,
+            destinatarios,
+        )
+    except Exception:
+        logger.exception('No se pudo enviar el aviso de equipos pendientes de baja')
+        return False
+    return True
+
+
+def notificar_pendientes_baja(equipos):
+    equipos = list(equipos)
+    transaction.on_commit(lambda: enviar_pendientes_baja(equipos))

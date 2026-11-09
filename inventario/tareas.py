@@ -4,7 +4,7 @@ from datetime import timedelta
 from django.conf import settings
 from django.utils import timezone
 
-from . import busqueda_semantica, notificaciones
+from . import busqueda_semantica, notificaciones, servicios
 from .models import Equipo, Solicitud
 
 logger = logging.getLogger(__name__)
@@ -34,6 +34,7 @@ def _indexar_busqueda():
 def ejecutar():
     ahora = timezone.now()
     marcadas = Solicitud.marcar_atrasadas()
+    pendientes_baja = servicios.marcar_pendientes_baja()
     recordatorios = _avisar(
         Solicitud.objects.filter(
             estado=Solicitud.EstadoSolicitud.ENTREGADA, recordatorio_enviado__isnull=True,
@@ -47,5 +48,6 @@ def ejecutar():
     )
     return {
         'atrasadas_marcadas': marcadas, 'recordatorios_enviados': recordatorios, 'avisos_atraso_enviados': atrasos,
+        'pendientes_baja_marcados': pendientes_baja,
         'vectores_actualizados': _indexar_busqueda(),
     }
