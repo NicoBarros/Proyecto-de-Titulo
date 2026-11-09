@@ -8,6 +8,7 @@ from django.utils import timezone
 from . import auditoria, notificaciones
 from .models import (
     Bloqueo,
+    ConflictoReserva,
     Equipo,
     HistorialEquipo,
     Insumo,
@@ -17,6 +18,14 @@ from .models import (
     SolicitudItem,
     Usuario,
 )
+
+
+class ConflictoReservaError(ValueError):
+    def __init__(self, mensaje, equipo, solicitud=None):
+        super().__init__(mensaje)
+        self.equipo = equipo
+        self.solicitud = solicitud
+
 
 DIAS_SANCION = 7
 UMBRAL_BAJA = Decimal('0.70')
@@ -169,7 +178,7 @@ def crear_solicitud(usuario, items, cantidades, inicio, fin, lugar_uso, justific
         if equipo is None:
             raise ValueError('Uno de los equipos seleccionados no existe.')
         if equipo.estado != Equipo.Estado.DISPONIBLE:
-            raise ValueError(f'El equipo {equipo.nombre} no se encuentra disponible actualmente.')
+            raise ConflictoReservaError(f'El equipo {equipo.nombre} no se encuentra disponible actualmente.', equipo)
         SolicitudItem.objects.create(solicitud=solicitud, equipo=equipo, cantidad=1)
     insumos = Insumo.objects.in_bulk(insumos_cant)
     for item_id, cantidad in insumos_cant.items():
@@ -184,8 +193,8 @@ def crear_solicitud(usuario, items, cantidades, inicio, fin, lugar_uso, justific
 
 def _aprobar(solicitud, equipos, usuario):
     for equipo in equipos:
-        if equipo.estado in (Equipo.Estado.EN_MANTENIMIENTO, Equipo.Estado.FUERA_SERVICIO):
-            raise ValueError(f'El equipo {equipo.nombre} está {equipo.get_estado_display().lower()}.')
+        if equipo.estado in (Equipo.Estado.EN_MANTENIMIENTO, Equipo.Estado.FUERA_SERVICIO, Equipo.Estado.PENDIENTE_BAJA):
+            raise ConflictoReservaError(f'El equipo {equipo.nombre} está {equipo.get_estado_display().lower()}.', equipo, solicitud)
         choque = SolicitudItem.objects.filter(
             equipo=equipo,
             solicitud__estado__in=[Solicitud.EstadoSolicitud.APROBADA, *Solicitud.ESTADOS_EN_PRESTAMO],
@@ -193,7 +202,7 @@ def _aprobar(solicitud, equipos, usuario):
             solicitud__horario_fin__gt=solicitud.horario_inicio,
         ).exclude(solicitud=solicitud).exists()
         if choque:
-            raise ValueError(f'El equipo {equipo} ya esta reservado en ese horario.')
+            raise ConflictoReservaError(f'El equipo {equipo} ya está reservado en ese horario.', equipo, solicitud)
     solicitud.estado = Solicitud.EstadoSolicitud.APROBADA
     solicitud.aprobado_por = usuario
     solicitud.fecha_aprobacion = timezone.now()
@@ -216,6 +225,12 @@ def _entregar(solicitud, equipos, items, usuario):
     solicitud.estado = Solicitud.EstadoSolicitud.ENTREGADA
     solicitud.save()
     Movimiento.objects.create(solicitud=solicitud, tipo=Movimiento.TipoMovimiento.ENTREGA, responsable=usuario)
+
+
+def registrar_conflicto(usuario, error):
+    return ConflictoReserva.objects.create(
+        usuario=usuario, equipo=error.equipo, solicitud=error.solicitud, motivo=str(error)[:255],
+    )
 
 
 def sancionar(usuario, solicitud):

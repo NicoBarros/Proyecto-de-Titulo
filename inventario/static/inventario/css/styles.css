@@ -842,6 +842,7 @@ small.representacion {
 
 .kpi-tarjeta.kpi-ok { border-left-color: #16a34a; }
 .kpi-tarjeta.kpi-alerta { border-left-color: #dc2626; }
+.kpi-tarjeta.kpi-seguimiento { border-left-color: #0284c7; }
 
 .kpi-nombre {
   font-size: 0.82rem;
@@ -858,6 +859,7 @@ small.representacion {
 
 .kpi-ok .kpi-valor { color: #15803d; }
 .kpi-alerta .kpi-valor { color: #b91c1c; }
+.kpi-seguimiento .kpi-valor { color: #075985; }
 .kpi-sin-datos .kpi-valor { color: #9ca3af; font-size: 1.3rem; }
 
 .kpi-meta {

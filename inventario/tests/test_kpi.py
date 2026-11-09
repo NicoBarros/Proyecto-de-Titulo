@@ -104,9 +104,15 @@ class ReportesKpiVistaTests(LeicaTestCase):
         self.client.force_login(self.director)
         r = self.client.get('/reportes/')
         self.assertEqual(r.context['periodo'], 30)
-        self.assertEqual(len(r.context['kpis']), 7)
-        self.assertContains(r, 'Indicadores clave (KPI)')
+        self.assertEqual([k.clave for k in r.context['kpis']], [
+            'devoluciones_a_tiempo', 'busqueda_segundos', 'conflictos_evitados', 'bloqueos_atraso', 'busquedas_primer_intento',
+        ])
+        self.assertEqual(len(r.context['operativos']), 6)
+        self.assertNotIn('devoluciones_a_tiempo', [k.clave for k in r.context['operativos']])
+        self.assertContains(r, 'Indicadores clave del proyecto (KPI)')
+        self.assertContains(r, 'Indicadores operativos')
         self.assertContains(r, 'data-kpi="disponibilidad"')
+        self.assertContains(r, 'data-kpi="conflictos_evitados"')
 
     def test_periodo_valido_e_invalido(self):
         self.client.force_login(self.director)

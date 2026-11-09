@@ -19,6 +19,7 @@ from ..exportar import generar_excel_inventario, generar_plantilla_importacion
 from ..forms import EquipoForm, InsumoForm
 from ..importar import importar_inventario
 from ..models import Equipo, HistorialEquipo, Insumo, Migracion, Solicitud, SolicitudItem, Usuario
+from .busqueda import registrar_eleccion
 
 EDITORES = (Usuario.Rol.ENCARGADO_LABORATORIO, Usuario.Rol.CONTROL_CALIDAD)
 
@@ -216,6 +217,8 @@ def historial_equipo(request, id):
 @login_required
 def ficha_equipo(request, id):
     equipo = get_object_or_404(Equipo, id=id)
+    if 'busqueda' in request.GET:
+        registrar_eleccion(request.user, request.GET['busqueda'], equipo)
     gestiona = request.user.rol in Usuario.ROLES_ESCRITURA_INVENTARIO
     ve_tecnico = gestiona or request.user.rol in Usuario.ROLES_APROBADORES
     reservas = (

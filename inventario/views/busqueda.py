@@ -1,7 +1,9 @@
 import json
 import logging
 import re
+import time
 from collections import Counter
+from datetime import timedelta
 
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
@@ -12,11 +14,12 @@ from django.urls import reverse
 from django.utils import timezone
 
 from .. import busqueda_semantica
-from ..models import Equipo
+from ..models import BusquedaIA, Equipo
 
 logger = logging.getLogger(__name__)
 
 MAX_RESULTADOS = 8
+VENTANA_REFORMULACION = timedelta(minutes=5)
 
 PROMPT = """Eres un asistente que ayuda a un encargado de laboratorio a encontrar equipos.
 Catalogo de equipos disponibles:
@@ -33,23 +36,37 @@ def _cupo_ia_disponible(usuario):
     return cache.incr(clave) <= settings.IA_CONSULTAS_POR_HORA
 
 
-def _resultado(equipo, disponibles):
+def _resultado(equipo, disponibles, busqueda):
     return {
         'nombre': equipo.nombre,
         'modelo': equipo.modelo or '',
         'codigo_inventario': equipo.codigo_inventario,
         'estado': equipo.get_estado_display(),
         'disponibles': disponibles,
-        'url': reverse('ficha_equipo', args=[equipo.id]),
+        'url': f"{reverse('ficha_equipo', args=[equipo.id])}?busqueda={busqueda.id}",
     }
 
 
-def _agrupar(encontrados, disponibles):
+def _agrupar(encontrados, disponibles, busqueda):
     cantidades = Counter(busqueda_semantica.clave_grupo(e) for e in disponibles)
     grupos = {}
     for equipo in encontrados:
         grupos.setdefault(busqueda_semantica.clave_grupo(equipo), equipo)
-    return [_resultado(e, cantidades[clave]) for clave, e in grupos.items()]
+    return [_resultado(e, cantidades[clave], busqueda) for clave, e in grupos.items()]
+
+
+def _es_reformulacion(usuario):
+    return BusquedaIA.objects.filter(
+        usuario=usuario, fecha__gte=timezone.now() - VENTANA_REFORMULACION, equipo_elegido__isnull=True,
+    ).exists()
+
+
+def registrar_eleccion(usuario, busqueda_id, equipo):
+    if not str(busqueda_id or '').isdigit():
+        return
+    BusquedaIA.objects.filter(id=busqueda_id, usuario=usuario, equipo_elegido__isnull=True).update(
+        equipo_elegido=equipo, elegida_en=timezone.now(),
+    )
 
 
 def _buscar_con_gemini(consulta, disponibles):
@@ -95,6 +112,7 @@ def busqueda_view(request):
     consulta = request.POST.get('consulta')
     if not consulta:
         return JsonResponse({'error': 'Falta consulta'}, status=400)
+    inicio = time.perf_counter()
     disponibles = list(Equipo.objects.filter(estado=Equipo.Estado.DISPONIBLE))
 
     encontrados, fuente = None, 'palabras_clave_local'
@@ -116,4 +134,12 @@ def busqueda_view(request):
 
     if not encontrados:
         encontrados = _buscar_local(consulta, disponibles)
-    return JsonResponse({'fuente': fuente, 'resultados': _agrupar(encontrados, disponibles)})
+    busqueda = BusquedaIA.objects.create(
+        usuario=request.user, consulta=consulta[:500], fuente=fuente,
+        resultados=len({busqueda_semantica.clave_grupo(e) for e in encontrados}),
+        duracion_ms=round((time.perf_counter() - inicio) * 1000),
+        reformulacion=_es_reformulacion(request.user),
+    )
+    return JsonResponse({
+        'fuente': fuente, 'busqueda': busqueda.id, 'resultados': _agrupar(encontrados, disponibles, busqueda),
+    })

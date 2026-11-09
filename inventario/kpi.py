@@ -4,7 +4,7 @@ from datetime import timedelta
 from django.db.models import Avg, Count, DurationField, ExpressionWrapper, F, Q
 from django.utils import timezone
 
-from .models import Equipo, Insumo, Mantenimiento, Movimiento, Solicitud
+from .models import Bloqueo, BusquedaIA, ConflictoReserva, Equipo, Insumo, Mantenimiento, Movimiento, Solicitud
 
 PERIODOS = [7, 30, 90, 365]
 
@@ -16,6 +16,8 @@ METAS = {
     'atrasos_activos': 0,
     'stock_critico': 10,
     'reparacion_dias': 7,
+    'busqueda_segundos': 3,
+    'busquedas_primer_intento': 70,
 }
 
 
@@ -30,12 +32,17 @@ class Indicador:
     menor_es_mejor: bool
     detalle: str
     texto_valor: str | None = None
+    texto_objetivo: str | None = None
 
     @property
     def cumple(self):
-        if self.valor is None:
+        if self.valor is None or self.meta is None:
             return None
         return self.valor <= self.meta if self.menor_es_mejor else self.valor >= self.meta
+
+    @property
+    def seguimiento(self):
+        return self.valor is not None and self.meta is None
 
     @property
     def texto(self):
@@ -45,6 +52,8 @@ class Indicador:
 
     @property
     def objetivo(self):
+        if self.texto_objetivo:
+            return self.texto_objetivo
         return f"{'≤' if self.menor_es_mejor else '≥'} {_numero(self.meta)}{self.unidad}"
 
 
@@ -72,6 +81,75 @@ def _texto_horas(horas):
     return '< 1 min' if minutos < 1 else f'{round(minutos)} min'
 
 
+def _devoluciones(desde):
+    return Movimiento.objects.filter(tipo=Movimiento.TipoMovimiento.DEVOLUCION, fecha__gte=desde).aggregate(
+        total=Count('id'),
+        a_tiempo=Count('id', filter=Q(solicitud__estado=Solicitud.EstadoSolicitud.DEVUELTA)),
+    )
+
+
+def _texto_segundos(segundos):
+    if segundos is None:
+        return None
+    return f'{round(segundos * 1000)} ms' if segundos < 1 else f'{_numero(segundos)} s'
+
+
+def calcular_kpis_proyecto(dias=30):
+    desde = timezone.now() - timedelta(days=dias)
+    anterior = desde - timedelta(days=dias)
+
+    devoluciones = _devoluciones(desde)
+    busquedas = BusquedaIA.objects.filter(fecha__gte=desde).aggregate(
+        total=Count('id'),
+        duracion=Avg('duracion_ms'),
+        hasta_eleccion=Avg(_duracion('elegida_en', 'fecha')),
+        primeros=Count('id', filter=Q(reformulacion=False)),
+        resueltos=Count('id', filter=Q(reformulacion=False, equipo_elegido__isnull=False)),
+    )
+    segundos = busquedas['duracion'] / 1000 if busquedas['duracion'] is not None else None
+    eleccion = busquedas['hasta_eleccion'].total_seconds() if busquedas['hasta_eleccion'] is not None else None
+    conflictos = ConflictoReserva.objects.filter(fecha__gte=desde).aggregate(
+        total=Count('id'), equipos=Count('equipo', distinct=True),
+    )
+    bloqueos = Bloqueo.objects.aggregate(
+        actual=Count('id', filter=Q(fecha_inicio__gte=desde)),
+        previo=Count('id', filter=Q(fecha_inicio__gte=anterior, fecha_inicio__lt=desde)),
+        usuarios=Count('usuario', filter=Q(fecha_inicio__gte=desde), distinct=True),
+    )
+
+    detalle_busqueda = _cantidad(busquedas['total'], 'búsqueda', 'búsquedas')
+    if eleccion is not None:
+        detalle_busqueda += f' · {_texto_segundos(eleccion)} hasta elegir un equipo'
+
+    return [
+        Indicador(
+            'devoluciones_a_tiempo', 'Préstamos devueltos dentro del plazo', 'bi-calendar-check',
+            _porcentaje(devoluciones['a_tiempo'], devoluciones['total']), ' %', METAS['devoluciones_a_tiempo'], False,
+            f"{devoluciones['a_tiempo']} de {_cantidad(devoluciones['total'], 'devolución', 'devoluciones')}",
+        ),
+        Indicador(
+            'busqueda_segundos', 'Tiempo promedio de búsqueda', 'bi-stopwatch',
+            segundos, ' s', METAS['busqueda_segundos'], True, detalle_busqueda, _texto_segundos(segundos),
+        ),
+        Indicador(
+            'conflictos_evitados', 'Conflictos de reserva evitados', 'bi-shield-check',
+            conflictos['total'], '', None, True,
+            _cantidad(conflictos['equipos'], 'equipo involucrado', 'equipos involucrados'),
+        ),
+        Indicador(
+            'bloqueos_atraso', 'Cuentas bloqueadas por atraso', 'bi-person-lock',
+            bloqueos['actual'], '', bloqueos['previo'], True,
+            _cantidad(bloqueos['usuarios'], 'cuenta distinta', 'cuentas distintas'),
+            texto_objetivo=f"≤ {bloqueos['previo']} (período anterior)",
+        ),
+        Indicador(
+            'busquedas_primer_intento', 'Búsquedas resueltas al primer intento', 'bi-bullseye',
+            _porcentaje(busquedas['resueltos'], busquedas['primeros']), ' %', METAS['busquedas_primer_intento'], False,
+            f"{busquedas['resueltos']} de {_cantidad(busquedas['primeros'], 'primera consulta', 'primeras consultas')}",
+        ),
+    ]
+
+
 def calcular_kpis(dias=30):
     desde = timezone.now() - timedelta(days=dias)
     Solicitud.marcar_atrasadas()
@@ -81,10 +159,7 @@ def calcular_kpis(dias=30):
     )
     horas_aprobacion = aprobacion['promedio'].total_seconds() / 3600 if aprobacion['promedio'] is not None else None
 
-    devoluciones = Movimiento.objects.filter(tipo=Movimiento.TipoMovimiento.DEVOLUCION, fecha__gte=desde).aggregate(
-        total=Count('id'),
-        a_tiempo=Count('id', filter=Q(solicitud__estado=Solicitud.EstadoSolicitud.DEVUELTA)),
-    )
+    devoluciones = _devoluciones(desde)
 
     operativos = Equipo.objects.exclude(estado=Equipo.Estado.FUERA_SERVICIO)
     inventario = operativos.aggregate(

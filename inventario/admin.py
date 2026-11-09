@@ -4,6 +4,8 @@ from django.contrib.auth.admin import UserAdmin
 from . import auditoria
 from .models import (
     Bloqueo,
+    BusquedaIA,
+    ConflictoReserva,
     Equipo,
     EventoSeguridad,
     HistorialEquipo,
@@ -112,6 +114,29 @@ class MantenimientoAdmin(admin.ModelAdmin):
 @admin.register(Migracion)
 class MigracionAdmin(admin.ModelAdmin):
     list_display = ('fecha', 'archivo_origen', 'filas_importadas', 'filas_con_error')
+
+
+class SoloLecturaAdmin(admin.ModelAdmin):
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(BusquedaIA)
+class BusquedaIAAdmin(SoloLecturaAdmin):
+    list_display = ('fecha', 'usuario', 'consulta', 'fuente', 'resultados', 'duracion_ms', 'reformulacion', 'equipo_elegido')
+    list_filter = ('fuente', 'reformulacion')
+    search_fields = ('consulta',)
+    date_hierarchy = 'fecha'
+
+
+@admin.register(ConflictoReserva)
+class ConflictoReservaAdmin(SoloLecturaAdmin):
+    list_display = ('fecha', 'usuario', 'equipo', 'solicitud', 'motivo')
+    search_fields = ('motivo', 'equipo__codigo_inventario')
+    date_hierarchy = 'fecha'
 
 
 @admin.register(EventoSeguridad)

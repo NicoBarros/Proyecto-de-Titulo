@@ -395,6 +395,61 @@ class VectorEquipo(models.Model):
         return f'Vector de {self.equipo}'
 
 
+class BusquedaIA(models.Model):
+
+    class Fuente(models.TextChoices):
+        SEMANTICA = 'semantica_local', 'Búsqueda semántica'
+        GEMINI = 'ia_gemini', 'Gemini'
+        PALABRAS_CLAVE = 'palabras_clave_local', 'Palabras clave'
+
+    fecha = models.DateTimeField(auto_now_add=True, db_index=True)
+    usuario = models.ForeignKey(
+        Usuario, on_delete=models.SET_NULL, blank=True, null=True, related_name='busquedas',
+    )
+    consulta = models.CharField(max_length=500)
+    fuente = models.CharField(max_length=30, choices=Fuente.choices)
+    resultados = models.PositiveIntegerField(default=0)
+    duracion_ms = models.PositiveIntegerField(default=0, verbose_name='Duración (ms)')
+    reformulacion = models.BooleanField(
+        default=False, verbose_name='Reformulación',
+        help_text='La misma persona buscó poco antes sin elegir ningún resultado',
+    )
+    equipo_elegido = models.ForeignKey(
+        Equipo, on_delete=models.SET_NULL, blank=True, null=True, related_name='busquedas',
+    )
+    elegida_en = models.DateTimeField(blank=True, null=True)
+
+    class Meta:
+        verbose_name = 'Búsqueda con IA'
+        verbose_name_plural = 'Búsquedas con IA'
+        ordering = ['-fecha']
+
+    def __str__(self):
+        return f'{self.consulta[:60]} ({self.fecha:%d/%m/%Y %H:%M})'
+
+
+class ConflictoReserva(models.Model):
+    fecha = models.DateTimeField(auto_now_add=True, db_index=True)
+    usuario = models.ForeignKey(
+        Usuario, on_delete=models.SET_NULL, blank=True, null=True, related_name='conflictos_reserva',
+    )
+    equipo = models.ForeignKey(
+        Equipo, on_delete=models.SET_NULL, blank=True, null=True, related_name='conflictos_reserva',
+    )
+    solicitud = models.ForeignKey(
+        Solicitud, on_delete=models.SET_NULL, blank=True, null=True, related_name='conflictos_reserva',
+    )
+    motivo = models.CharField(max_length=255)
+
+    class Meta:
+        verbose_name = 'Conflicto de reserva'
+        verbose_name_plural = 'Conflictos de reserva'
+        ordering = ['-fecha']
+
+    def __str__(self):
+        return f'{self.motivo} ({self.fecha:%d/%m/%Y %H:%M})'
+
+
 class EventoSeguridad(models.Model):
 
     class Tipo(models.TextChoices):

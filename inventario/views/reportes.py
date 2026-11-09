@@ -7,7 +7,7 @@ from django.db.models import Count
 from django.shortcuts import redirect, render
 from django.utils import timezone
 
-from ..kpi import PERIODOS, calcular_kpis
+from ..kpi import PERIODOS, calcular_kpis, calcular_kpis_proyecto
 from ..models import Equipo, Solicitud, Usuario
 
 
@@ -41,7 +41,8 @@ def reportes_view(request):
 
     periodo_str = request.GET.get('periodo', '30')
     periodo = int(periodo_str) if periodo_str.isdigit() and int(periodo_str) in PERIODOS else 30
-    kpis = calcular_kpis(periodo)
+    kpis = calcular_kpis_proyecto(periodo)
+    operativos = [k for k in calcular_kpis(periodo) if k.clave != 'devoluciones_a_tiempo']
 
     return render(request, 'inventario/reportes.html', {
         'top_equipos': top_equipos, 'vencidos': vencidos, 'sin_movimiento': sin_movimiento, 'dias': dias,
@@ -49,4 +50,7 @@ def reportes_view(request):
         'kpis': kpis, 'periodo': periodo, 'periodos': PERIODOS,
         'kpis_cumplidos': sum(1 for k in kpis if k.cumple),
         'kpis_medidos': sum(1 for k in kpis if k.cumple is not None),
+        'operativos': operativos,
+        'operativos_cumplidos': sum(1 for k in operativos if k.cumple),
+        'operativos_medidos': sum(1 for k in operativos if k.cumple is not None),
     })
