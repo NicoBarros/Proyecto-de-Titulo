@@ -1,6 +1,11 @@
 (function () {
   const formulario = document.getElementById('fBusqueda');
   const resultado = document.getElementById('resBusqueda');
+  const FUENTES = {
+    semantica_local: 'Búsqueda semántica',
+    ia_gemini: 'Gemini',
+    palabras_clave_local: 'Palabras clave',
+  };
 
   function el(tag, texto, clase) {
     const n = document.createElement(tag);
@@ -19,7 +24,7 @@
     const cargando = el('div', undefined, 'd-flex align-items-center gap-2 text-primary');
     const spinner = el('div', undefined, 'spinner-border spinner-border-sm');
     spinner.setAttribute('role', 'status');
-    cargando.append(spinner, document.createTextNode(' Buscando con Inteligencia Artificial...'));
+    cargando.append(spinner, document.createTextNode(' Buscando...'));
     resultado.replaceChildren(cargando);
   }
 
@@ -71,7 +76,7 @@
       const data = await resp.json();
       if (!resp.ok) throw new Error(data.error || 'Error en la búsqueda');
 
-      resultado.replaceChildren(el('p', `Fuente: ${data.fuente}`, 'hint mb-3'));
+      resultado.replaceChildren(el('p', `Fuente: ${FUENTES[data.fuente] || data.fuente}`, 'hint mb-3'));
       if (data.resultados.length > 0) {
         mostrarTabla(data.resultados);
       } else {

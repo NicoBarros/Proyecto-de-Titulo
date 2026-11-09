@@ -366,6 +366,20 @@ class HistorialEquipo(models.Model):
         return f'{self.codigo_inventario} — {self.get_accion_display()} ({self.fecha:%d/%m/%Y %H:%M})'
 
 
+class VectorEquipo(models.Model):
+    equipo = models.OneToOneField(Equipo, on_delete=models.CASCADE, related_name='vector_busqueda')
+    huella = models.CharField(max_length=64)
+    vector = models.BinaryField()
+    actualizado = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Vector de búsqueda'
+        verbose_name_plural = 'Vectores de búsqueda'
+
+    def __str__(self):
+        return f'Vector de {self.equipo}'
+
+
 class EventoSeguridad(models.Model):
 
     class Tipo(models.TextChoices):

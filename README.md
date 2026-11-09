@@ -6,7 +6,7 @@ Permite administrar equipos e insumos, solicitar préstamos (kits), aprobarlos, 
 registrar su devolución equipo por equipo, sancionar atrasos, avisar por correo, gestionar
 mantenimientos con la regla del 70 %, generar reportes, importar y exportar el inventario en Excel,
 registrar el historial de cambios de cada equipo, generar códigos QR que abren la ficha del equipo
-y buscar equipos en lenguaje natural con IA (Google Gemini).
+y buscar equipos en lenguaje natural con IA (búsqueda semántica local y, opcionalmente, Google Gemini).
 
 ## Stack
 
@@ -15,7 +15,7 @@ y buscar equipos en lenguaje natural con IA (Google Gemini).
 | Backend | Python 3.14 + Django 6.1 |
 | Frontend | Plantillas de Django (HTML, CSS y JavaScript sin frameworks) |
 | Base de datos | PostgreSQL (probado con la versión 18) |
-| IA | Google Gemini (`google-genai`), con búsqueda local por palabras clave como respaldo |
+| IA | Búsqueda semántica local con EmbeddingGemma (`fastembed`, ONNX Runtime, solo CPU); Google Gemini (`google-genai`) opcional; búsqueda por palabras clave como respaldo |
 | Producción | Gunicorn + WhiteNoise para archivos estáticos |
 
 ## Instalación local
@@ -62,7 +62,9 @@ copy .env.example .env
 | `ALLOWED_HOSTS` | Dominios permitidos, separados por coma |
 | `DATABASE_URL` | `postgres://leica:una-clave-segura@localhost:5432/leica_inventario` |
 | `DOMINIO_INSTITUCIONAL` | Dominio de correo aceptado al crear usuarios (`inacapmail.cl`) |
-| `GEMINI_API_KEY` | Opcional. Sin ella, la búsqueda usa solo palabras clave |
+| `BUSQUEDA_SEMANTICA` | `True` activa la búsqueda semántica local. Necesita unos 1,5 GB de RAM por proceso; en Azure App Service B1 déjala en `False`. Por defecto `False` |
+| `MODELOS_DIR` | Carpeta donde se descarga el modelo de búsqueda (~1,2 GB, una sola vez). Por defecto `modelos/` |
+| `GEMINI_API_KEY` | Opcional. Se usa cuando la búsqueda semántica está desactivada o no encuentra resultados |
 | `GEMINI_MODELO` / `GEMINI_MODELO_RESPALDO` | Opcionales. Modelo principal y de respaldo (por defecto `gemini-2.5-flash` y `gemini-2.5-flash-lite`) |
 | `POSTGRES_BIN` | Opcional. Carpeta de `pg_dump` y `pg_restore` si no están en el PATH |
 | `SESION_MINUTOS` | Minutos de inactividad antes de cerrar la sesión. Por defecto `60` |
@@ -154,7 +156,8 @@ comunes: no puede modificar a otros administradores ni asignar roles con permiso
   de Bootstrap; no hay JavaScript inline en ninguna plantilla, lo que bloquea la inyección de scripts (XSS).
   Tampoco se permite incrustar la aplicación en otros sitios (`frame-ancestors 'none'`).
 - **Base de datos:** en Azure, el firewall solo acepta conexiones desde las IP de salida de la aplicación.
-- **Búsqueda con IA:** cada usuario tiene un máximo de consultas a Gemini por hora (`IA_CONSULTAS_POR_HORA`).
+- **Búsqueda con IA:** la búsqueda semántica se ejecuta en el propio servidor, por lo que las consultas no
+  salen de él. Cada usuario tiene un máximo de consultas a Gemini por hora (`IA_CONSULTAS_POR_HORA`).
 - **Dependencias:** cada push ejecuta `pip-audit` contra la base de vulnerabilidades conocidas, y Dependabot
   propone actualizaciones semanales.
 
@@ -200,7 +203,7 @@ ruff check .                           # estilo y errores comunes
 
 La suite está en `inventario/tests/` y cubre permisos por rol, inventario, el flujo de préstamos,
 mantenimiento, importación y exportación a Excel, correos, tareas programadas, códigos QR, auditoría,
-búsqueda con IA (Gemini simulado, nunca llama a la API real), la política de seguridad de contenido y
+búsqueda con IA (modelo semántico y Gemini simulados, nunca descargan modelos ni llaman a la API real), la política de seguridad de contenido y
 el panel de administración. El CI ejecuta `ruff`, las migraciones pendientes, `check --deploy`, la suite
 con cobertura y `pip-audit` en cada push.
 

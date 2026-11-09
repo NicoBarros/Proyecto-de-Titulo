@@ -1,10 +1,13 @@
+import logging
 from datetime import timedelta
 
 from django.conf import settings
 from django.utils import timezone
 
-from . import notificaciones
-from .models import Solicitud
+from . import busqueda_semantica, notificaciones
+from .models import Equipo, Solicitud
+
+logger = logging.getLogger(__name__)
 
 
 def _avisar(solicitudes, tipo, campo):
@@ -16,6 +19,16 @@ def _avisar(solicitudes, tipo, campo):
             Solicitud.objects.filter(id=solicitud.id).update(**{campo: timezone.now()})
             enviados += 1
     return enviados
+
+
+def _indexar_busqueda():
+    if not settings.BUSQUEDA_SEMANTICA:
+        return 0
+    try:
+        return busqueda_semantica.indexar(Equipo.objects.all())[1]
+    except Exception:
+        logger.exception('No se pudo actualizar el índice de búsqueda semántica')
+        return 0
 
 
 def ejecutar():
@@ -32,4 +45,7 @@ def ejecutar():
         Solicitud.objects.filter(estado=Solicitud.EstadoSolicitud.ATRASADA, aviso_atraso_enviado__isnull=True),
         'atraso', 'aviso_atraso_enviado',
     )
-    return {'atrasadas_marcadas': marcadas, 'recordatorios_enviados': recordatorios, 'avisos_atraso_enviados': atrasos}
+    return {
+        'atrasadas_marcadas': marcadas, 'recordatorios_enviados': recordatorios, 'avisos_atraso_enviados': atrasos,
+        'vectores_actualizados': _indexar_busqueda(),
+    }

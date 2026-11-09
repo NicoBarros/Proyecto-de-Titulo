@@ -10,6 +10,7 @@ from django.shortcuts import render
 from django.urls import reverse
 from django.utils import timezone
 
+from .. import busqueda_semantica
 from ..models import Equipo
 
 logger = logging.getLogger(__name__)
@@ -86,7 +87,15 @@ def busqueda_view(request):
     disponibles = list(Equipo.objects.filter(estado=Equipo.Estado.DISPONIBLE))
 
     encontrados, fuente = None, 'palabras_clave_local'
-    if settings.GEMINI_API_KEY and _cupo_ia_disponible(request.user):
+    if settings.BUSQUEDA_SEMANTICA:
+        try:
+            encontrados = busqueda_semantica.buscar(consulta, disponibles, MAX_RESULTADOS)
+            if encontrados:
+                fuente = 'semantica_local'
+        except Exception as e:
+            logger.warning('Falló la búsqueda semántica (%s). Se usa el siguiente método.', e)
+
+    if not encontrados and settings.GEMINI_API_KEY and _cupo_ia_disponible(request.user):
         try:
             encontrados = _buscar_con_gemini(consulta, disponibles)
             if encontrados is not None:
