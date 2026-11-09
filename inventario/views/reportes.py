@@ -2,6 +2,7 @@ from datetime import timedelta
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.contrib.postgres.aggregates import StringAgg
 from django.db.models import Count
 from django.shortcuts import redirect, render
 from django.utils import timezone
@@ -32,7 +33,10 @@ def reportes_view(request):
     fecha_limite = timezone.now() - timedelta(days=dias)
     sin_movimiento = list(
         Equipo.objects.exclude(solicituditem__solicitud__created_at__gte=fecha_limite)
-        .exclude(estado=Equipo.Estado.FUERA_SERVICIO).order_by('nombre', 'codigo_inventario')
+        .exclude(estado=Equipo.Estado.FUERA_SERVICIO)
+        .values('nombre', 'modelo')
+        .annotate(unidades=Count('id'), ubicaciones=StringAgg('ubicacion', ' · ', distinct=True, default=''))
+        .order_by('-unidades', 'nombre')
     )
 
     periodo_str = request.GET.get('periodo', '30')
@@ -41,6 +45,7 @@ def reportes_view(request):
 
     return render(request, 'inventario/reportes.html', {
         'top_equipos': top_equipos, 'vencidos': vencidos, 'sin_movimiento': sin_movimiento, 'dias': dias,
+        'unidades_sin_movimiento': sum(g['unidades'] for g in sin_movimiento),
         'kpis': kpis, 'periodo': periodo, 'periodos': PERIODOS,
         'kpis_cumplidos': sum(1 for k in kpis if k.cumple),
         'kpis_medidos': sum(1 for k in kpis if k.cumple is not None),

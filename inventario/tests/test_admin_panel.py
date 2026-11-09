@@ -136,16 +136,22 @@ class ReportesTests(LeicaTestCase):
         r = self.client.get('/reportes/', {'dias': '30'})
         self.assertEqual([(t['nombre'], t['veces']) for t in r.context['top_equipos']], [('Usado', 1)])
         self.assertEqual(len(r.context['vencidos']), 1)
-        self.assertEqual([e.codigo_inventario for e in r.context['sin_movimiento']], ['R-2'])
+        self.assertEqual([g['nombre'] for g in r.context['sin_movimiento']], ['Sin uso'])
 
     def test_reportes_agrupan_modelos_y_omiten_dados_de_baja(self):
         for codigo in ('R-1', 'R-2'):
             self.crear_solicitud(self.estudiante, equipos=[self.crear_equipo(codigo, 'Router', modelo='ISR 4321')])
         self.crear_equipo('R-3', 'Viejo', estado=Equipo.Estado.FUERA_SERVICIO)
+        for codigo, ubicacion in (('R-4', 'Repisa 1'), ('R-5', 'Repisa 2'), ('R-6', 'Repisa 1')):
+            self.crear_equipo(codigo, 'Switch', modelo='2960', ubicacion=ubicacion)
         self.client.force_login(self.director)
         r = self.client.get('/reportes/')
         self.assertEqual([(t['nombre'], t['modelo'], t['veces']) for t in r.context['top_equipos']], [('Router', 'ISR 4321', 2)])
-        self.assertNotIn('R-3', [e.codigo_inventario for e in r.context['sin_movimiento']])
+        self.assertEqual(
+            [(g['nombre'], g['unidades'], g['ubicaciones']) for g in r.context['sin_movimiento']],
+            [('Switch', 3, 'Repisa 1 · Repisa 2')],
+        )
+        self.assertContains(r, '3 unidades · 1 modelos')
         self.assertContains(r, 'tabla-scroll', count=3)
 
     def test_docente_staff_no_ve_reportes(self):

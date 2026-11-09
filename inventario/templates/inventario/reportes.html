@@ -107,7 +107,7 @@
 <div class="card">
   <div class="card-header">
     <i class="bi bi-clock-history me-2"></i>Equipos sin movimiento ({{ dias }} días)
-    {% if sin_movimiento %}<span class="badge bg-secondary ms-2">{{ sin_movimiento|length }}</span>{% endif %}
+    {% if sin_movimiento %}<span class="badge bg-secondary ms-2">{{ unidades_sin_movimiento }} unidades · {{ sin_movimiento|length }} modelos</span>{% endif %}
   </div>
   <div class="card-body p-0">
     <div class="table-responsive tabla-scroll">
@@ -115,18 +115,18 @@
         <thead>
           <tr>
             <th>Equipo</th>
-            <th>Código</th>
+            <th>Modelo</th>
+            <th>Unidades</th>
             <th>Ubicación</th>
-            <th>Estado</th>
           </tr>
         </thead>
         <tbody>
-          {% for e in sin_movimiento %}
+          {% for g in sin_movimiento %}
           <tr>
-            <td>{{ e.nombre }}</td>
-            <td><code>{{ e.codigo_inventario }}</code></td>
-            <td class="text-muted">{{ e.ubicacion|default:"—" }}</td>
-            <td><span class="badge {{ e.estado }}">{{ e.get_estado_display }}</span></td>
+            <td><a href="{% url 'inventario' %}?tab=equipos&q={{ g.nombre|urlencode }}" class="link-equipo">{{ g.nombre }}</a></td>
+            <td class="text-muted">{{ g.modelo|default:"—" }}</td>
+            <td><span class="badge bg-secondary">{{ g.unidades }}</span></td>
+            <td class="text-muted small">{{ g.ubicaciones|default:"—" }}</td>
           </tr>
           {% empty %}
           <tr>
