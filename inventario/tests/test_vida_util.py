@@ -172,3 +172,18 @@ class RegistroConFechaTests(LeicaTestCase):
         viejo, nuevo = Equipo.objects.order_by('codigo_inventario')
         self.assertEqual((viejo.fecha_adquisicion, viejo.estado), (date(2015, 5, 20), Equipo.Estado.PENDIENTE_BAJA))
         self.assertEqual((nuevo.fecha_adquisicion.month, nuevo.estado), (2, Equipo.Estado.DISPONIBLE))
+
+    def test_importacion_envia_un_solo_aviso(self):
+        wb = Workbook()
+        ws = wb.active
+        ws.title = 'Equipos'
+        ws.append(['Código', 'Nombre', 'Fecha de adquisición'])
+        for i in range(3):
+            ws.append([f'IM-{i}', 'Router antiguo', datetime(2015, 1, 1 + i)])
+        salida = BytesIO()
+        wb.save(salida)
+        with self.captureOnCommitCallbacks(execute=True):
+            self.client.post('/inventario/importar/', {'archivo': SimpleUploadedFile('i.xlsx', salida.getvalue())})
+        self.assertEqual(Equipo.objects.filter(estado=Equipo.Estado.PENDIENTE_BAJA).count(), 3)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].subject, 'Equipos pendientes de baja (3)')

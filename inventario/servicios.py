@@ -65,10 +65,11 @@ def cambiar_estado_equipo(equipo, usuario, estado, detalle):
         notificaciones.notificar_pendientes_baja([equipo])
 
 
-def aplicar_vida_util(equipo, usuario):
+def aplicar_vida_util(equipo, usuario, notificar=True):
     if equipo.estado == Equipo.Estado.DISPONIBLE and equipo.supera_vida_util():
         cambiar_estado_equipo(equipo, usuario, Equipo.Estado.PENDIENTE_BAJA, DETALLE_VIDA_UTIL)
-        notificaciones.notificar_pendientes_baja([equipo])
+        if notificar:
+            notificaciones.notificar_pendientes_baja([equipo])
         return True
     if equipo.estado == Equipo.Estado.PENDIENTE_BAJA and not equipo.supera_vida_util():
         cambiar_estado_equipo(equipo, usuario, Equipo.Estado.DISPONIBLE, 'Fecha de adquisición corregida')

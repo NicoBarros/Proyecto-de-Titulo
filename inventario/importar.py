@@ -6,7 +6,7 @@ from django.db import transaction
 from openpyxl import load_workbook
 from openpyxl.utils.exceptions import InvalidFileException
 
-from . import auditoria, servicios
+from . import auditoria, notificaciones, servicios
 from .forms import EquipoForm, InsumoForm
 from .models import Equipo, HistorialEquipo, Insumo, Migracion
 
@@ -99,8 +99,8 @@ def _importar_equipo(datos, usuario):
             equipo.version += 1
             equipo.save()
             auditoria.registrar(equipo, usuario, HistorialEquipo.Accion.EDITADO, antes, DETALLE)
-            servicios.aplicar_vida_util(equipo, usuario)
-        return
+            return equipo if servicios.aplicar_vida_util(equipo, usuario, notificar=False) else None
+        return None
 
     if estado and estado not in ESTADOS_IMPORTABLES:
         raise ValueError(f'Estado: "{estado}" no es válido para un equipo nuevo.')
@@ -108,7 +108,7 @@ def _importar_equipo(datos, usuario):
     equipo.estado = ESTADOS_IMPORTABLES.get(estado, Equipo.Estado.DISPONIBLE)
     equipo.save()
     auditoria.registrar(equipo, usuario, HistorialEquipo.Accion.IMPORTADO, detalle=DETALLE)
-    servicios.aplicar_vida_util(equipo, usuario)
+    return equipo if servicios.aplicar_vida_util(equipo, usuario, notificar=False) else None
 
 
 def _importar_insumo(datos, usuario):
@@ -155,17 +155,22 @@ def importar_inventario(archivo, usuario):
 
     totales = importadas = 0
     errores = []
+    pendientes_baja = []
     with transaction.atomic():
         for nombre, columnas, clave, importar_fila in encontradas:
             for numero, datos in _filas(hojas[nombre], columnas, clave):
                 totales += 1
                 try:
                     with transaction.atomic():
-                        importar_fila(datos, usuario)
+                        pendiente = importar_fila(datos, usuario)
                     importadas += 1
+                    if pendiente:
+                        pendientes_baja.append(pendiente)
                 except ValueError as e:
                     errores.append(f'{nombre.capitalize()}, fila {numero}: {e}')
 
+        if pendientes_baja:
+            notificaciones.notificar_pendientes_baja(pendientes_baja)
         migracion = Migracion.objects.create(
             archivo_origen=archivo.name[:255],
             filas_totales=totales,
