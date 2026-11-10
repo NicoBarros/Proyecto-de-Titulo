@@ -64,6 +64,28 @@ def enviar_pendientes_baja(equipos):
     return True
 
 
+def enviar_falla_respaldo(error):
+    destinatarios = sorted(
+        Usuario.objects.filter(is_superuser=True, is_active=True).exclude(email='').values_list('email', flat=True)
+    )
+    if not destinatarios:
+        return True
+    contexto = {
+        'error': str(error), 'directorio': settings.RESPALDOS_DIR, 'horas': settings.RESPALDO_HORAS,
+    }
+    try:
+        send_mail(
+            'Falló el respaldo automático de la base de datos',
+            render_to_string('inventario/correos/respaldo_fallido.txt', contexto),
+            None,
+            destinatarios,
+        )
+    except Exception:
+        logger.exception('No se pudo enviar el aviso de falla del respaldo automático')
+        return False
+    return True
+
+
 def notificar_pendientes_baja(equipos):
     equipos = list(equipos)
     transaction.on_commit(lambda: enviar_pendientes_baja(equipos))

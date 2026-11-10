@@ -20,6 +20,7 @@ STORAGES_TEST = {
     STORAGES=STORAGES_TEST,
     GEMINI_API_KEY='',
     BUSQUEDA_SEMANTICA=False,
+    RESPALDO_AUTOMATICO=False,
     # Hasher rapido: PBKDF2 hace muy lenta la creacion de usuarios en cada clase de test.
     PASSWORD_HASHERS=['django.contrib.auth.hashers.MD5PasswordHasher'],
     SECURE_SSL_REDIRECT=False,

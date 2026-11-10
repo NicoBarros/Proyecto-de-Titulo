@@ -1,0 +1,11 @@
+{% autoescape off %}Hola:
+
+No se pudo generar el respaldo automático de la base de datos de LEICA Inventario. El sistema lo volverá a intentar en la próxima ejecución de las tareas programadas; este aviso no se repetirá durante las próximas {{ horas }} horas.
+
+Error: {{ error }}
+Carpeta de respaldos: {{ directorio }}
+
+Revisa que el cliente de PostgreSQL (pg_dump) esté instalado, que la carpeta tenga espacio y permisos de escritura, y que la base de datos esté disponible. Mientras tanto, puedes generar un respaldo manual con: python manage.py respaldar
+
+Laboratorio LEICA · INACAP Sede Valdivia
+{% endautoescape %}

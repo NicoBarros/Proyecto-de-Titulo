@@ -6,7 +6,7 @@ from inventario import tareas
 class Command(BaseCommand):
     help = (
         'Ejecuta las tareas periódicas: marca préstamos atrasados y equipos pendientes de baja, '
-        'envía los avisos pendientes y actualiza el índice de búsqueda.'
+        'envía los avisos pendientes, actualiza el índice de búsqueda y genera el respaldo diario.'
     )
 
     def handle(self, *args, **kwargs):

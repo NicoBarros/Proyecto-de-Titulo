@@ -67,6 +67,8 @@ copy .env.example .env
 | `GEMINI_API_KEY` | Opcional. Se usa cuando la búsqueda semántica está desactivada o no encuentra resultados |
 | `GEMINI_MODELO` / `GEMINI_MODELO_RESPALDO` | Opcionales. Modelo principal y de respaldo (por defecto `gemini-2.5-flash` y `gemini-2.5-flash-lite`) |
 | `POSTGRES_BIN` | Opcional. Carpeta de `pg_dump` y `pg_restore` si no están en el PATH |
+| `RESPALDOS_DIR` | Carpeta de los respaldos. Por defecto `respaldos/` |
+| `RESPALDO_AUTOMATICO` | `True` genera un respaldo con las tareas programadas cada `RESPALDO_HORAS` (por defecto `24`) y conserva los últimos `RESPALDO_CONSERVAR` (por defecto `14`). Si falla, avisa por correo a los administradores. En Azure déjalo en `False`: la base ya tiene respaldos automáticos y App Service no incluye `pg_dump`. Por defecto `False` |
 | `SESION_MINUTOS` | Minutos de inactividad antes de cerrar la sesión. Por defecto `60` |
 | `IA_CONSULTAS_POR_HORA` | Consultas a Gemini por usuario y hora; al superarlas se usa la búsqueda local. Por defecto `20` |
 | `URL_SITIO` | URL pública usada en los correos y en los códigos QR. En Azure se toma de `WEBSITE_HOSTNAME` |
@@ -271,7 +273,8 @@ despliegue, entra a **Actions → CI/CD → Run workflow**.
 - `GET /salud/` responde `{"estado": "ok", "base_de_datos": "ok"}` o un 503 si la base no está disponible.
 - Azure respalda la base automáticamente (7 días, restauración a cualquier minuto). Además,
   `python manage.py respaldar` y `python manage.py restaurar` generan y restauran respaldos propios
-  verificados con SHA-256. La política y los procedimientos están en [docs/respaldos.md](docs/respaldos.md).
+  verificados con SHA-256. En un servidor propio, `RESPALDO_AUTOMATICO=True` hace que las tareas
+  programadas generen un respaldo diario y avisen por correo a los administradores si falla. La política y los procedimientos están en [docs/respaldos.md](docs/respaldos.md).
 
 ## Estructura
 

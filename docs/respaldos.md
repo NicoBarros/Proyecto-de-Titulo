@@ -9,6 +9,7 @@ Procedimientos de respaldo y recuperación de la base de datos de LEICA Inventar
 |---|---|---|---|---|
 | Automática (Azure) | Snapshot completo + registro de transacciones (WAL) | Snapshot diario, WAL continuo | 7 días | Azure, región Chile Central |
 | Lógica (`respaldar`) | Volcado completo con `pg_dump`, formato comprimido, con huella SHA-256 | Semanal y antes de cada despliegue con migraciones | Últimos 14 respaldos | Fuera de Azure: equipo del encargado y OneDrive institucional |
+| Lógica automática (servidor propio) | Igual que `respaldar`, generado por las tareas programadas con `RESPALDO_AUTOMATICO=True` | Diaria (`RESPALDO_HORAS=24`) | Últimos `RESPALDO_CONSERVAR` (14) | `RESPALDOS_DIR`, en un disco distinto al de la base, más copia semanal a OneDrive |
 | Prueba de restauración | Restaurar el último respaldo lógico en una base temporal y comparar | Mensual | Registro en la bitácora de este documento | Equipo del encargado |
 
 Objetivos de recuperación:
@@ -20,6 +21,30 @@ Objetivos de recuperación:
 
 Las dos capas se complementan: la automática cubre errores recientes con mínima pérdida de datos, y la
 lógica sobrevive a la eliminación del servidor o de la suscripción, porque se guarda fuera de Azure.
+
+## Respaldo diario automático
+
+En un servidor propio (por ejemplo, el R720 del laboratorio) no hay respaldos administrados como los de
+Azure. Con `RESPALDO_AUTOMATICO=True`, cada ejecución de las tareas programadas (`POST /tareas/` o
+`python manage.py tareas_programadas`) revisa el respaldo más reciente de `RESPALDOS_DIR`; si tiene más de
+`RESPALDO_HORAS` horas, genera uno nuevo con su huella SHA-256 y elimina los que excedan
+`RESPALDO_CONSERVAR`.
+
+- Si dos ejecuciones coinciden, solo una genera el respaldo.
+- Si falla (falta `pg_dump`, disco lleno, base caída), se registra en el log, se avisa por correo a los
+  usuarios administradores activos y se reintenta en cada ejecución siguiente. El aviso se envía una vez
+  cada `RESPALDO_HORAS` mientras la falla persista.
+- La respuesta de las tareas incluye `respaldo`: el nombre del archivo creado, `null` si no correspondía
+  o `"error"`.
+
+Ejemplo de programación con cron (cada 15 minutos, como en Azure):
+
+```
+*/15 * * * * cd /opt/leica && venv/bin/python manage.py tareas_programadas >> /var/log/leica/tareas.log 2>&1
+```
+
+`RESPALDOS_DIR` debe estar en un disco distinto al de los datos de PostgreSQL (en el R720, uno de los
+discos de 3 TB), para que una falla del disco de la base no se lleve también los respaldos.
 
 ## Herramientas
 

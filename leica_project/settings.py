@@ -35,6 +35,9 @@ env = environ.Env(
     SESION_MINUTOS=(int, 60),
     SECURE_HSTS_SECONDS=(int, 31536000),
     RESPALDOS_DIR=(str, str(BASE_DIR / 'respaldos')),
+    RESPALDO_AUTOMATICO=(bool, False),
+    RESPALDO_HORAS=(int, 24),
+    RESPALDO_CONSERVAR=(int, 14),
 )
 environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
 
@@ -137,6 +140,9 @@ CACHES = {
 
 POSTGRES_BIN = env('POSTGRES_BIN')
 RESPALDOS_DIR = env('RESPALDOS_DIR')
+RESPALDO_AUTOMATICO = env('RESPALDO_AUTOMATICO')
+RESPALDO_HORAS = env('RESPALDO_HORAS')
+RESPALDO_CONSERVAR = env('RESPALDO_CONSERVAR')
 
 AUTH_USER_MODEL = 'inventario.Usuario'
 
