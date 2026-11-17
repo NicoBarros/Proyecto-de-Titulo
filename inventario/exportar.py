@@ -200,3 +200,111 @@ def generar_plantilla_importacion():
     salida = BytesIO()
     wb.save(salida)
     return salida.getvalue()
+
+
+def _fecha_local(fecha):
+    return timezone.localtime(fecha).replace(tzinfo=None)
+
+
+def _estado_indicador(k):
+    if k.cumple is None:
+        return 'Seguimiento' if k.seguimiento else 'Sin datos'
+    return 'Cumple' if k.cumple else 'No cumple'
+
+
+def _hoja_indicadores(ws, datos):
+    ws.title = 'Indicadores'
+    encabezados = ['Indicador', 'Tipo', 'Valor', 'Objetivo', 'Estado']
+    _encabezado_hoja(ws, f'Reportes LEICA — Indicadores de los últimos {datos["periodo"]} días', len(encabezados))
+    indicadores = (
+        [('Proyecto', k) for k in datos['kpis']] + [('Operativo', k) for k in datos['operativos']]
+        + [('SLA', k) for k in datos['sla']] + [('Calidad IA', k) for k in datos['calidad_ia']]
+        + [('Búsqueda', k) for k in datos['evaluacion_indicadores']]
+    )
+    filas = [
+        [k.nombre, tipo, k.texto, '' if k.seguimiento else k.objetivo, _estado_indicador(k)]
+        for tipo, k in indicadores
+    ]
+    primera = _tabla(ws, 'Indicadores', encabezados, filas, [44, 12, 18, 18, 14])
+    for fila, (_, k) in enumerate(indicadores, start=primera):
+        ws.cell(row=fila, column=1).font = Font(bold=True)
+        if k.cumple is not None:
+            _pintar(ws.cell(row=fila, column=5), COLOR_OK if k.cumple else COLOR_ALERTA)
+
+
+def _hoja_mas_solicitados(ws, datos):
+    encabezados = ['Equipo', 'Modelo', 'Solicitudes']
+    _encabezado_hoja(ws, 'Reportes LEICA — Equipos más solicitados', len(encabezados))
+    filas = [[t['nombre'], t['modelo'] or '', t['veces']] for t in datos['top_equipos']]
+    _tabla(ws, 'MasSolicitados', encabezados, filas, [36, 26, 14])
+
+
+def _hoja_vencidos(ws, datos):
+    encabezados = ['Solicitud', 'Responsable', 'Sección', 'Solicitante', 'Inicio', 'Vence', 'Días de atraso']
+    _encabezado_hoja(ws, 'Reportes LEICA — Préstamos vencidos', len(encabezados))
+    ahora = timezone.now()
+    filas = []
+    for v in datos['vencidos']:
+        responsable = v.beneficiario
+        filas.append([
+            v.id, responsable.get_full_name() or responsable.email, responsable.seccion or '',
+            v.solicitante.get_full_name() or v.solicitante.email,
+            _fecha_local(v.horario_inicio), _fecha_local(v.horario_fin), (ahora - v.horario_fin).days,
+        ])
+    primera = _tabla(ws, 'Vencidos', encabezados, filas, [12, 30, 12, 30, 18, 18, 15])
+    for fila in range(primera, primera + len(filas)):
+        for col in (5, 6):
+            ws.cell(row=fila, column=col).number_format = 'DD/MM/YYYY HH:MM'
+        _pintar(ws.cell(row=fila, column=7), COLOR_ALERTA)
+
+
+def _hoja_sin_movimiento(ws, datos):
+    encabezados = ['Equipo', 'Modelo', 'Unidades', 'Ubicaciones']
+    _encabezado_hoja(ws, f'Reportes LEICA — Equipos sin movimiento en {datos["dias"]} días', len(encabezados))
+    filas = [[g['nombre'], g['modelo'] or '', g['unidades'], g['ubicaciones']] for g in datos['sin_movimiento']]
+    _tabla(ws, 'SinMovimiento', encabezados, filas, [36, 26, 12, 40])
+
+
+def _hoja_brechas(ws, datos):
+    encabezados = ['Consulta', 'Veces', 'Sin resultados', 'No útil', 'Última']
+    _encabezado_hoja(ws, f'Reportes LEICA — Brechas de la búsqueda de los últimos {datos["periodo"]} días', len(encabezados))
+    filas = [
+        [b['texto'], b['veces'], b['sin_resultados'], b['no_utiles'], _fecha_local(b['ultima'])]
+        for b in datos['brechas']
+    ]
+    primera = _tabla(ws, 'Brechas', encabezados, filas, [50, 10, 15, 10, 18])
+    for fila in range(primera, primera + len(filas)):
+        ws.cell(row=fila, column=5).number_format = 'DD/MM/YYYY HH:MM'
+
+
+def _hoja_evaluacion(ws, evaluacion):
+    encabezados = ['Consulta', 'Esperado', 'Posición', 'Resultados obtenidos']
+    fecha = timezone.localtime(evaluacion.fecha).strftime('%d-%m-%Y %H:%M')
+    _encabezado_hoja(
+        ws, f'Reportes LEICA — Evaluación de la búsqueda del {fecha}: '
+        f'{evaluacion.aciertos} de {evaluacion.consultas} en el top {evaluacion.TOP}', len(encabezados),
+    )
+    filas = [
+        [d['consulta'], ', '.join(d['esperado']), d['posicion'] or 'Sin acierto', ', '.join(d['obtenidos'])]
+        for d in evaluacion.detalle
+    ]
+    primera = _tabla(ws, 'Evaluacion', encabezados, filas, [48, 30, 14, 80])
+    for fila, d in enumerate(evaluacion.detalle, start=primera):
+        _pintar(ws.cell(row=fila, column=3), COLOR_OK if d['posicion'] else COLOR_ALERTA)
+
+
+def generar_excel_reportes(datos):
+    wb = Workbook()
+    _hoja_indicadores(wb.active, datos)
+    _hoja_mas_solicitados(wb.create_sheet('Más solicitados'), datos)
+    _hoja_vencidos(wb.create_sheet('Préstamos vencidos'), datos)
+    _hoja_sin_movimiento(wb.create_sheet('Sin movimiento'), datos)
+    _hoja_brechas(wb.create_sheet('Brechas búsqueda'), datos)
+    if datos['evaluacion']:
+        _hoja_evaluacion(wb.create_sheet('Evaluación búsqueda'), datos['evaluacion'])
+    for ws in wb.worksheets:
+        ws.sheet_view.showGridLines = False
+        ws.sheet_properties.tabColor = ROJO_INACAP
+    salida = BytesIO()
+    wb.save(salida)
+    return salida.getvalue()

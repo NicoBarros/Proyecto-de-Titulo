@@ -7,6 +7,7 @@ from .models import (
     BusquedaIA,
     ConflictoReserva,
     Equipo,
+    EvaluacionBusqueda,
     EventoSeguridad,
     HistorialEquipo,
     Insumo,
@@ -126,9 +127,19 @@ class SoloLecturaAdmin(admin.ModelAdmin):
 
 @admin.register(BusquedaIA)
 class BusquedaIAAdmin(SoloLecturaAdmin):
-    list_display = ('fecha', 'usuario', 'consulta', 'fuente', 'resultados', 'duracion_ms', 'reformulacion', 'equipo_elegido')
-    list_filter = ('fuente', 'reformulacion')
+    list_display = (
+        'fecha', 'usuario', 'consulta', 'fuente', 'resultados', 'generacion', 'util', 'duracion_ms', 'reformulacion',
+        'equipo_elegido',
+    )
+    list_filter = ('fuente', 'generacion', 'util', 'reformulacion')
     search_fields = ('consulta',)
+    date_hierarchy = 'fecha'
+
+
+@admin.register(EvaluacionBusqueda)
+class EvaluacionBusquedaAdmin(SoloLecturaAdmin):
+    list_display = ('fecha', 'aciertos', 'consultas', 'metodo', 'duracion_ms', 'ejecutada_por')
+    list_filter = ('metodo',)
     date_hierarchy = 'fecha'
 
 

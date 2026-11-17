@@ -142,7 +142,7 @@ class AprobarSolicitudTests(LeicaTestCase):
 
     def test_rechazar(self):
         s = self.crear_solicitud(self.estudiante, equipos=[self.equipo])
-        self.accion_solicitud(s, 'rechazar')
+        self.accion_solicitud(s, 'rechazar', motivo_rechazo='Equipo reservado para examen')
         s.refresh_from_db()
         self.assertEqual(s.estado, Solicitud.EstadoSolicitud.RECHAZADA)
 

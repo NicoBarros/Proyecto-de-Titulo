@@ -45,7 +45,7 @@ class BusquedaSemanticaTests(LeicaTestCase):
 
     def test_usa_busqueda_semantica(self):
         data = self.buscar('ver una señal en el osciloscopio')
-        self.assertEqual(data['fuente'], 'semantica_local')
+        self.assertEqual(data['fuente'], 'hibrida_local')
         self.assertEqual(self.codigos(data), ['S-1'])
 
     def test_no_incluye_equipos_no_disponibles(self):
@@ -89,14 +89,6 @@ class BusquedaSemanticaTests(LeicaTestCase):
         data = self.buscar('silla')
         self.assertEqual(data['fuente'], 'palabras_clave_local')
         self.assertEqual(data['resultados'], [])
-
-    @override_settings(GEMINI_API_KEY='clave-falsa')
-    @patch('google.genai.Client')
-    def test_sin_coincidencias_consulta_a_gemini(self, client_cls):
-        client_cls.return_value.models.generate_content.return_value.text = f'[{self.mul.id}]'
-        data = self.buscar('silla')
-        self.assertEqual(data['fuente'], 'ia_gemini')
-        self.assertEqual(self.codigos(data), ['S-2'])
 
     def test_si_el_modelo_falla_usa_palabras_clave(self):
         self.consulta.side_effect = busqueda_semantica.ModeloNoDisponible('sin modelo')

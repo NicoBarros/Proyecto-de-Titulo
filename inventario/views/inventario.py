@@ -176,27 +176,37 @@ def eliminar_equipo(request, id):
     return redirect('/inventario/?tab=equipos')
 
 
+def _hay_conflicto(request, registro):
+    enviada = request.POST.get('version')
+    return enviada is not None and enviada != str(registro.version)
+
+
 @login_required
 @role_required(*EDITORES)
 def editar_equipo(request, id):
     equipo = get_object_or_404(Equipo, id=id)
+    conflicto = False
     if request.method == 'POST':
-        antes = auditoria.foto(equipo)
-        form = EquipoForm(request.POST, instance=equipo)
-        if form.is_valid():
-            with transaction.atomic():
+        with transaction.atomic():
+            equipo = get_object_or_404(Equipo.objects.select_for_update(), id=id)
+            antes = auditoria.foto(equipo)
+            form = EquipoForm(request.POST, instance=equipo)
+            conflicto = _hay_conflicto(request, equipo)
+            guardado = not conflicto and form.is_valid()
+            if guardado:
                 equipo = form.save(commit=False)
                 equipo.version += 1
                 equipo.save()
                 auditoria.registrar(equipo, request.user, HistorialEquipo.Accion.EDITADO, antes)
                 pendiente = servicios.aplicar_vida_util(equipo, request.user)
+        if guardado:
             messages.success(request, 'Equipo actualizado exitosamente.')
             if pendiente:
                 messages.warning(request, f'{servicios.DETALLE_VIDA_UTIL}: quedó pendiente de baja.')
             return redirect('/inventario/?tab=equipos')
     else:
         form = EquipoForm(instance=equipo)
-    return render(request, 'inventario/editar_equipo.html', {'form': form, 'equipo': equipo})
+    return render(request, 'inventario/editar_equipo.html', {'form': form, 'equipo': equipo, 'conflicto': conflicto})
 
 
 @login_required
@@ -280,12 +290,14 @@ def eliminar_insumo(request, id):
 @role_required(*EDITORES)
 def editar_insumo(request, id):
     insumo = get_object_or_404(Insumo, id=id)
+    conflicto = False
     if request.method == 'POST':
         with transaction.atomic():
             insumo = get_object_or_404(Insumo.objects.select_for_update(), id=id)
             entregadas = servicios.unidades_entregadas(insumo)
             form = InsumoForm(request.POST, instance=insumo)
-            if form.is_valid():
+            conflicto = _hay_conflicto(request, insumo)
+            if not conflicto and form.is_valid():
                 try:
                     servicios.aplicar_total_insumo(form.save(commit=False), entregadas)
                 except ValueError as e:
@@ -295,7 +307,7 @@ def editar_insumo(request, id):
                     return redirect('/inventario/?tab=insumos')
     else:
         form = InsumoForm(instance=insumo)
-    return render(request, 'inventario/editar_insumo.html', {'form': form, 'insumo': insumo})
+    return render(request, 'inventario/editar_insumo.html', {'form': form, 'insumo': insumo, 'conflicto': conflicto})
 
 
 @login_required

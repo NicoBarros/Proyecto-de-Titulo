@@ -40,6 +40,30 @@ def notificar(tipo, solicitud):
     transaction.on_commit(lambda: enviar(tipo, solicitud))
 
 
+def enviar_revisiones_vencidas(solicitudes):
+    destinatarios = sorted(
+        Usuario.objects.filter(rol__in=Usuario.ROLES_APROBADORES, is_active=True)
+        .exclude(email='').values_list('email', flat=True)
+    )
+    if not destinatarios:
+        return True
+    contexto = {
+        'solicitudes': solicitudes, 'horas': settings.SLA_REVISION_HORAS,
+        'url': f"{settings.URL_SITIO}{reverse('solicitudes')}",
+    }
+    try:
+        send_mail(
+            f'Solicitudes sin revisar hace más de {settings.SLA_REVISION_HORAS} h ({len(solicitudes)})',
+            render_to_string('inventario/correos/revision_vencida.txt', contexto),
+            None,
+            destinatarios,
+        )
+    except Exception:
+        logger.exception('No se pudo enviar el aviso de solicitudes sin revisar')
+        return False
+    return True
+
+
 def enviar_pendientes_baja(equipos):
     destinatarios = sorted(
         Usuario.objects.filter(rol=Usuario.Rol.CONTROL_CALIDAD, is_active=True).exclude(email='').values_list('email', flat=True)

@@ -152,7 +152,7 @@ class ReportesTests(LeicaTestCase):
             [('Switch', 3, 'Repisa 1 · Repisa 2')],
         )
         self.assertContains(r, '3 unidades · 1 modelos')
-        self.assertContains(r, 'tabla-scroll', count=3)
+        self.assertContains(r, 'tabla-scroll', count=4)
 
     def test_docente_staff_no_ve_reportes(self):
         self.client.force_login(self.crear_usuario('docstaff', Usuario.Rol.DOCENTE, is_staff=True))

@@ -105,11 +105,20 @@ def _nombre(usuario):
     return usuario.get_full_name() or usuario.email
 
 
+def bloqueo_de_seccion(usuario):
+    if usuario.rol != Usuario.Rol.ESTUDIANTE or not usuario.seccion:
+        return None
+    return Bloqueo.objects.filter(seccion=usuario.seccion, fecha_fin__gt=timezone.now()).order_by('-fecha_fin').first()
+
+
 def _validar_puede_solicitar(usuario, representado):
     if usuario.esta_bloqueado():
         raise ValueError(f'Tu cuenta está bloqueada para solicitar préstamos hasta el {_fecha_texto(usuario.bloqueado_hasta)}.')
     if representado and representado.esta_bloqueado():
         raise ValueError(f'{_nombre(representado)} está bloqueado para préstamos hasta el {_fecha_texto(representado.bloqueado_hasta)}.')
+    bloqueo = bloqueo_de_seccion(representado or usuario)
+    if bloqueo:
+        raise ValueError(f'La sección {bloqueo.seccion} está bloqueada para préstamos hasta el {_fecha_texto(bloqueo.fecha_fin)}.')
     if (representado or usuario).tiene_atrasos():
         if representado:
             raise ValueError(f'{_nombre(representado)} tiene préstamos atrasados sin devolver.')
@@ -206,6 +215,7 @@ def _aprobar(solicitud, equipos, usuario):
     solicitud.estado = Solicitud.EstadoSolicitud.APROBADA
     solicitud.aprobado_por = usuario
     solicitud.fecha_aprobacion = timezone.now()
+    solicitud.revisada_en = solicitud.revisada_en or solicitud.fecha_aprobacion
     solicitud.save()
     notificaciones.notificar('aprobada', solicitud)
 
@@ -239,7 +249,7 @@ def sancionar(usuario, solicitud):
         usuario.bloqueado_hasta = hasta
         usuario.save(update_fields=['bloqueado_hasta'])
     Bloqueo.objects.create(
-        usuario=usuario, seccion=usuario.seccion, solicitud=solicitud,
+        usuario=usuario, seccion=usuario.seccion if usuario.rol == Usuario.Rol.ESTUDIANTE else None, solicitud=solicitud,
         fecha_fin=hasta, motivo='Devolucion atrasada',
     )
 
@@ -314,7 +324,12 @@ def aplicar_accion_solicitud(usuario, solicitud_id, accion, datos=None):
     elif accion == 'devolver':
         _devolver(solicitud, equipos, items, usuario, datos)
     elif accion == 'rechazar':
+        motivo = (datos.get('motivo_rechazo') or '').strip()
+        if not motivo:
+            raise ValueError('Indica el motivo del rechazo.')
         solicitud.estado = Solicitud.EstadoSolicitud.RECHAZADA
+        solicitud.motivo_rechazo = motivo[:500]
+        solicitud.revisada_en = solicitud.revisada_en or timezone.now()
         solicitud.save()
         notificaciones.notificar('rechazada', solicitud)
     elif accion == 'cancelar':

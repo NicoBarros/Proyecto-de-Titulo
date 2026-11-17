@@ -17,8 +17,8 @@ env = environ.Env(
     SECURE_SSL_REDIRECT=(bool, True),
     DOMINIO_INSTITUCIONAL=(str, 'inacapmail.cl'),
     GEMINI_API_KEY=(str, ''),
-    GEMINI_MODELO=(str, 'gemini-2.5-flash'),
-    GEMINI_MODELO_RESPALDO=(str, 'gemini-2.5-flash-lite'),
+    GEMINI_MODELO=(str, 'gemini-3.5-flash-lite'),
+    GEMINI_MODELO_RESPALDO=(str, 'gemini-3.1-flash-lite'),
     IA_CONSULTAS_POR_HORA=(int, 20),
     BUSQUEDA_SEMANTICA=(bool, False),
     MODELOS_DIR=(str, str(BASE_DIR / 'modelos')),
@@ -32,12 +32,15 @@ env = environ.Env(
     DEFAULT_FROM_EMAIL=(str, 'LEICA Inventario <no-responder@inacapmail.cl>'),
     HORAS_RECORDATORIO=(int, 24),
     POSTGRES_BIN=(str, ''),
-    SESION_MINUTOS=(int, 60),
+    SESION_MINUTOS=(int, 30),
     SECURE_HSTS_SECONDS=(int, 31536000),
     RESPALDOS_DIR=(str, str(BASE_DIR / 'respaldos')),
     RESPALDO_AUTOMATICO=(bool, False),
     RESPALDO_HORAS=(int, 24),
     RESPALDO_CONSERVAR=(int, 14),
+    EVALUACION_BUSQUEDA_DIAS=(int, 30),
+    SLA_REVISION_HORAS=(int, 24),
+    SLA_BAJA_DIAS=(int, 5),
 )
 environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
 
@@ -143,6 +146,9 @@ RESPALDOS_DIR = env('RESPALDOS_DIR')
 RESPALDO_AUTOMATICO = env('RESPALDO_AUTOMATICO')
 RESPALDO_HORAS = env('RESPALDO_HORAS')
 RESPALDO_CONSERVAR = env('RESPALDO_CONSERVAR')
+EVALUACION_BUSQUEDA_DIAS = env('EVALUACION_BUSQUEDA_DIAS')
+SLA_REVISION_HORAS = env('SLA_REVISION_HORAS')
+SLA_BAJA_DIAS = env('SLA_BAJA_DIAS')
 
 AUTH_USER_MODEL = 'inventario.Usuario'
 

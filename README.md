@@ -6,7 +6,8 @@ Permite administrar equipos e insumos, solicitar préstamos (kits), aprobarlos, 
 registrar su devolución equipo por equipo, sancionar atrasos, avisar por correo, gestionar
 mantenimientos con la regla del 70 %, generar reportes, importar y exportar el inventario en Excel,
 registrar el historial de cambios de cada equipo, generar códigos QR que abren la ficha del equipo
-y buscar equipos en lenguaje natural con IA (búsqueda semántica local y, opcionalmente, Google Gemini).
+y buscar equipos en lenguaje natural con IA mediante una arquitectura RAG híbrida (recuperación local y
+respuesta redactada por Google Gemini).
 
 ## Stack
 
@@ -15,7 +16,7 @@ y buscar equipos en lenguaje natural con IA (búsqueda semántica local y, opcio
 | Backend | Python 3.14 + Django 6.1 |
 | Frontend | Plantillas de Django (HTML, CSS y JavaScript sin frameworks) |
 | Base de datos | PostgreSQL (probado con la versión 18) |
-| IA | Búsqueda semántica local con EmbeddingGemma (`fastembed`, ONNX Runtime, solo CPU); Google Gemini (`google-genai`) opcional; búsqueda por palabras clave como respaldo |
+| IA | RAG híbrido: recuperación densa con EmbeddingGemma (`fastembed`, ONNX Runtime, solo CPU) y léxica con BM25, fusionadas con RRF; generación con Google Gemini (`google-genai`) |
 | Producción | Gunicorn + WhiteNoise para archivos estáticos |
 
 ## Instalación local
@@ -64,13 +65,16 @@ copy .env.example .env
 | `DOMINIO_INSTITUCIONAL` | Dominio de correo aceptado al crear usuarios (`inacapmail.cl`) |
 | `BUSQUEDA_SEMANTICA` | `True` activa la búsqueda semántica local. Necesita unos 1,5 GB de RAM por proceso; en Azure App Service B1 déjala en `False`. Por defecto `False` |
 | `MODELOS_DIR` | Carpeta donde se descarga el modelo de búsqueda (~1,2 GB, una sola vez). Por defecto `modelos/` |
-| `GEMINI_API_KEY` | Opcional. Se usa cuando la búsqueda semántica está desactivada o no encuentra resultados |
-| `GEMINI_MODELO` / `GEMINI_MODELO_RESPALDO` | Opcionales. Modelo principal y de respaldo (por defecto `gemini-2.5-flash` y `gemini-2.5-flash-lite`) |
+| `GEMINI_API_KEY` | Opcional. Sin clave, la búsqueda muestra los equipos recuperados sin la respuesta redactada |
+| `GEMINI_MODELO` / `GEMINI_MODELO_RESPALDO` | Opcionales. Modelo principal y de respaldo (por defecto `gemini-3.5-flash-lite` y `gemini-3.1-flash-lite`) |
 | `POSTGRES_BIN` | Opcional. Carpeta de `pg_dump` y `pg_restore` si no están en el PATH |
 | `RESPALDOS_DIR` | Carpeta de los respaldos. Por defecto `respaldos/` |
 | `RESPALDO_AUTOMATICO` | `True` genera un respaldo con las tareas programadas cada `RESPALDO_HORAS` (por defecto `24`) y conserva los últimos `RESPALDO_CONSERVAR` (por defecto `14`). Si falla, avisa por correo a los administradores. En Azure déjalo en `False`: la base ya tiene respaldos automáticos y App Service no incluye `pg_dump`. Por defecto `False` |
-| `SESION_MINUTOS` | Minutos de inactividad antes de cerrar la sesión. Por defecto `60` |
-| `IA_CONSULTAS_POR_HORA` | Consultas a Gemini por usuario y hora; al superarlas se usa la búsqueda local. Por defecto `20` |
+| `SESION_MINUTOS` | Minutos de inactividad antes de cerrar la sesión. Por defecto `30` |
+| `SLA_REVISION_HORAS` | Plazo para revisar una solicitud pendiente. Al vencer, las tareas programadas avisan por correo a quienes aprueban. Por defecto `24` |
+| `SLA_BAJA_DIAS` | Plazo para validar un equipo pendiente de baja. Por defecto `5` |
+| `EVALUACION_BUSQUEDA_DIAS` | Cada cuántos días las tareas programadas evalúan la búsqueda con las consultas de referencia. `0` la desactiva. Por defecto `30` |
+| `IA_CONSULTAS_POR_HORA` | Respuestas generadas con Gemini por usuario y hora; al superarlas solo se muestran los equipos recuperados. Por defecto `20` |
 | `URL_SITIO` | URL pública usada en los correos y en los códigos QR. En Azure se toma de `WEBSITE_HOSTNAME` |
 | `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `EMAIL_USE_TLS` | Servidor SMTP para los avisos. Sin `EMAIL_HOST`, los correos se muestran en la consola |
 | `DEFAULT_FROM_EMAIL` | Remitente de los correos |
@@ -135,7 +139,11 @@ comunes: no puede modificar a otros administradores ni asignar roles con permiso
   pasan a mantenimiento y el resto queda disponible.
 - **Cancelación:** quien creó una solicitud puede cancelarla mientras esté pendiente o aprobada.
 - **Insumos:** los renovables vuelven al stock al devolverse; los perecibles se consumen.
-- **Sanciones (RF-09):** una devolución atrasada bloquea al estudiante por 7 días para pedir préstamos.
+- **Rechazo:** quien rechaza una solicitud debe indicar el motivo; se guarda y se envía al solicitante.
+- **Sanciones (RF-09):** una devolución atrasada bloquea por 7 días al estudiante y a su sección. Al
+  quitar la sanción desde el panel de administración también se libera la sección.
+- **Edición concurrente:** si otra persona guardó cambios en un equipo o insumo mientras se editaba,
+  el sistema avisa y no sobrescribe hasta que se recargue o se confirme guardando de nuevo.
 - **Mantenimiento (RF-10):** si el costo de reparación es igual o mayor al 70 % del valor de
   adquisición, el sistema sugiere dar el equipo de baja.
 - **Historial:** un equipo, insumo o usuario con préstamos o mantenimientos registrados no se puede
@@ -158,8 +166,9 @@ comunes: no puede modificar a otros administradores ni asignar roles con permiso
   de Bootstrap; no hay JavaScript inline en ninguna plantilla, lo que bloquea la inyección de scripts (XSS).
   Tampoco se permite incrustar la aplicación en otros sitios (`frame-ancestors 'none'`).
 - **Base de datos:** en Azure, el firewall solo acepta conexiones desde las IP de salida de la aplicación.
-- **Búsqueda con IA:** la búsqueda semántica se ejecuta en el propio servidor, por lo que las consultas no
-  salen de él. Cada usuario tiene un máximo de consultas a Gemini por hora (`IA_CONSULTAS_POR_HORA`).
+- **Búsqueda con IA:** la recuperación se ejecuta en el propio servidor. Gemini recibe solo los fragmentos
+  del catálogo recuperados y la consulta, nunca datos personales. Cada usuario tiene un máximo de respuestas
+  generadas por hora (`IA_CONSULTAS_POR_HORA`).
 - **Dependencias:** cada push ejecuta `pip-audit` contra la base de vulnerabilidades conocidas, y Dependabot
   propone actualizaciones semanales.
 
@@ -190,6 +199,60 @@ el resto se importa. Cada importación queda registrada con su resultado.
 El botón "Exportar Inventario Excel" de la pantalla Inventario descarga `inventario_leica_AAAAMMDD.xlsx`
 con tres hojas con formato: **Resumen** (equipos por estado, valor total e insumos con stock bajo),
 **Equipos** e **Insumos**, con colores por estado y filtros en cada columna.
+
+En Reportes, "Exportar Excel" descarga `reportes_leica_AAAAMMDD.xlsx` con los indicadores del período
+elegido, los equipos más solicitados, los préstamos vencidos, los equipos sin movimiento, las brechas de
+la búsqueda y el detalle de la última evaluación de la búsqueda.
+
+## Supervisión humana y calidad de la IA
+
+Reportes muestra, para el período elegido:
+
+- **Supervisión humana (SLA):** solicitudes revisadas dentro de `SLA_REVISION_HORAS`, solicitudes
+  pendientes fuera de plazo, equipos pendientes de baja sin validar en `SLA_BAJA_DIAS` y tasa de
+  aprobación directa (revisadas que no se rechazaron). Cuando una solicitud supera el plazo sin revisión,
+  las tareas programadas envían un aviso único a Encargado, Control de Calidad y Dirección de Carrera.
+- **Calidad de la IA y adopción:** fidelidad de las respuestas (generadas que pasaron la verificación de
+  citas), búsquedas calificadas como útiles, tasa de escalado (búsquedas sin resultado o calificadas
+  como no útiles, que requieren intervención humana) y adopción (usuarios activos con búsquedas o
+  solicitudes en el período).
+- **Brechas de la búsqueda:** consultas sin resultados o calificadas como no útiles, agrupadas y
+  ordenadas por frecuencia. Indican equipos que se necesitan y no están en el inventario o que la
+  búsqueda no encuentra.
+
+## Búsqueda en lenguaje natural (RAG híbrido)
+
+La búsqueda sigue el esquema recuperar → generar → verificar (`inventario/rag.py`):
+
+1. **Indexación:** cada modelo de equipo es un fragmento (nombre, modelo y especificaciones) con su vector
+   de EmbeddingGemma, guardado en `VectorEquipo` y actualizado por las tareas programadas.
+2. **Recuperación híbrida:** sobre los equipos disponibles, combina la similitud de vectores (que además
+   divide la consulta cuando pide varias cosas) con BM25 sobre los términos, que encuentra códigos y
+   modelos exactos. Las dos listas se fusionan con *Reciprocal Rank Fusion* y se toman los 5 primeros.
+3. **Generación:** Gemini recibe solo esos 5 fragmentos, numerados `[E1]`…`[E5]`, con instrucciones de
+   sistema separadas de la consulta, temperatura 0,2 y salida JSON. Redacta una recomendación de una a
+   tres oraciones citando cada equipo. La consulta va delimitada y se trata como dato, no como instrucción.
+4. **Verificación:** se descarta la respuesta si cita un fragmento que no recibió, si contiene un correo
+   o si no tiene el formato esperado; si nombra un equipo recuperado sin citarlo, se agrega la cita.
+5. **Supervisión humana:** los equipos aparecen al instante y la respuesta llega después, sin bloquear.
+   Quien busca puede calificar si le sirvió. Cada búsqueda guarda la consulta, los equipos recuperados,
+   la respuesta, las citas, el resultado de la verificación, los tiempos, el equipo elegido y la
+   calificación.
+
+Si Gemini no está configurado, falla o se agota el cupo, se muestran los equipos recuperados igual. Si el
+modelo principal no responde, se usa el de respaldo.
+
+## Evaluación de la búsqueda (RNF-11)
+
+`inventario/datos/consultas_referencia.json` contiene 30 consultas en lenguaje natural con el equipo
+esperado para cada una. La evaluación ejecuta la búsqueda local (semántica o por palabras clave, sin
+Gemini) sobre todo el catálogo vigente y cuenta una consulta como acertada si el equipo esperado
+aparece entre los 5 primeros resultados. La meta es 80 %.
+
+- Las tareas programadas la ejecutan una vez al mes (`EVALUACION_BUSQUEDA_DIAS`).
+- El Encargado o Control de Calidad puede ejecutarla con "Evaluar ahora" en Reportes, donde se ve el
+  porcentaje y las consultas sin acierto.
+- Por consola: `python manage.py evaluar_busqueda` (acepta `--consultas otro_archivo.json`).
 
 ## Tests y calidad del código
 
@@ -268,7 +331,8 @@ despliegue, entra a **Actions → CI/CD → Run workflow**.
   administrador (solo si no existe) e inicia Gunicorn.
 - Los logs se ven en el portal, en **App Service → Log stream**.
 - Cada 15 minutos, el workflow `.github/workflows/tareas.yml` llama a `POST /tareas/` con el token
-  `TAREAS_TOKEN`: marca los préstamos vencidos como atrasados y envía los avisos pendientes. Localmente,
+  `TAREAS_TOKEN`: marca los préstamos vencidos como atrasados, envía los avisos pendientes, avisa de las
+  solicitudes sin revisar fuera de plazo y una vez al mes evalúa la búsqueda. Localmente,
   lo mismo se ejecuta con `python manage.py tareas_programadas`.
 - `GET /salud/` responde `{"estado": "ok", "base_de_datos": "ok"}` o un 503 si la base no está disponible.
 - Azure respalda la base automáticamente (7 días, restauración a cualquier minuto). Además,
@@ -292,7 +356,11 @@ inventario/
   templates/          Plantillas HTML (correos en templates/inventario/correos/)
   static/             CSS, JavaScript e imágenes
   migrations/         Migraciones de la base de datos
-  management/commands/ seed, respaldar, restaurar, marcar_atrasadas, tareas_programadas, crear_admin
+  rag.py              Recuperación híbrida, generación con Gemini y verificación de citas
+  evaluacion_busqueda.py Evaluación mensual de la búsqueda con las consultas de referencia
+  datos/              Consultas de referencia de la evaluación
+  management/commands/ seed, respaldar, restaurar, marcar_atrasadas, tareas_programadas, crear_admin,
+                      evaluar_busqueda, indexar_busqueda
   tests/              Suite de tests
 azure/                Script de infraestructura
 docs/respaldos.md     Política y procedimientos de respaldo

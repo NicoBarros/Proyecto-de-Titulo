@@ -94,8 +94,10 @@ def _alternar_activo(request, usuario):
 
 
 def _desbloquear(request, usuario):
+    ahora = timezone.now()
     usuario.bloqueado_hasta = None
     usuario.save(update_fields=['bloqueado_hasta'])
+    usuario.bloqueos.filter(fecha_fin__gt=ahora).update(fecha_fin=ahora)
     registrar_cambio_cuenta(request, usuario, 'sanción removida')
     return f'Sanción removida: {usuario.email} ahora está desbloqueado.'
 

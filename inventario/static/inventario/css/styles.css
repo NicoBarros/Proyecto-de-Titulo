@@ -916,3 +916,41 @@ small.representacion {
 .filtro-grupo .filtro-opciones {
   max-width: 10rem;
 }
+
+.rag-respuesta {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  padding: 0.9rem 1rem;
+  border-radius: 12px;
+  background: var(--leica-red-light);
+  border-left: 4px solid var(--leica-red);
+  line-height: 1.55;
+}
+
+.rag-icono {
+  color: var(--leica-red);
+  font-size: 1.1rem;
+  margin-top: 0.1rem;
+}
+
+.rag-cita {
+  display: inline-block;
+  min-width: 1.35rem;
+  margin: 0 0.15rem;
+  padding: 0 0.3rem;
+  border-radius: 6px;
+  background: var(--leica-red);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-align: center;
+  text-decoration: none;
+  vertical-align: 0.1rem;
+}
+
+.rag-cita:hover,
+.rag-cita:focus {
+  background: var(--leica-red-dark);
+  color: #fff;
+}

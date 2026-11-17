@@ -6,10 +6,15 @@
     <span><i class="bi bi-speedometer2 me-2"></i>Indicadores clave del proyecto (KPI)
       <span class="badge bg-secondary ms-2">{{ kpis_cumplidos }} de {{ kpis_medidos }} cumplen la meta</span>
     </span>
-    <div class="btn-group btn-group-sm" role="group" aria-label="Período de los indicadores">
-      {% for p in periodos %}
-      <a href="?periodo={{ p }}&dias={{ dias }}" class="btn {% if p == periodo %}btn-dark{% else %}btn-outline-secondary{% endif %}">{{ p }} días</a>
-      {% endfor %}
+    <div class="d-flex flex-wrap gap-2">
+      <div class="btn-group btn-group-sm" role="group" aria-label="Período de los indicadores">
+        {% for p in periodos %}
+        <a href="?periodo={{ p }}&dias={{ dias }}" class="btn {% if p == periodo %}btn-dark{% else %}btn-outline-secondary{% endif %}">{{ p }} días</a>
+        {% endfor %}
+      </div>
+      <a href="{% url 'exportar_reportes' %}?periodo={{ periodo }}&dias={{ dias }}" class="btn btn-sm btn-success">
+        <i class="bi bi-file-earmark-excel me-1"></i>Exportar Excel
+      </a>
     </div>
   </div>
   <div class="card-body">
@@ -24,6 +29,102 @@
   </div>
   <div class="card-body">
     {% include 'inventario/_kpi_tarjetas.html' with indicadores=operativos columnas='row-cols-xl-3' %}
+  </div>
+</div>
+
+<div class="card mb-4" id="supervision">
+  <div class="card-header">
+    <i class="bi bi-person-check me-2"></i>Supervisión humana (SLA)
+    <span class="badge bg-secondary ms-2">{{ sla_cumplidos }} de {{ sla_medidos }} cumplen la meta</span>
+  </div>
+  <div class="card-body">
+    {% include 'inventario/_kpi_tarjetas.html' with indicadores=sla columnas='row-cols-xl-4' %}
+  </div>
+</div>
+
+<div class="card mb-4" id="calidad-ia">
+  <div class="card-header">
+    <i class="bi bi-stars me-2"></i>Calidad de la IA y adopción
+    <span class="badge bg-secondary ms-2">{{ calidad_ia_cumplidos }} de {{ calidad_ia_medidos }} cumplen la meta</span>
+  </div>
+  <div class="card-body">
+    {% include 'inventario/_kpi_tarjetas.html' with indicadores=calidad_ia columnas='row-cols-xl-4' %}
+  </div>
+</div>
+
+<div class="card mb-4" id="brechas">
+  <div class="card-header">
+    <i class="bi bi-binoculars me-2"></i>Brechas de la búsqueda
+    {% if brechas %}<span class="badge bg-secondary ms-2">{{ brechas|length }}</span>{% endif %}
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive tabla-scroll">
+      <table class="table table-hover align-middle mb-0">
+        <thead>
+          <tr>
+            <th>Consulta</th>
+            <th>Veces</th>
+            <th>Sin resultados</th>
+            <th>No útil</th>
+            <th>Última</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for b in brechas %}
+          <tr>
+            <td>{{ b.texto }}</td>
+            <td>{{ b.veces }}</td>
+            <td>{{ b.sin_resultados }}</td>
+            <td>{{ b.no_utiles }}</td>
+            <td style="white-space: nowrap;">{{ b.ultima|date:"d/m/Y H:i" }}</td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="5" class="text-center text-muted py-4">
+              <i class="bi bi-check-circle fs-3 d-block mb-2 text-success"></i>Ninguna.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="card mb-4" id="evaluacion-busqueda">
+  <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+    <span><i class="bi bi-search me-2"></i>Evaluación de la búsqueda</span>
+    {% if puede_evaluar %}
+    <form method="post" action="{% url 'evaluar_busqueda' %}" class="m-0">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-sm btn-outline-dark"><i class="bi bi-play-fill me-1"></i>Evaluar ahora</button>
+    </form>
+    {% endif %}
+  </div>
+  <div class="card-body">
+    {% include 'inventario/_kpi_tarjetas.html' with indicadores=evaluacion_indicadores columnas='row-cols-xl-3' %}
+    {% if evaluacion.fallos %}
+    <div class="table-responsive tabla-scroll mt-3">
+      <table class="table table-sm align-middle mb-0">
+        <thead>
+          <tr>
+            <th>Consulta sin acierto</th>
+            <th>Esperado</th>
+            <th>Resultados obtenidos</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for f in evaluacion.fallos %}
+          <tr>
+            <td>{{ f.consulta }}</td>
+            <td>{{ f.esperado|join:", " }}</td>
+            <td class="text-muted small">{{ f.obtenidos|join:", "|default:"Sin resultados" }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
   </div>
 </div>
 
