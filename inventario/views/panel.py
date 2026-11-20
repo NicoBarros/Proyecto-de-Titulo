@@ -8,8 +8,8 @@ from django.db.models import Count, Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
-from .. import servicios
-from ..models import Equipo, Movimiento, Usuario
+from .. import privacidad, servicios
+from ..models import Equipo, Movimiento, SolicitudDerecho, Usuario
 from ..seguridad import registrar_cambio_cuenta
 
 ACCIONES_SOBRE_CUENTAS = ('cambiar_rol', 'toggle_activo', 'desbloquear', 'reset_password')
@@ -128,6 +128,22 @@ ACCIONES_CUENTA = {
 }
 
 
+def _resolver_derecho(request):
+    if not request.user.is_superuser:
+        raise ValueError('Solo un superusuario puede resolver solicitudes de derechos.')
+    decision = request.POST.get('decision')
+    if decision not in ('aceptar', 'rechazar'):
+        raise ValueError('Decisión no válida.')
+    solicitud = privacidad.resolver_solicitud_derecho(
+        request.POST.get('derecho_id'), request.user, decision == 'aceptar', request.POST.get('respuesta'),
+    )
+    registrar_cambio_cuenta(
+        request, solicitud.usuario or request.user,
+        f'solicitud de {solicitud.get_tipo_display().lower()} {solicitud.get_estado_display().lower()}',
+    )
+    return f'Solicitud de {solicitud.get_tipo_display().lower()} {solicitud.get_estado_display().lower()}.'
+
+
 def _procesar(request):
     accion = request.POST.get('accion')
     for campo in ('user_id', 'equipo_id'):
@@ -138,6 +154,8 @@ def _procesar(request):
         return _crear_usuario(request)
     if accion == 'cambiar_estado_equipo':
         return _cambiar_estado_equipo(request)
+    if accion == 'resolver_derecho':
+        return _resolver_derecho(request)
     if accion in ACCIONES_CUENTA:
         return ACCIONES_CUENTA[accion](request, get_object_or_404(Usuario, id=request.POST.get('user_id')))
     return None
@@ -211,4 +229,6 @@ def admin_panel_view(request):
         'busqueda_equipo': busqueda_equipo,
         'filtro_estado_equipo': filtro_estado_equipo,
         'ultimos_movimientos': Movimiento.objects.select_related('solicitud', 'responsable').order_by('-fecha')[:10],
+        'derechos_pendientes': SolicitudDerecho.objects.filter(estado=SolicitudDerecho.Estado.PENDIENTE)
+        .order_by('creada'),
     })

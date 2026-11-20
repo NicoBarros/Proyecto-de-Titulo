@@ -1,0 +1,80 @@
+{% extends 'inventario/base.html' %}
+
+{% block content %}
+<div class="card mb-4">
+  <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+    <span><i class="bi bi-person-vcard me-2"></i>Mis datos</span>
+    <a href="{% url 'descargar_mis_datos' %}" class="btn btn-sm btn-success">
+      <i class="bi bi-download me-1"></i>Descargar mis datos
+    </a>
+  </div>
+  <div class="card-body">
+    <div class="row g-4">
+      <div class="col-12 col-lg-6">
+        <dl class="row mb-0 small">
+          <dt class="col-5 text-muted fw-semibold">Nombre</dt><dd class="col-7">{{ user.get_full_name|default:"—" }}</dd>
+          <dt class="col-5 text-muted fw-semibold">Correo</dt><dd class="col-7">{{ user.email }}</dd>
+          <dt class="col-5 text-muted fw-semibold">Rol</dt><dd class="col-7">{{ user.get_rol_display }}</dd>
+          <dt class="col-5 text-muted fw-semibold">Sección</dt><dd class="col-7">{{ user.seccion|default:"—" }}</dd>
+          <dt class="col-5 text-muted fw-semibold">Registro</dt><dd class="col-7">{{ user.date_joined|date:"d/m/Y" }}</dd>
+          <dt class="col-5 text-muted fw-semibold">Último acceso</dt><dd class="col-7">{{ user.last_login|date:"d/m/Y H:i"|default:"—" }}</dd>
+        </dl>
+      </div>
+      <div class="col-12 col-lg-6">
+        <div class="row row-cols-2 g-3">
+          <div class="col"><div class="kpi-tarjeta h-100"><span class="kpi-nombre">Solicitudes</span><div class="kpi-valor">{{ resumen.solicitudes }}</div></div></div>
+          <div class="col"><div class="kpi-tarjeta h-100"><span class="kpi-nombre">Bloqueos</span><div class="kpi-valor">{{ resumen.bloqueos }}</div></div></div>
+          <div class="col"><div class="kpi-tarjeta h-100"><span class="kpi-nombre">Búsquedas</span><div class="kpi-valor">{{ resumen.busquedas }}</div></div></div>
+          <div class="col"><div class="kpi-tarjeta h-100"><span class="kpi-nombre">Eventos de seguridad</span><div class="kpi-valor">{{ resumen.eventos }}</div></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card mb-4" id="derechos">
+  <div class="card-header">
+    <i class="bi bi-shield-check me-2"></i>Solicitar un derecho
+  </div>
+  <div class="card-body">
+    <form method="post" class="row g-3">
+      {% csrf_token %}
+      <div class="col-12 col-md-4">
+        <label for="tipo-derecho" class="form-label fw-semibold small">Derecho *</label>
+        <select name="tipo" id="tipo-derecho" class="form-select" required>
+          {% for valor, etiqueta in tipos_derecho %}<option value="{{ valor }}">{{ etiqueta }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="col-12 col-md-8">
+        <label for="detalle-derecho" class="form-label fw-semibold small">Detalle *</label>
+        <textarea name="detalle" id="detalle-derecho" class="form-control" rows="2" maxlength="2000" required></textarea>
+      </div>
+      <div class="col-12 d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <a href="{% url 'aviso_privacidad' %}" class="small">Aviso de privacidad</a>
+        <button type="submit" class="btn btn-leica btn-sm"><i class="bi bi-send me-1"></i>Enviar solicitud</button>
+      </div>
+    </form>
+  </div>
+  {% if derechos %}
+  <div class="card-body p-0 border-top">
+    <div class="table-responsive tabla-scroll">
+      <table class="table table-hover align-middle mb-0">
+        <thead>
+          <tr><th>Fecha</th><th>Derecho</th><th>Estado</th><th>Respuesta</th></tr>
+        </thead>
+        <tbody>
+          {% for d in derechos %}
+          <tr>
+            <td style="white-space: nowrap;">{{ d.creada|date:"d/m/Y" }}</td>
+            <td>{{ d.get_tipo_display }}</td>
+            <td><span class="badge derecho-{{ d.estado }}">{{ d.get_estado_display }}</span>{% if d.estado == 'pendiente' %}<br><small class="text-muted">Respuesta antes del {{ d.vence|date:"d/m/Y" }}</small>{% endif %}</td>
+            <td class="small">{{ d.respuesta|default:"—" }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

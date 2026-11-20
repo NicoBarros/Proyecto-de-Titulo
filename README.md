@@ -73,6 +73,9 @@ copy .env.example .env
 | `SESION_MINUTOS` | Minutos de inactividad antes de cerrar la sesión. Por defecto `30` |
 | `SLA_REVISION_HORAS` | Plazo para revisar una solicitud pendiente. Al vencer, las tareas programadas avisan por correo a quienes aprueban. Por defecto `24` |
 | `SLA_BAJA_DIAS` | Plazo para validar un equipo pendiente de baja. Por defecto `5` |
+| `PRIVACIDAD_CONTACTO` | Correo de contacto del responsable que muestra el aviso de privacidad. Opcional |
+| `PLAZO_DERECHOS_DIAS` | Plazo para responder solicitudes de derechos sobre datos personales. Por defecto `30` |
+| `RETENCION_BUSQUEDAS_DIAS` / `RETENCION_EVENTOS_DIAS` | Días que las búsquedas quedan asociadas a su autor y que se conservan los eventos de seguridad. Por defecto `365` |
 | `EVALUACION_BUSQUEDA_DIAS` | Cada cuántos días las tareas programadas evalúan la búsqueda con las consultas de referencia. `0` la desactiva. Por defecto `30` |
 | `IA_CONSULTAS_POR_HORA` | Respuestas generadas con Gemini por usuario y hora; al superarlas solo se muestran los equipos recuperados. Por defecto `20` |
 | `URL_SITIO` | URL pública usada en los correos y en los códigos QR. En Azure se toma de `WEBSITE_HOSTNAME` |
@@ -203,6 +206,21 @@ con tres hojas con formato: **Resumen** (equipos por estado, valor total e insum
 En Reportes, "Exportar Excel" descarga `reportes_leica_AAAAMMDD.xlsx` con los indicadores del período
 elegido, los equipos más solicitados, los préstamos vencidos, los equipos sin movimiento, las brechas de
 la búsqueda y el detalle de la última evaluación de la búsqueda.
+
+## Datos personales (Ley N.° 21.719)
+
+- **Aviso de privacidad** (`/privacidad/`), enlazado en el inicio de sesión y en el pie de página: datos,
+  finalidad, base de licitud, conservación, proveedores, seguridad y derechos.
+- **Mis datos** (ícono de tarjeta en la barra superior): perfil, resumen de lo registrado y descarga de
+  todos los datos personales en JSON (acceso y portabilidad).
+- **Solicitudes de derechos:** rectificación, supresión, oposición y bloqueo se piden desde Mis datos,
+  llegan por correo a los superusuarios y se resuelven en el panel de administración con una respuesta
+  al titular. Aceptar una supresión anonimiza la cuenta conservando los préstamos sin datos
+  identificables; aceptar un bloqueo suspende la cuenta.
+- **Conservación limitada:** las tareas programadas desvinculan las búsquedas antiguas de su autor y
+  eliminan los eventos de seguridad vencidos.
+
+El registro de actividades de tratamiento y el cifrado en reposo están en [docs/privacidad.md](docs/privacidad.md).
 
 ## Supervisión humana y calidad de la IA
 
@@ -357,6 +375,7 @@ inventario/
   static/             CSS, JavaScript e imágenes
   migrations/         Migraciones de la base de datos
   rag.py              Recuperación híbrida, generación con Gemini y verificación de citas
+  privacidad.py       Exportación de datos personales, solicitudes de derechos, anonimización y conservación
   evaluacion_busqueda.py Evaluación mensual de la búsqueda con las consultas de referencia
   datos/              Consultas de referencia de la evaluación
   management/commands/ seed, respaldar, restaurar, marcar_atrasadas, tareas_programadas, crear_admin,
@@ -364,6 +383,7 @@ inventario/
   tests/              Suite de tests
 azure/                Script de infraestructura
 docs/respaldos.md     Política y procedimientos de respaldo
+docs/privacidad.md    Registro de tratamiento de datos personales (Ley N.° 21.719)
 ```
 
 Hubo un prototipo anterior en Node/Express. Ya no forma parte del proyecto y se conserva en la

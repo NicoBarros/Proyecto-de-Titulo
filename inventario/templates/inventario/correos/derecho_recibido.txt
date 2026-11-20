@@ -1,0 +1,11 @@
+{% autoescape off %}Hola:
+
+{{ solicitud.identificador }} solicitó la {{ solicitud.get_tipo_display|lower }} de sus datos personales el {{ solicitud.creada|date:"d/m/Y H:i" }}. Debe responderse a más tardar el {{ solicitud.vence|date:"d/m/Y" }}.
+
+Detalle:
+{{ solicitud.detalle }}
+
+{{ url }}
+
+Laboratorio LEICA · INACAP Sede Valdivia
+{% endautoescape %}

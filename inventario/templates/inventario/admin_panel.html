@@ -2,6 +2,52 @@
 {% load static %}
 
 {% block content %}
+{% if derechos_pendientes %}
+<div class="card mb-4" id="derechos">
+  <div class="card-header">
+    <i class="bi bi-shield-check me-2"></i>Solicitudes de derechos sobre datos personales
+    <span class="badge bg-secondary ms-2">{{ derechos_pendientes|length }}</span>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table align-middle mb-0">
+        <thead>
+          <tr><th>Titular</th><th>Derecho</th><th>Detalle</th><th>Vence</th><th>Respuesta</th></tr>
+        </thead>
+        <tbody>
+          {% for d in derechos_pendientes %}
+          <tr>
+            <td>{{ d.identificador }}</td>
+            <td>{{ d.get_tipo_display }}</td>
+            <td class="small">{{ d.detalle }}</td>
+            <td style="white-space: nowrap;"><span class="{% if d.vencida %}text-danger fw-semibold{% endif %}">{{ d.vence|date:"d/m/Y" }}</span></td>
+            <td style="min-width: 18rem;">
+              {% if user.is_superuser %}
+              <form method="post" class="d-flex flex-column gap-2">
+                {% csrf_token %}
+                <input type="hidden" name="accion" value="resolver_derecho">
+                <input type="hidden" name="derecho_id" value="{{ d.id }}">
+                <textarea name="respuesta" class="form-control form-control-sm" rows="2" maxlength="2000" required aria-label="Respuesta al titular"></textarea>
+                <div class="btn-group btn-group-sm align-self-end">
+                  <button type="{% if d.tipo == 'supresion' or d.tipo == 'bloqueo' %}button{% else %}submit{% endif %}" name="decision" value="aceptar" class="btn btn-success"
+                    {% if d.tipo == 'supresion' %}data-confirm="Se anonimizarán los datos de {{ d.identificador }} y se cerrará su cuenta. Esta acción no se puede deshacer." data-confirm-title="Suprimir datos" data-confirm-btn="Anonimizar"{% elif d.tipo == 'bloqueo' %}data-confirm="Se suspenderá la cuenta de {{ d.identificador }}." data-confirm-title="Bloquear tratamiento" data-confirm-btn="Suspender"{% endif %}>
+                    <i class="bi bi-check-lg me-1"></i>Aceptar
+                  </button>
+                  <button type="submit" name="decision" value="rechazar" class="btn btn-outline-danger"><i class="bi bi-x-lg me-1"></i>Rechazar</button>
+                </div>
+              </form>
+              {% else %}
+              <span class="text-muted small">Pendiente de un superusuario</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endif %}
 <div class="card mb-4">
   <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
     <span><i class="bi bi-shield-lock-fill me-2"></i>Panel de Administración Integrado · LEICA</span>

@@ -532,3 +532,50 @@ class EvaluacionBusqueda(models.Model):
     @property
     def fallos(self):
         return [d for d in self.detalle if not d.get('posicion')]
+
+
+class SolicitudDerecho(models.Model):
+
+    class Tipo(models.TextChoices):
+        RECTIFICACION = 'rectificacion', 'Rectificación'
+        SUPRESION = 'supresion', 'Supresión'
+        OPOSICION = 'oposicion', 'Oposición'
+        BLOQUEO = 'bloqueo', 'Bloqueo del tratamiento'
+
+    class Estado(models.TextChoices):
+        PENDIENTE = 'pendiente', 'Pendiente'
+        ACEPTADA = 'aceptada', 'Aceptada'
+        RECHAZADA = 'rechazada', 'Rechazada'
+
+    usuario = models.ForeignKey(
+        Usuario, on_delete=models.SET_NULL, blank=True, null=True, related_name='solicitudes_derechos',
+    )
+    identificador = models.CharField(max_length=254)
+    tipo = models.CharField(max_length=20, choices=Tipo.choices)
+    detalle = models.TextField()
+    estado = models.CharField(max_length=20, choices=Estado.choices, default=Estado.PENDIENTE, db_index=True)
+    respuesta = models.TextField(blank=True, default='')
+    creada = models.DateTimeField(auto_now_add=True)
+    resuelta_en = models.DateTimeField(blank=True, null=True)
+    resuelta_por = models.ForeignKey(
+        Usuario, on_delete=models.SET_NULL, blank=True, null=True, related_name='+',
+    )
+
+    class Meta:
+        verbose_name = 'Solicitud de derechos'
+        verbose_name_plural = 'Solicitudes de derechos'
+        ordering = ['-creada', '-id']
+
+    def __str__(self):
+        return f'{self.get_tipo_display()} — {self.identificador} ({self.get_estado_display()})'
+
+    @property
+    def vence(self):
+        from datetime import timedelta
+
+        from django.conf import settings
+        return self.creada + timedelta(days=settings.PLAZO_DERECHOS_DIAS)
+
+    @property
+    def vencida(self):
+        return self.estado == self.Estado.PENDIENTE and timezone.now() > self.vence

@@ -15,6 +15,7 @@ from .models import (
     Migracion,
     Movimiento,
     Solicitud,
+    SolicitudDerecho,
     SolicitudItem,
     Usuario,
 )
@@ -165,3 +166,10 @@ class EventoSeguridadAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+
+@admin.register(SolicitudDerecho)
+class SolicitudDerechoAdmin(SoloLecturaAdmin):
+    list_display = ('creada', 'identificador', 'tipo', 'estado', 'resuelta_en', 'resuelta_por')
+    list_filter = ('tipo', 'estado')
+    search_fields = ('identificador',)

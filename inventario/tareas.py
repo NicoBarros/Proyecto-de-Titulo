@@ -4,7 +4,7 @@ from datetime import timedelta
 from django.conf import settings
 from django.utils import timezone
 
-from . import busqueda_semantica, evaluacion_busqueda, notificaciones, respaldos, servicios
+from . import busqueda_semantica, evaluacion_busqueda, notificaciones, privacidad, respaldos, servicios
 from .models import Equipo, Solicitud
 
 logger = logging.getLogger(__name__)
@@ -63,6 +63,7 @@ def ejecutar():
         'atrasadas_marcadas': marcadas, 'recordatorios_enviados': recordatorios, 'avisos_atraso_enviados': atrasos,
         'pendientes_baja_marcados': pendientes_baja,
         'revisiones_escaladas': _escalar_revisiones(),
+        'datos_depurados': privacidad.depurar_datos_antiguos(),
         'vectores_actualizados': _indexar_busqueda(),
         'respaldo': respaldos.respaldo_automatico(),
         'evaluacion_busqueda': evaluacion_busqueda.evaluacion_mensual(),

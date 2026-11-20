@@ -1,0 +1,55 @@
+<div class="card aviso-privacidad mx-auto">
+  <div class="card-header">
+    <i class="bi bi-shield-check me-2"></i>Aviso de privacidad
+  </div>
+  <div class="card-body">
+    <p>El Laboratorio LEICA de INACAP Sede Valdivia trata los datos personales de quienes usan este sistema conforme a la Ley N.° 19.628, modificada por la Ley N.° 21.719 sobre protección de datos personales.{% if contacto %} Contacto del responsable: <a href="mailto:{{ contacto }}">{{ contacto }}</a>.{% endif %}</p>
+
+    <h2 class="h6 fw-bold mt-4">Datos, finalidad y conservación</h2>
+    <div class="table-responsive">
+      <table class="table table-sm align-middle">
+        <thead>
+          <tr><th>Datos</th><th>Finalidad</th><th>Conservación</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Nombre, correo institucional, rol y sección</td>
+            <td>Identificarte, asignar permisos y aplicar sanciones por sección</td>
+            <td>Mientras la cuenta esté vigente</td>
+          </tr>
+          <tr>
+            <td>Solicitudes, préstamos, devoluciones y bloqueos</td>
+            <td>Gestionar préstamos y mantener la trazabilidad del inventario para auditorías</td>
+            <td>Mientras exista el registro; al suprimir la cuenta se anonimizan</td>
+          </tr>
+          <tr>
+            <td>Búsquedas y calificaciones</td>
+            <td>Responder la búsqueda y medir su calidad</td>
+            <td>Asociadas a ti por {{ retencion_busquedas }} días; después se conservan sin identificarte</td>
+          </tr>
+          <tr>
+            <td>Inicios de sesión, IP y navegador</td>
+            <td>Proteger las cuentas y detectar accesos indebidos</td>
+            <td>{{ retencion_eventos }} días</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h2 class="h6 fw-bold mt-4">Base de licitud</h2>
+    <p>El tratamiento se basa en tu relación académica o laboral con INACAP y en el uso de los recursos del laboratorio. Los datos no se usan con otros fines, no se venden ni se ceden a terceros.</p>
+
+    <h2 class="h6 fw-bold mt-4">Proveedores</h2>
+    <ul>
+      <li>El sistema y su base de datos se alojan en la infraestructura de INACAP o en Microsoft Azure.</li>
+      <li>La búsqueda en lenguaje natural envía a Google Gemini solo el texto de la búsqueda y datos del catálogo de equipos, nunca tu nombre, correo ni historial. No escribas datos personales en la búsqueda.</li>
+      <li>Los correos de aviso se envían por el servidor de correo institucional.</li>
+    </ul>
+
+    <h2 class="h6 fw-bold mt-4">Seguridad</h2>
+    <p>Conexión cifrada (HTTPS), contraseñas almacenadas con hash, acceso según rol, registro de eventos de seguridad, almacenamiento cifrado y respaldos verificados.</p>
+
+    <h2 class="h6 fw-bold mt-4">Tus derechos</h2>
+    <p class="mb-0">Puedes ejercer los derechos de acceso, rectificación, supresión, oposición, portabilidad y bloqueo. El acceso y la portabilidad son inmediatos desde <a href="{% url 'mis_datos' %}">Mis datos</a>, donde también puedes solicitar los demás. Respondemos dentro de {{ plazo_derechos }} días. Si no quedas conforme, puedes reclamar ante la Agencia de Protección de Datos Personales.</p>
+  </div>
+</div>

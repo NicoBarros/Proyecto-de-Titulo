@@ -40,6 +40,38 @@ def notificar(tipo, solicitud):
     transaction.on_commit(lambda: enviar(tipo, solicitud))
 
 
+def _correo(asunto, plantilla, contexto, destinatarios, error):
+    if not destinatarios:
+        return True
+    try:
+        send_mail(asunto, render_to_string(plantilla, contexto), None, destinatarios)
+    except Exception:
+        logger.exception(error)
+        return False
+    return True
+
+
+def enviar_solicitud_derecho(solicitud):
+    destinatarios = sorted(
+        Usuario.objects.filter(is_superuser=True, is_active=True).exclude(email='').values_list('email', flat=True)
+    )
+    contexto = {'solicitud': solicitud, 'url': f"{settings.URL_SITIO}{reverse('admin_panel')}#derechos"}
+    return _correo(
+        f'Solicitud de {solicitud.get_tipo_display().lower()} de datos personales',
+        'inventario/correos/derecho_recibido.txt', contexto, destinatarios,
+        'No se pudo avisar de la solicitud de derechos',
+    )
+
+
+def enviar_respuesta_derecho(solicitud, correo):
+    contexto = {'solicitud': solicitud, 'url': f"{settings.URL_SITIO}{reverse('mis_datos')}"}
+    return _correo(
+        f'Respuesta a tu solicitud de {solicitud.get_tipo_display().lower()}',
+        'inventario/correos/derecho_resuelto.txt', contexto, [correo],
+        'No se pudo enviar la respuesta de la solicitud de derechos',
+    )
+
+
 def enviar_revisiones_vencidas(solicitudes):
     destinatarios = sorted(
         Usuario.objects.filter(rol__in=Usuario.ROLES_APROBADORES, is_active=True)

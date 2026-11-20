@@ -954,3 +954,23 @@ small.representacion {
   background: var(--leica-red-dark);
   color: #fff;
 }
+
+.aviso-privacidad {
+  max-width: 860px;
+  line-height: 1.6;
+}
+
+.badge.derecho-pendiente {
+  background: #FEF3C7;
+  color: #92400E;
+}
+
+.badge.derecho-aceptada {
+  background: #E3F6E3;
+  color: #1E6B1E;
+}
+
+.badge.derecho-rechazada {
+  background: #FEE2E2;
+  color: #B91C1C;
+}

@@ -16,14 +16,15 @@ from .inventario import (
 )
 from .mantenimiento import mantenimiento_view
 from .panel import admin_panel_view
+from .privacidad import aviso_privacidad, descargar_mis_datos, mis_datos
 from .reportes import evaluar_busqueda, exportar_reportes, reportes_view
 from .solicitudes import solicitudes_view
 from .tareas import tareas_view
 
 __all__ = [
-    'CambiarContrasenaView', 'admin_panel_view', 'busqueda_view', 'calificar_busqueda', 'dashboard_view',
-    'editar_equipo', 'editar_insumo', 'eliminar_equipo', 'eliminar_insumo', 'evaluar_busqueda',
-    'exportar_inventario', 'exportar_reportes', 'ficha_equipo', 'generar_respuesta', 'historial_equipo',
-    'importar_inventario_view', 'inventario_view', 'mantenimiento_view', 'plantilla_importacion', 'qr_equipo',
-    'reportes_view', 'solicitudes_view', 'tareas_view',
+    'CambiarContrasenaView', 'admin_panel_view', 'aviso_privacidad', 'busqueda_view', 'calificar_busqueda',
+    'dashboard_view', 'descargar_mis_datos', 'editar_equipo', 'editar_insumo', 'eliminar_equipo',
+    'eliminar_insumo', 'evaluar_busqueda', 'exportar_inventario', 'exportar_reportes', 'ficha_equipo',
+    'generar_respuesta', 'historial_equipo', 'importar_inventario_view', 'inventario_view', 'mantenimiento_view',
+    'mis_datos', 'plantilla_importacion', 'qr_equipo', 'reportes_view', 'solicitudes_view', 'tareas_view',
 ]
