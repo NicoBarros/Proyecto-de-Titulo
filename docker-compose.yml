@@ -1,0 +1,48 @@
+# docker-compose.yml — LEICA Inventario
+# Levanta la app Django + PostgreSQL con un solo comando.
+#
+# Uso:
+#   docker compose up -d          → levantar todo en segundo plano
+#   docker compose logs -f web    → ver logs de la app
+#   docker compose down           → detener todo
+#   docker compose down -v        → detener y BORRAR datos de la BD
+
+services:
+
+  # ── Base de datos PostgreSQL ───────────────────────────────
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: leica_inventario
+      POSTGRES_USER: leica
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-leica_segura_2024}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"                # Quitar en producción
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U leica -d leica_inventario"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ── Aplicación Django (Gunicorn) ───────────────────────────
+  web:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env.docker                # Variables de entorno para Docker
+    volumes:
+      - app_respaldos:/app/respaldos
+      - app_modelos:/app/modelos
+
+volumes:
+  postgres_data:                   # Datos persistentes de PostgreSQL
+  app_respaldos:                   # Respaldos de la BD
+  app_modelos:                     # Modelos de ML (fastembed)

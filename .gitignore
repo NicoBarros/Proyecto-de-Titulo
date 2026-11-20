@@ -1,5 +1,6 @@
 # Entorno y secretos
 .env
+.env.docker
 venv/
 
 # Python

@@ -1,0 +1,29 @@
+# Archivos que NO deben entrar a la imagen Docker
+.git
+.github
+.ruff_cache
+.coverage
+htmlcov/
+venv/
+__pycache__
+*.pyc
+*.log
+db.sqlite3
+
+# Secretos (se pasan como env_file, no se copian a la imagen)
+.env
+.env.docker
+
+# Archivos generados en el despliegue
+staticfiles/
+
+# Datos locales (se montan como volúmenes)
+respaldos/
+modelos/
+
+# Documentación y config de desarrollo
+docs/
+azure/
+*.md
+requirements-dev.txt
+pyproject.toml
