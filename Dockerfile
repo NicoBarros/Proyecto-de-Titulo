@@ -15,9 +15,9 @@ RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
 # ── Etapa 2: Runtime ────────────────────────────────────────
 FROM python:3.14-slim
 
-# Dependencia de runtime para psycopg2 y pg_dump (respaldos)
+# Dependencia de runtime para psycopg2, pg_dump (respaldos) y ONNX (fastembed)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        libpq5 postgresql-client \
+        libpq5 postgresql-client libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
 # Copiar paquetes instalados desde el builder
@@ -34,8 +34,8 @@ COPY . .
 RUN mkdir -p staticfiles respaldos modelos \
     && chown -R appuser:appuser /app
 
-# Dar permisos de ejecución al script de arranque
-RUN chmod +x startup.sh
+# Convertir finales de línea Windows→Linux y dar permisos
+RUN sed -i 's/\r$//' startup.sh && chmod +x startup.sh
 
 # Cambiar a usuario no-root
 USER appuser

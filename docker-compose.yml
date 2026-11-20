@@ -16,11 +16,11 @@ services:
     environment:
       POSTGRES_DB: leica_inventario
       POSTGRES_USER: leica
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-leica_segura_2024}
+      POSTGRES_PASSWORD: leica_segura_2024
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
-      - "5432:5432"                # Quitar en producción
+      - "5433:5432"                # Puerto 5433 para evitar conflicto con PostgreSQL local
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U leica -d leica_inventario"]
       interval: 5s
