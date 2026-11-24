@@ -147,8 +147,9 @@
             <td>
               <span class="badge {{ s.estado }}">{{ s.get_estado_display }}</span>
               {% if s.estado == 'rechazada' and s.motivo_rechazo %}<br><small class="text-muted motivo-rechazo">{{ s.motivo_rechazo }}</small>{% endif %}
-              {% if s.estado == 'atrasada' %}<br><small class="vencida">Vencida hace {{ s.horario_fin|timesince:ahora
-                }}</small>{% endif %}
+              {% if s.estado == 'atrasada' %}<br><small class="vencida">Vencida hace {{ s.horario_fin|timesince:ahora}}
+              </small>
+              {% endif %}
             </td>
             <td>
               {% if puede_aprobar %}

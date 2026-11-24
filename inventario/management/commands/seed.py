@@ -392,6 +392,14 @@ class Command(BaseCommand):
             )
             self.stdout.write(self.style.SUCCESS('  ✓ Creada solicitud de derecho de datos personales (Ley 21.719)'))
 
+        # ── 10. Indexación de Vectores de Búsqueda ──────────────────────────────────
+        from inventario import busqueda_semantica
+        try:
+            _, actualizados = busqueda_semantica.indexar(Equipo.objects.all())
+            self.stdout.write(self.style.SUCCESS(f'  ✓ Vectores de búsqueda semántica indexados ({actualizados} nuevos)'))
+        except Exception as err:
+            self.stdout.write(self.style.WARNING(f'  ⚠ Búsqueda semántica no indexada: {err}'))
+
         self.stdout.write(self.style.SUCCESS('\n========================================================'))
         self.stdout.write(self.style.SUCCESS('  Base de datos poblada exitosamente (Seed enriquecido).'))
         self.stdout.write(self.style.SUCCESS('========================================================\n'))

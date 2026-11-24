@@ -276,6 +276,13 @@ def _devolver(solicitud, equipos, items, usuario, datos):
             destino = (Equipo.Estado.EN_MANTENIMIENTO if estado in SolicitudItem.ESTADOS_CON_FALLA
                        else Equipo.Estado.DISPONIBLE)
             cambiar_estado_equipo(equipo, usuario, destino, f'Devolución de la solicitud #{solicitud.id} (estado: {estado})')
+            if estado in SolicitudItem.ESTADOS_CON_FALLA:
+                Mantenimiento.objects.create(
+                    equipo=equipo,
+                    falla_descrita=f'Devuelto en estado {estado} en la solicitud #{solicitud.id}. Pendiente de revisión técnica.',
+                    decision=Mantenimiento.Decision.PENDIENTE,
+                    reportado_por=usuario,
+                )
     for item in items:
         if item.insumo_id and item.insumo.tipo == Insumo.Tipo.RENOVABLE:
             Insumo.objects.filter(id=item.insumo_id).update(

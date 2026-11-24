@@ -11,7 +11,7 @@ from django.contrib.messages import get_messages
 from django.core.management import call_command
 from django.utils import timezone
 
-from inventario.models import Bloqueo, Equipo, Insumo, Movimiento, Solicitud, Usuario
+from inventario.models import Bloqueo, Equipo, Insumo, Mantenimiento, Movimiento, Solicitud, Usuario
 
 from .base import LeicaTestCase
 
@@ -194,6 +194,9 @@ class EntregaDevolucionTests(LeicaTestCase):
         self.equipo.refresh_from_db()
         self.assertEqual(self.equipo.estado, Equipo.Estado.EN_MANTENIMIENTO)
         self.assertEqual(Movimiento.objects.get(tipo='devolucion').estado_equipo, 'dañado')
+        mant = Mantenimiento.objects.get(equipo=self.equipo)
+        self.assertEqual(mant.decision, Mantenimiento.Decision.PENDIENTE)
+        self.assertIn('Devuelto en estado dañado', mant.falla_descrita)
 
     def test_devolucion_atrasada_bloquea_7_dias(self):
         inicio = timezone.now() - timedelta(days=2)

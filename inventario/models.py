@@ -302,7 +302,7 @@ class Mantenimiento(models.Model):
     class Decision(models.TextChoices):
         REPARAR = 'reparar', 'Reparar'
         DAR_BAJA = 'dar_baja', 'Dar de baja'
-        PENDIENTE = 'pendiente', 'Pendiente'
+        PENDIENTE = 'pendiente', 'Pendiente de revisión'
         COMPLETADO = 'completado', 'Reparación completada'
 
     equipo = models.ForeignKey(
