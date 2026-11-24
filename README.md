@@ -19,6 +19,51 @@ respuesta redactada por Google Gemini).
 | IA | RAG híbrido: recuperación densa con EmbeddingGemma (`fastembed`, ONNX Runtime, solo CPU) y léxica con BM25, fusionadas con RRF; generación con Google Gemini (`google-genai`) |
 | Producción | Gunicorn + WhiteNoise para archivos estáticos |
 
+## Despliegue con Docker (Recomendado)
+
+Requisitos: [Docker Desktop](https://www.docker.com/products/docker-desktop/) instalado y en ejecución.
+
+Permite levantar la plataforma completa (aplicación Django, base de datos PostgreSQL y servidor de correos Mailpit) con un solo comando:
+
+**1. Configurar variables de entorno**
+
+Copia la plantilla `.env.docker.example` como `.env.docker`:
+
+```powershell
+copy .env.docker.example .env.docker
+```
+
+Configura tu `SECRET_KEY`, `GEMINI_API_KEY` (opcional, para respuestas redactadas con IA) y las credenciales deseadas para el administrador inicial (`ADMIN_EMAIL` y `ADMIN_PASSWORD`).
+
+**2. Construir y levantar los contenedores**
+
+```powershell
+docker compose up -d --build
+```
+
+Esto inicia tres servicios:
+- **`web`**: Aplicación Django (Gunicorn + WhiteNoise) en [http://localhost:8000](http://localhost:8000).
+- **`db`**: Base de datos PostgreSQL 17 (datos persistentes en el volumen `postgres_data`).
+- **`mailpit`**: Servidor de correo de pruebas con bandeja visual en [http://localhost:8025](http://localhost:8025).
+
+**3. Poblar datos iniciales y de prueba (Seed enriquecido)**
+
+Para cargar usuarios de prueba, inventario, solicitudes con historial, mantenimientos y métricas de KPIs:
+
+```powershell
+docker compose exec web python manage.py seed
+```
+
+**4. Comandos útiles**
+
+```powershell
+docker compose logs -f web                                  # Ver logs en vivo de la aplicación
+docker compose exec web python manage.py tareas_programadas # Ejecutar manualmente tareas de SLA y atrasos
+docker compose exec web bash                                # Abrir terminal dentro del contenedor
+docker compose down                                         # Detener los contenedores sin borrar datos
+docker compose down -v                                      # Detener y reiniciar la base de datos desde cero
+```
+
 ## Instalación local
 
 Requisitos: Python 3.14 y PostgreSQL instalados. Los comandos son para PowerShell en Windows.
