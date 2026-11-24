@@ -11,8 +11,15 @@
       <div class="card-body p-4">
         <h5 class="card-title fw-bold text-dark mb-3">{{ insumo.nombre }}</h5>
 
+        {% if conflicto %}
+        <div class="alert alert-warning d-flex flex-wrap justify-content-between align-items-center gap-2 conflicto-edicion" role="alert">
+          <span><i class="bi bi-exclamation-triangle-fill me-1"></i>Otro usuario modificó este insumo mientras lo editabas.</span>
+          <a href="{% url 'editar_insumo' insumo.id %}" class="btn btn-sm btn-outline-dark"><i class="bi bi-arrow-clockwise me-1"></i>Recargar</a>
+        </div>
+        {% endif %}
         <form method="post">
           {% csrf_token %}
+          <input type="hidden" name="version" value="{{ insumo.version }}">
           <div class="mb-3">
             <label class="form-label fw-semibold small">Nombre del Insumo *</label>
             <input type="text" name="nombre" class="form-control" value="{{ form.nombre.value }}" required>

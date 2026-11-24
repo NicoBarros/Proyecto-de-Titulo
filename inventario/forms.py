@@ -1,4 +1,5 @@
 from django import forms
+from django.utils import timezone
 
 from .models import Equipo, Insumo
 
@@ -6,7 +7,13 @@ from .models import Equipo, Insumo
 class EquipoForm(forms.ModelForm):
     class Meta:
         model = Equipo
-        fields = ['codigo_inventario', 'nombre', 'modelo', 'especificaciones', 'ubicacion', 'valor_adquisicion']
+        fields = ['codigo_inventario', 'nombre', 'modelo', 'especificaciones', 'ubicacion', 'valor_adquisicion', 'fecha_adquisicion']
+
+    def clean_fecha_adquisicion(self):
+        fecha = self.cleaned_data.get('fecha_adquisicion')
+        if fecha and fecha > timezone.localdate():
+            raise forms.ValidationError('La fecha de adquisición no puede ser futura.')
+        return fecha
 
 
 class InsumoForm(forms.ModelForm):

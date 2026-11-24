@@ -17,7 +17,9 @@
           <div class="row g-2 align-items-end">
             <div class="col-md-8">
               <label class="form-label fw-semibold small">Ítem</label>
-              <select name="item[]" class="form-select form-select-sm item-select">
+              <div class="input-group input-group-sm filtro-grupo">
+              <input type="search" class="form-control filtro-opciones" placeholder="Filtrar…" aria-label="Filtrar ítems">
+              <select name="item[]" class="form-select form-select-sm item-select" aria-label="Ítem">
                 <optgroup label="Equipos disponibles">
                   {% for e in equipos %}
                   <option value="equipo:{{ e.id }}" data-tipo="equipo" data-stock="1"{% if equipo_preseleccionado == e.id|stringformat:'s' %} selected{% endif %}>{{ e.nombre }} ({{ e.codigo_inventario }})</option>
@@ -31,6 +33,7 @@
                   {% endfor %}
                 </optgroup>
               </select>
+              </div>
             </div>
             <div class="col-9 col-md-3">
               <label class="form-label fw-semibold small">Cantidad</label>
@@ -143,6 +146,7 @@
             <td>{{ s.get_lugar_uso_display }}</td>
             <td>
               <span class="badge {{ s.estado }}">{{ s.get_estado_display }}</span>
+              {% if s.estado == 'rechazada' and s.motivo_rechazo %}<br><small class="text-muted motivo-rechazo">{{ s.motivo_rechazo }}</small>{% endif %}
               {% if s.estado == 'atrasada' %}<br><small class="vencida">Vencida hace {{ s.horario_fin|timesince:ahora
                 }}</small>{% endif %}
             </td>
@@ -157,7 +161,7 @@
                   <button type="submit" name="accion" value="aprobar" class="btn btn-success">
                     <i class="bi bi-check-lg"></i> Aprobar
                   </button>
-                  <button type="submit" name="accion" value="rechazar" class="btn btn-outline-danger">
+                  <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#rechazo-{{ s.id }}">
                     <i class="bi bi-x-lg"></i> Rechazar
                   </button>
                 </div>
@@ -166,7 +170,7 @@
                   <button type="submit" name="accion" value="entregar" class="btn btn-primary">
                     <i class="bi bi-box-arrow-right"></i> Entregar
                   </button>
-                  <button type="submit" name="accion" value="rechazar" class="btn btn-outline-danger">
+                  <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#rechazo-{{ s.id }}">
                     <i class="bi bi-x-lg"></i> Rechazar
                   </button>
                 </div>
@@ -209,6 +213,32 @@
 
 {% if puede_aprobar %}
 {% for s in solicitudes %}
+{% if s.estado == 'pendiente' or s.estado == 'aprobada' %}
+<div class="modal fade" id="rechazo-{{ s.id }}" tabindex="-1" aria-labelledby="rechazo-titulo-{{ s.id }}" aria-hidden="true">
+  <div class="modal-dialog">
+    <form method="post" action="{% url 'solicitudes' %}" class="modal-content">
+      {% csrf_token %}
+      <input type="hidden" name="solicitud_id" value="{{ s.id }}">
+      <div class="modal-header">
+        <h5 class="modal-title" id="rechazo-titulo-{{ s.id }}">
+          <i class="bi bi-x-circle me-2"></i>Rechazar solicitud #{{ s.id }}
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body">
+        <label for="motivo-rechazo-{{ s.id }}" class="form-label fw-semibold small">Motivo *</label>
+        <textarea name="motivo_rechazo" id="motivo-rechazo-{{ s.id }}" class="form-control" rows="3" maxlength="500" required></textarea>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+        <button type="submit" name="accion" value="rechazar" class="btn btn-danger btn-sm">
+          <i class="bi bi-x-lg me-1"></i>Rechazar
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endif %}
 {% if s.estado == 'entregada' or s.estado == 'atrasada' %}
 <div class="modal fade" id="devolucion-{{ s.id }}" tabindex="-1" aria-labelledby="devolucion-titulo-{{ s.id }}" aria-hidden="true">
   <div class="modal-dialog modal-dialog-scrollable">
@@ -246,7 +276,7 @@
         {% if s.estado == 'atrasada' %}
         <div class="alert alert-warning small mt-3 mb-0">
           <i class="bi bi-exclamation-triangle-fill me-1"></i>Devolución atrasada: se bloqueará a
-          {{ s.beneficiario.get_full_name|default:s.beneficiario.email }} por 7 días.
+          {{ s.beneficiario.get_full_name|default:s.beneficiario.email }}{% if s.beneficiario.rol == 'estudiante' and s.beneficiario.seccion %} y a la sección {{ s.beneficiario.seccion }}{% endif %} por 7 días.
         </div>
         {% endif %}
       </div>
@@ -265,5 +295,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{% static 'inventario/js/solicitudes.js' %}?v=2.1"></script>
+<script src="{% static 'inventario/js/solicitudes.js' %}?v=2.2"></script>
 {% endblock %}

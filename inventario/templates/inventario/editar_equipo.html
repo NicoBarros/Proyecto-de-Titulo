@@ -11,8 +11,15 @@
       <div class="card-body p-4">
         <h5 class="card-title fw-bold text-dark mb-3">{{ equipo.nombre }}</h5>
         
+        {% if conflicto %}
+        <div class="alert alert-warning d-flex flex-wrap justify-content-between align-items-center gap-2 conflicto-edicion" role="alert">
+          <span><i class="bi bi-exclamation-triangle-fill me-1"></i>Otro usuario modificó este equipo mientras lo editabas.</span>
+          <a href="{% url 'editar_equipo' equipo.id %}" class="btn btn-sm btn-outline-dark"><i class="bi bi-arrow-clockwise me-1"></i>Recargar</a>
+        </div>
+        {% endif %}
         <form method="post">
           {% csrf_token %}
+          <input type="hidden" name="version" value="{{ equipo.version }}">
           <div class="mb-3">
             <label class="form-label fw-semibold small">Código de Inventario *</label>
             <input type="text" name="codigo_inventario" class="form-control" value="{{ form.codigo_inventario.value }}" required>
@@ -35,11 +42,20 @@
             <label class="form-label fw-semibold small">Especificaciones Técnicas</label>
             <textarea name="especificaciones" class="form-control" rows="3">{{ form.especificaciones.value|default:'' }}</textarea>
           </div>
-          <div class="mb-4">
-            <label class="form-label fw-semibold small">Valor de Adquisición ($)</label>
-            <div class="input-group">
-              <span class="input-group-text">$</span>
-              <input type="number" step="0.01" name="valor_adquisicion" class="form-control" value="{{ form.valor_adquisicion.value|default:'' }}">
+          <div class="row g-2 mb-4">
+            <div class="col-md-6">
+              <label class="form-label fw-semibold small">Valor de Adquisición ($)</label>
+              <div class="input-group">
+                <span class="input-group-text">$</span>
+                <input type="number" step="0.01" name="valor_adquisicion" class="form-control" value="{{ form.valor_adquisicion.value|default:'' }}">
+              </div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold small">Fecha de Adquisición</label>
+              <input type="date" name="fecha_adquisicion" max="{% now 'Y-m-d' %}"
+                class="form-control{% if form.fecha_adquisicion.errors %} is-invalid{% endif %}"
+                value="{% if form.instance.fecha_adquisicion and not form.is_bound %}{{ form.instance.fecha_adquisicion|date:'Y-m-d' }}{% else %}{{ form.fecha_adquisicion.value|default:'' }}{% endif %}">
+              {% for error in form.fecha_adquisicion.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
             </div>
           </div>
           

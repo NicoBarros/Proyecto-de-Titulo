@@ -6,6 +6,8 @@ from django.db import transaction
 from django.template.loader import render_to_string
 from django.urls import reverse
 
+from .models import Equipo, Usuario
+
 logger = logging.getLogger(__name__)
 
 ASUNTOS = {
@@ -36,3 +38,110 @@ def enviar(tipo, solicitud):
 
 def notificar(tipo, solicitud):
     transaction.on_commit(lambda: enviar(tipo, solicitud))
+
+
+def _correo(asunto, plantilla, contexto, destinatarios, error):
+    if not destinatarios:
+        return True
+    try:
+        send_mail(asunto, render_to_string(plantilla, contexto), None, destinatarios)
+    except Exception:
+        logger.exception(error)
+        return False
+    return True
+
+
+def enviar_solicitud_derecho(solicitud):
+    destinatarios = sorted(
+        Usuario.objects.filter(is_superuser=True, is_active=True).exclude(email='').values_list('email', flat=True)
+    )
+    contexto = {'solicitud': solicitud, 'url': f"{settings.URL_SITIO}{reverse('admin_panel')}#derechos"}
+    return _correo(
+        f'Solicitud de {solicitud.get_tipo_display().lower()} de datos personales',
+        'inventario/correos/derecho_recibido.txt', contexto, destinatarios,
+        'No se pudo avisar de la solicitud de derechos',
+    )
+
+
+def enviar_respuesta_derecho(solicitud, correo):
+    contexto = {'solicitud': solicitud, 'url': f"{settings.URL_SITIO}{reverse('mis_datos')}"}
+    return _correo(
+        f'Respuesta a tu solicitud de {solicitud.get_tipo_display().lower()}',
+        'inventario/correos/derecho_resuelto.txt', contexto, [correo],
+        'No se pudo enviar la respuesta de la solicitud de derechos',
+    )
+
+
+def enviar_revisiones_vencidas(solicitudes):
+    destinatarios = sorted(
+        Usuario.objects.filter(rol__in=Usuario.ROLES_APROBADORES, is_active=True)
+        .exclude(email='').values_list('email', flat=True)
+    )
+    if not destinatarios:
+        return True
+    contexto = {
+        'solicitudes': solicitudes, 'horas': settings.SLA_REVISION_HORAS,
+        'url': f"{settings.URL_SITIO}{reverse('solicitudes')}",
+    }
+    try:
+        send_mail(
+            f'Solicitudes sin revisar hace más de {settings.SLA_REVISION_HORAS} h ({len(solicitudes)})',
+            render_to_string('inventario/correos/revision_vencida.txt', contexto),
+            None,
+            destinatarios,
+        )
+    except Exception:
+        logger.exception('No se pudo enviar el aviso de solicitudes sin revisar')
+        return False
+    return True
+
+
+def enviar_pendientes_baja(equipos):
+    destinatarios = sorted(
+        Usuario.objects.filter(rol=Usuario.Rol.CONTROL_CALIDAD, is_active=True).exclude(email='').values_list('email', flat=True)
+    )
+    if not destinatarios:
+        return True
+    contexto = {
+        'equipos': equipos,
+        'años': Equipo.AÑOS_VIDA_UTIL,
+        'url': f"{settings.URL_SITIO}{reverse('inventario')}?estado={Equipo.Estado.PENDIENTE_BAJA}",
+    }
+    try:
+        send_mail(
+            f'Equipos pendientes de baja ({len(equipos)})',
+            render_to_string('inventario/correos/pendiente_baja.txt', contexto),
+            None,
+            destinatarios,
+        )
+    except Exception:
+        logger.exception('No se pudo enviar el aviso de equipos pendientes de baja')
+        return False
+    return True
+
+
+def enviar_falla_respaldo(error):
+    destinatarios = sorted(
+        Usuario.objects.filter(is_superuser=True, is_active=True).exclude(email='').values_list('email', flat=True)
+    )
+    if not destinatarios:
+        return True
+    contexto = {
+        'error': str(error), 'directorio': settings.RESPALDOS_DIR, 'horas': settings.RESPALDO_HORAS,
+    }
+    try:
+        send_mail(
+            'Falló el respaldo automático de la base de datos',
+            render_to_string('inventario/correos/respaldo_fallido.txt', contexto),
+            None,
+            destinatarios,
+        )
+    except Exception:
+        logger.exception('No se pudo enviar el aviso de falla del respaldo automático')
+        return False
+    return True
+
+
+def notificar_pendientes_baja(equipos):
+    equipos = list(equipos)
+    transaction.on_commit(lambda: enviar_pendientes_baja(equipos))

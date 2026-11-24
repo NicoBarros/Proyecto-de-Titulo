@@ -64,6 +64,9 @@ class Equipo(models.Model):
         PRESTADO = 'prestado', 'Prestado'
         EN_MANTENIMIENTO = 'en_mantenimiento', 'En mantenimiento'
         FUERA_SERVICIO = 'fuera_servicio', 'Fuera de servicio'
+        PENDIENTE_BAJA = 'pendiente_baja', 'Pendiente de baja'
+
+    AÑOS_VIDA_UTIL = 4
 
     codigo_inventario = models.CharField(
         max_length=50, unique=True,
@@ -81,6 +84,7 @@ class Equipo(models.Model):
         validators=[MinValueValidator(0)],
         verbose_name='Valor de adquisición ($)',
     )
+    fecha_adquisicion = models.DateField(blank=True, null=True, verbose_name='Fecha de adquisición')
     version = models.PositiveIntegerField(default=1)
 
     created_at = models.DateTimeField(auto_now_add=True)
@@ -93,6 +97,17 @@ class Equipo(models.Model):
 
     def __str__(self):
         return f'{self.codigo_inventario} — {self.nombre}'
+
+    @classmethod
+    def limite_vida_util(cls):
+        hoy = timezone.localdate()
+        try:
+            return hoy.replace(year=hoy.year - cls.AÑOS_VIDA_UTIL)
+        except ValueError:
+            return hoy.replace(year=hoy.year - cls.AÑOS_VIDA_UTIL, day=28)
+
+    def supera_vida_util(self):
+        return bool(self.fecha_adquisicion and self.fecha_adquisicion < self.limite_vida_util())
 
 class Insumo(models.Model):
 
@@ -168,8 +183,11 @@ class Solicitud(models.Model):
         related_name='solicitudes_aprobadas',
     )
     fecha_aprobacion = models.DateTimeField(blank=True, null=True)
+    revisada_en = models.DateTimeField(blank=True, null=True, verbose_name='Revisada en')
+    motivo_rechazo = models.TextField(blank=True, default='', verbose_name='Motivo del rechazo')
     recordatorio_enviado = models.DateTimeField(blank=True, null=True)
     aviso_atraso_enviado = models.DateTimeField(blank=True, null=True)
+    aviso_revision_enviado = models.DateTimeField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     ESTADOS_EN_PRESTAMO = [EstadoSolicitud.ENTREGADA, EstadoSolicitud.ATRASADA]
@@ -366,6 +384,90 @@ class HistorialEquipo(models.Model):
         return f'{self.codigo_inventario} — {self.get_accion_display()} ({self.fecha:%d/%m/%Y %H:%M})'
 
 
+class VectorEquipo(models.Model):
+    equipo = models.OneToOneField(Equipo, on_delete=models.CASCADE, related_name='vector_busqueda')
+    huella = models.CharField(max_length=64)
+    vector = models.BinaryField()
+    actualizado = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Vector de búsqueda'
+        verbose_name_plural = 'Vectores de búsqueda'
+
+    def __str__(self):
+        return f'Vector de {self.equipo}'
+
+
+class BusquedaIA(models.Model):
+
+    class Fuente(models.TextChoices):
+        HIBRIDA = 'hibrida_local', 'Recuperación híbrida'
+        SEMANTICA = 'semantica_local', 'Búsqueda semántica'
+        GEMINI = 'ia_gemini', 'Gemini'
+        PALABRAS_CLAVE = 'palabras_clave_local', 'Palabras clave'
+
+    class Generacion(models.TextChoices):
+        GENERADA = 'generada', 'Generada'
+        DESCARTADA = 'descartada', 'Descartada por verificación'
+        SIN_GENERACION = 'sin_generacion', 'Sin generación'
+
+    fecha = models.DateTimeField(auto_now_add=True, db_index=True)
+    usuario = models.ForeignKey(
+        Usuario, on_delete=models.SET_NULL, blank=True, null=True, related_name='busquedas',
+    )
+    consulta = models.CharField(max_length=500)
+    fuente = models.CharField(max_length=30, choices=Fuente.choices)
+    resultados = models.PositiveIntegerField(default=0)
+    duracion_ms = models.PositiveIntegerField(default=0, verbose_name='Duración (ms)')
+    reformulacion = models.BooleanField(
+        default=False, verbose_name='Reformulación',
+        help_text='La misma persona buscó poco antes sin elegir ningún resultado',
+    )
+    equipo_elegido = models.ForeignKey(
+        Equipo, on_delete=models.SET_NULL, blank=True, null=True, related_name='busquedas',
+    )
+    elegida_en = models.DateTimeField(blank=True, null=True)
+    generacion = models.CharField(
+        max_length=20, choices=Generacion.choices, default=Generacion.SIN_GENERACION, verbose_name='Generación',
+    )
+    contexto = models.JSONField(default=list, blank=True, help_text='Equipos recuperados, en orden')
+    respuesta = models.TextField(blank=True, default='')
+    citas = models.JSONField(default=list, blank=True)
+    duracion_generacion_ms = models.PositiveIntegerField(default=0, verbose_name='Duración de la generación (ms)')
+    util = models.BooleanField(null=True, blank=True, verbose_name='Calificación')
+    calificada_en = models.DateTimeField(blank=True, null=True)
+
+    class Meta:
+        verbose_name = 'Búsqueda con IA'
+        verbose_name_plural = 'Búsquedas con IA'
+        ordering = ['-fecha']
+
+    def __str__(self):
+        return f'{self.consulta[:60]} ({self.fecha:%d/%m/%Y %H:%M})'
+
+
+class ConflictoReserva(models.Model):
+    fecha = models.DateTimeField(auto_now_add=True, db_index=True)
+    usuario = models.ForeignKey(
+        Usuario, on_delete=models.SET_NULL, blank=True, null=True, related_name='conflictos_reserva',
+    )
+    equipo = models.ForeignKey(
+        Equipo, on_delete=models.SET_NULL, blank=True, null=True, related_name='conflictos_reserva',
+    )
+    solicitud = models.ForeignKey(
+        Solicitud, on_delete=models.SET_NULL, blank=True, null=True, related_name='conflictos_reserva',
+    )
+    motivo = models.CharField(max_length=255)
+
+    class Meta:
+        verbose_name = 'Conflicto de reserva'
+        verbose_name_plural = 'Conflictos de reserva'
+        ordering = ['-fecha']
+
+    def __str__(self):
+        return f'{self.motivo} ({self.fecha:%d/%m/%Y %H:%M})'
+
+
 class EventoSeguridad(models.Model):
 
     class Tipo(models.TextChoices):
@@ -394,3 +496,86 @@ class EventoSeguridad(models.Model):
 
     def __str__(self):
         return f'{self.get_tipo_display()} — {self.identificador or "anónimo"} ({self.fecha:%d/%m/%Y %H:%M})'
+
+
+class EvaluacionBusqueda(models.Model):
+
+    META = 80
+    TOP = 5
+
+    fecha = models.DateTimeField(auto_now_add=True, db_index=True)
+    ejecutada_por = models.ForeignKey(
+        Usuario, on_delete=models.SET_NULL, blank=True, null=True, related_name='evaluaciones_busqueda',
+    )
+    metodo = models.CharField(max_length=30, choices=BusquedaIA.Fuente.choices)
+    consultas = models.PositiveIntegerField()
+    aciertos = models.PositiveIntegerField()
+    duracion_ms = models.PositiveIntegerField(default=0, verbose_name='Duración (ms)')
+    detalle = models.JSONField(default=list)
+
+    class Meta:
+        verbose_name = 'Evaluación de la búsqueda'
+        verbose_name_plural = 'Evaluaciones de la búsqueda'
+        ordering = ['-fecha', '-id']
+
+    def __str__(self):
+        return f'Evaluación {self.fecha:%d/%m/%Y}: {self.aciertos}/{self.consultas}'
+
+    @property
+    def porcentaje(self):
+        return self.aciertos * 100 / self.consultas if self.consultas else None
+
+    @property
+    def cumple(self):
+        return self.porcentaje is not None and self.porcentaje >= self.META
+
+    @property
+    def fallos(self):
+        return [d for d in self.detalle if not d.get('posicion')]
+
+
+class SolicitudDerecho(models.Model):
+
+    class Tipo(models.TextChoices):
+        RECTIFICACION = 'rectificacion', 'Rectificación'
+        SUPRESION = 'supresion', 'Supresión'
+        OPOSICION = 'oposicion', 'Oposición'
+        BLOQUEO = 'bloqueo', 'Bloqueo del tratamiento'
+
+    class Estado(models.TextChoices):
+        PENDIENTE = 'pendiente', 'Pendiente'
+        ACEPTADA = 'aceptada', 'Aceptada'
+        RECHAZADA = 'rechazada', 'Rechazada'
+
+    usuario = models.ForeignKey(
+        Usuario, on_delete=models.SET_NULL, blank=True, null=True, related_name='solicitudes_derechos',
+    )
+    identificador = models.CharField(max_length=254)
+    tipo = models.CharField(max_length=20, choices=Tipo.choices)
+    detalle = models.TextField()
+    estado = models.CharField(max_length=20, choices=Estado.choices, default=Estado.PENDIENTE, db_index=True)
+    respuesta = models.TextField(blank=True, default='')
+    creada = models.DateTimeField(auto_now_add=True)
+    resuelta_en = models.DateTimeField(blank=True, null=True)
+    resuelta_por = models.ForeignKey(
+        Usuario, on_delete=models.SET_NULL, blank=True, null=True, related_name='+',
+    )
+
+    class Meta:
+        verbose_name = 'Solicitud de derechos'
+        verbose_name_plural = 'Solicitudes de derechos'
+        ordering = ['-creada', '-id']
+
+    def __str__(self):
+        return f'{self.get_tipo_display()} — {self.identificador} ({self.get_estado_display()})'
+
+    @property
+    def vence(self):
+        from datetime import timedelta
+
+        from django.conf import settings
+        return self.creada + timedelta(days=settings.PLAZO_DERECHOS_DIAS)
+
+    @property
+    def vencida(self):
+        return self.estado == self.Estado.PENDIENTE and timezone.now() > self.vence

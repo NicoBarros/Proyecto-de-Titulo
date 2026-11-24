@@ -19,6 +19,7 @@ from ..exportar import generar_excel_inventario, generar_plantilla_importacion
 from ..forms import EquipoForm, InsumoForm
 from ..importar import importar_inventario
 from ..models import Equipo, HistorialEquipo, Insumo, Migracion, Solicitud, SolicitudItem, Usuario
+from .busqueda import registrar_eleccion
 
 EDITORES = (Usuario.Rol.ENCARGADO_LABORATORIO, Usuario.Rol.CONTROL_CALIDAD)
 
@@ -87,9 +88,13 @@ def inventario_view(request):
         if puede_escribir and request.method == 'POST' and 'codigo_inventario' in request.POST:
             form = EquipoForm(request.POST)
             if form.is_valid():
-                equipo = form.save()
-                auditoria.registrar(equipo, request.user, HistorialEquipo.Accion.CREADO)
+                with transaction.atomic():
+                    equipo = form.save()
+                    auditoria.registrar(equipo, request.user, HistorialEquipo.Accion.CREADO)
+                    pendiente = servicios.aplicar_vida_util(equipo, request.user)
                 messages.success(request, 'Equipo agregado exitosamente.')
+                if pendiente:
+                    messages.warning(request, f'{servicios.DETALLE_VIDA_UTIL}: quedó pendiente de baja.')
                 return redirect('/inventario/?tab=equipos')
             else:
                 messages.error(request, 'Error al agregar equipo.')
@@ -157,7 +162,7 @@ def inventario_view(request):
 def eliminar_equipo(request, id):
     equipo = get_object_or_404(Equipo, id=id)
     if request.method == 'POST':
-        if equipo.estado not in [Equipo.Estado.DISPONIBLE, Equipo.Estado.FUERA_SERVICIO]:
+        if equipo.estado not in [Equipo.Estado.DISPONIBLE, Equipo.Estado.FUERA_SERVICIO, Equipo.Estado.PENDIENTE_BAJA]:
             messages.error(request, 'No puedes eliminar un equipo que está prestado o en mantenimiento.')
         else:
             try:
@@ -171,23 +176,37 @@ def eliminar_equipo(request, id):
     return redirect('/inventario/?tab=equipos')
 
 
+def _hay_conflicto(request, registro):
+    enviada = request.POST.get('version')
+    return enviada is not None and enviada != str(registro.version)
+
+
 @login_required
 @role_required(*EDITORES)
 def editar_equipo(request, id):
     equipo = get_object_or_404(Equipo, id=id)
+    conflicto = False
     if request.method == 'POST':
-        antes = auditoria.foto(equipo)
-        form = EquipoForm(request.POST, instance=equipo)
-        if form.is_valid():
-            equipo = form.save(commit=False)
-            equipo.version += 1
-            equipo.save()
-            auditoria.registrar(equipo, request.user, HistorialEquipo.Accion.EDITADO, antes)
+        with transaction.atomic():
+            equipo = get_object_or_404(Equipo.objects.select_for_update(), id=id)
+            antes = auditoria.foto(equipo)
+            form = EquipoForm(request.POST, instance=equipo)
+            conflicto = _hay_conflicto(request, equipo)
+            guardado = not conflicto and form.is_valid()
+            if guardado:
+                equipo = form.save(commit=False)
+                equipo.version += 1
+                equipo.save()
+                auditoria.registrar(equipo, request.user, HistorialEquipo.Accion.EDITADO, antes)
+                pendiente = servicios.aplicar_vida_util(equipo, request.user)
+        if guardado:
             messages.success(request, 'Equipo actualizado exitosamente.')
+            if pendiente:
+                messages.warning(request, f'{servicios.DETALLE_VIDA_UTIL}: quedó pendiente de baja.')
             return redirect('/inventario/?tab=equipos')
     else:
         form = EquipoForm(instance=equipo)
-    return render(request, 'inventario/editar_equipo.html', {'form': form, 'equipo': equipo})
+    return render(request, 'inventario/editar_equipo.html', {'form': form, 'equipo': equipo, 'conflicto': conflicto})
 
 
 @login_required
@@ -208,6 +227,8 @@ def historial_equipo(request, id):
 @login_required
 def ficha_equipo(request, id):
     equipo = get_object_or_404(Equipo, id=id)
+    if 'busqueda' in request.GET:
+        registrar_eleccion(request.user, request.GET['busqueda'], equipo)
     gestiona = request.user.rol in Usuario.ROLES_ESCRITURA_INVENTARIO
     ve_tecnico = gestiona or request.user.rol in Usuario.ROLES_APROBADORES
     reservas = (
@@ -269,12 +290,14 @@ def eliminar_insumo(request, id):
 @role_required(*EDITORES)
 def editar_insumo(request, id):
     insumo = get_object_or_404(Insumo, id=id)
+    conflicto = False
     if request.method == 'POST':
         with transaction.atomic():
             insumo = get_object_or_404(Insumo.objects.select_for_update(), id=id)
             entregadas = servicios.unidades_entregadas(insumo)
             form = InsumoForm(request.POST, instance=insumo)
-            if form.is_valid():
+            conflicto = _hay_conflicto(request, insumo)
+            if not conflicto and form.is_valid():
                 try:
                     servicios.aplicar_total_insumo(form.save(commit=False), entregadas)
                 except ValueError as e:
@@ -284,7 +307,7 @@ def editar_insumo(request, id):
                     return redirect('/inventario/?tab=insumos')
     else:
         form = InsumoForm(instance=insumo)
-    return render(request, 'inventario/editar_insumo.html', {'form': form, 'insumo': insumo})
+    return render(request, 'inventario/editar_insumo.html', {'form': form, 'insumo': insumo, 'conflicto': conflicto})
 
 
 @login_required

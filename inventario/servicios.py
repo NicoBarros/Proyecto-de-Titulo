@@ -8,6 +8,7 @@ from django.utils import timezone
 from . import auditoria, notificaciones
 from .models import (
     Bloqueo,
+    ConflictoReserva,
     Equipo,
     HistorialEquipo,
     Insumo,
@@ -18,8 +19,17 @@ from .models import (
     Usuario,
 )
 
+
+class ConflictoReservaError(ValueError):
+    def __init__(self, mensaje, equipo, solicitud=None):
+        super().__init__(mensaje)
+        self.equipo = equipo
+        self.solicitud = solicitud
+
+
 DIAS_SANCION = 7
 UMBRAL_BAJA = Decimal('0.70')
+DETALLE_VIDA_UTIL = f'Supera {Equipo.AÑOS_VIDA_UTIL} años de antigüedad'
 
 TRANSICIONES_SOLICITUD = {
     'aprobar': [Solicitud.EstadoSolicitud.PENDIENTE],
@@ -50,6 +60,9 @@ ESTADOS_DIAGNOSTICABLES = [Equipo.Estado.DISPONIBLE, Equipo.Estado.EN_MANTENIMIE
 
 
 def cambiar_estado_equipo(equipo, usuario, estado, detalle):
+    por_antiguedad = estado == Equipo.Estado.DISPONIBLE and equipo.supera_vida_util()
+    if por_antiguedad:
+        estado, detalle = Equipo.Estado.PENDIENTE_BAJA, f'{detalle}. {DETALLE_VIDA_UTIL}'
     if equipo.estado == estado:
         return
     antes = auditoria.foto(equipo)
@@ -57,6 +70,31 @@ def cambiar_estado_equipo(equipo, usuario, estado, detalle):
     equipo.version += 1
     equipo.save(update_fields=['estado', 'version', 'updated_at'])
     auditoria.registrar(equipo, usuario, HistorialEquipo.Accion.ESTADO, antes, detalle)
+    if por_antiguedad:
+        notificaciones.notificar_pendientes_baja([equipo])
+
+
+def aplicar_vida_util(equipo, usuario, notificar=True):
+    if equipo.estado == Equipo.Estado.DISPONIBLE and equipo.supera_vida_util():
+        cambiar_estado_equipo(equipo, usuario, Equipo.Estado.PENDIENTE_BAJA, DETALLE_VIDA_UTIL)
+        if notificar:
+            notificaciones.notificar_pendientes_baja([equipo])
+        return True
+    if equipo.estado == Equipo.Estado.PENDIENTE_BAJA and not equipo.supera_vida_util():
+        cambiar_estado_equipo(equipo, usuario, Equipo.Estado.DISPONIBLE, 'Fecha de adquisición corregida')
+    return False
+
+
+@transaction.atomic
+def marcar_pendientes_baja():
+    equipos = list(Equipo.objects.select_for_update().filter(
+        estado=Equipo.Estado.DISPONIBLE, fecha_adquisicion__lt=Equipo.limite_vida_util(),
+    ))
+    for equipo in equipos:
+        cambiar_estado_equipo(equipo, None, Equipo.Estado.PENDIENTE_BAJA, DETALLE_VIDA_UTIL)
+    if equipos:
+        notificaciones.notificar_pendientes_baja(equipos)
+    return len(equipos)
 
 
 def _fecha_texto(fecha):
@@ -67,11 +105,20 @@ def _nombre(usuario):
     return usuario.get_full_name() or usuario.email
 
 
+def bloqueo_de_seccion(usuario):
+    if usuario.rol != Usuario.Rol.ESTUDIANTE or not usuario.seccion:
+        return None
+    return Bloqueo.objects.filter(seccion=usuario.seccion, fecha_fin__gt=timezone.now()).order_by('-fecha_fin').first()
+
+
 def _validar_puede_solicitar(usuario, representado):
     if usuario.esta_bloqueado():
         raise ValueError(f'Tu cuenta está bloqueada para solicitar préstamos hasta el {_fecha_texto(usuario.bloqueado_hasta)}.')
     if representado and representado.esta_bloqueado():
         raise ValueError(f'{_nombre(representado)} está bloqueado para préstamos hasta el {_fecha_texto(representado.bloqueado_hasta)}.')
+    bloqueo = bloqueo_de_seccion(representado or usuario)
+    if bloqueo:
+        raise ValueError(f'La sección {bloqueo.seccion} está bloqueada para préstamos hasta el {_fecha_texto(bloqueo.fecha_fin)}.')
     if (representado or usuario).tiene_atrasos():
         if representado:
             raise ValueError(f'{_nombre(representado)} tiene préstamos atrasados sin devolver.')
@@ -140,7 +187,7 @@ def crear_solicitud(usuario, items, cantidades, inicio, fin, lugar_uso, justific
         if equipo is None:
             raise ValueError('Uno de los equipos seleccionados no existe.')
         if equipo.estado != Equipo.Estado.DISPONIBLE:
-            raise ValueError(f'El equipo {equipo.nombre} no se encuentra disponible actualmente.')
+            raise ConflictoReservaError(f'El equipo {equipo.nombre} no se encuentra disponible actualmente.', equipo)
         SolicitudItem.objects.create(solicitud=solicitud, equipo=equipo, cantidad=1)
     insumos = Insumo.objects.in_bulk(insumos_cant)
     for item_id, cantidad in insumos_cant.items():
@@ -155,8 +202,8 @@ def crear_solicitud(usuario, items, cantidades, inicio, fin, lugar_uso, justific
 
 def _aprobar(solicitud, equipos, usuario):
     for equipo in equipos:
-        if equipo.estado in (Equipo.Estado.EN_MANTENIMIENTO, Equipo.Estado.FUERA_SERVICIO):
-            raise ValueError(f'El equipo {equipo.nombre} está {equipo.get_estado_display().lower()}.')
+        if equipo.estado in (Equipo.Estado.EN_MANTENIMIENTO, Equipo.Estado.FUERA_SERVICIO, Equipo.Estado.PENDIENTE_BAJA):
+            raise ConflictoReservaError(f'El equipo {equipo.nombre} está {equipo.get_estado_display().lower()}.', equipo, solicitud)
         choque = SolicitudItem.objects.filter(
             equipo=equipo,
             solicitud__estado__in=[Solicitud.EstadoSolicitud.APROBADA, *Solicitud.ESTADOS_EN_PRESTAMO],
@@ -164,10 +211,11 @@ def _aprobar(solicitud, equipos, usuario):
             solicitud__horario_fin__gt=solicitud.horario_inicio,
         ).exclude(solicitud=solicitud).exists()
         if choque:
-            raise ValueError(f'El equipo {equipo} ya esta reservado en ese horario.')
+            raise ConflictoReservaError(f'El equipo {equipo} ya está reservado en ese horario.', equipo, solicitud)
     solicitud.estado = Solicitud.EstadoSolicitud.APROBADA
     solicitud.aprobado_por = usuario
     solicitud.fecha_aprobacion = timezone.now()
+    solicitud.revisada_en = solicitud.revisada_en or solicitud.fecha_aprobacion
     solicitud.save()
     notificaciones.notificar('aprobada', solicitud)
 
@@ -189,13 +237,19 @@ def _entregar(solicitud, equipos, items, usuario):
     Movimiento.objects.create(solicitud=solicitud, tipo=Movimiento.TipoMovimiento.ENTREGA, responsable=usuario)
 
 
+def registrar_conflicto(usuario, error):
+    return ConflictoReserva.objects.create(
+        usuario=usuario, equipo=error.equipo, solicitud=error.solicitud, motivo=str(error)[:255],
+    )
+
+
 def sancionar(usuario, solicitud):
     hasta = timezone.now() + timedelta(days=DIAS_SANCION)
     if not usuario.bloqueado_hasta or usuario.bloqueado_hasta < hasta:
         usuario.bloqueado_hasta = hasta
         usuario.save(update_fields=['bloqueado_hasta'])
     Bloqueo.objects.create(
-        usuario=usuario, seccion=usuario.seccion, solicitud=solicitud,
+        usuario=usuario, seccion=usuario.seccion if usuario.rol == Usuario.Rol.ESTUDIANTE else None, solicitud=solicitud,
         fecha_fin=hasta, motivo='Devolucion atrasada',
     )
 
@@ -270,7 +324,12 @@ def aplicar_accion_solicitud(usuario, solicitud_id, accion, datos=None):
     elif accion == 'devolver':
         _devolver(solicitud, equipos, items, usuario, datos)
     elif accion == 'rechazar':
+        motivo = (datos.get('motivo_rechazo') or '').strip()
+        if not motivo:
+            raise ValueError('Indica el motivo del rechazo.')
         solicitud.estado = Solicitud.EstadoSolicitud.RECHAZADA
+        solicitud.motivo_rechazo = motivo[:500]
+        solicitud.revisada_en = solicitud.revisada_en or timezone.now()
         solicitud.save()
         notificaciones.notificar('rechazada', solicitud)
     elif accion == 'cancelar':
@@ -344,6 +403,10 @@ def cambiar_estado_manual(equipo, usuario, nuevo_estado, detalle):
         raise ValueError('Estado de equipo no válido.')
     if Equipo.Estado.PRESTADO in (equipo.estado, nuevo_estado):
         raise ValueError('El estado "Prestado" solo cambia mediante la entrega y devolución de solicitudes.')
+    if nuevo_estado == Equipo.Estado.DISPONIBLE and equipo.supera_vida_util():
+        raise ValueError(
+            f'El equipo supera {Equipo.AÑOS_VIDA_UTIL} años de antigüedad: corrige su fecha de adquisición o dalo de baja.'
+        )
     cambiar_estado_equipo(equipo, usuario, nuevo_estado, detalle)
 
 

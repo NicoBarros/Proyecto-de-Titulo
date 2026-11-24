@@ -93,7 +93,7 @@ class SesionTests(LeicaTestCase):
     def test_expira_por_inactividad_y_al_cerrar_el_navegador(self):
         self.client.post('/login/', {'username': 'docente@inacapmail.cl', 'password': CLAVE})
         r = self.client.get('/')
-        self.assertEqual(self.client.session.get_expiry_age(), 60 * 60)
+        self.assertEqual(self.client.session.get_expiry_age(), 30 * 60)
         self.assertTrue(self.client.session.get_expire_at_browser_close())
         self.assertEqual(r.cookies[settings.SESSION_COOKIE_NAME]['expires'], '')
 

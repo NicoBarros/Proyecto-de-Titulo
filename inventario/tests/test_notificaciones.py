@@ -31,7 +31,7 @@ class CorreosSolicitudTests(LeicaTestCase):
     def test_rechazar_envia_correo(self):
         s = self.crear_solicitud(self.estudiante)
         with self.captureOnCommitCallbacks(execute=True):
-            self.accion_solicitud(s, 'rechazar')
+            self.accion_solicitud(s, 'rechazar', motivo_rechazo='Equipo reservado para examen')
         self.assertIn('rechazada', mail.outbox[0].subject)
 
     def test_representacion_avisa_a_ambos(self):

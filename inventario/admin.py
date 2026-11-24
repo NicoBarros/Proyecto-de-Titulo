@@ -4,7 +4,10 @@ from django.contrib.auth.admin import UserAdmin
 from . import auditoria
 from .models import (
     Bloqueo,
+    BusquedaIA,
+    ConflictoReserva,
     Equipo,
+    EvaluacionBusqueda,
     EventoSeguridad,
     HistorialEquipo,
     Insumo,
@@ -12,6 +15,7 @@ from .models import (
     Migracion,
     Movimiento,
     Solicitud,
+    SolicitudDerecho,
     SolicitudItem,
     Usuario,
 )
@@ -114,6 +118,39 @@ class MigracionAdmin(admin.ModelAdmin):
     list_display = ('fecha', 'archivo_origen', 'filas_importadas', 'filas_con_error')
 
 
+class SoloLecturaAdmin(admin.ModelAdmin):
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(BusquedaIA)
+class BusquedaIAAdmin(SoloLecturaAdmin):
+    list_display = (
+        'fecha', 'usuario', 'consulta', 'fuente', 'resultados', 'generacion', 'util', 'duracion_ms', 'reformulacion',
+        'equipo_elegido',
+    )
+    list_filter = ('fuente', 'generacion', 'util', 'reformulacion')
+    search_fields = ('consulta',)
+    date_hierarchy = 'fecha'
+
+
+@admin.register(EvaluacionBusqueda)
+class EvaluacionBusquedaAdmin(SoloLecturaAdmin):
+    list_display = ('fecha', 'aciertos', 'consultas', 'metodo', 'duracion_ms', 'ejecutada_por')
+    list_filter = ('metodo',)
+    date_hierarchy = 'fecha'
+
+
+@admin.register(ConflictoReserva)
+class ConflictoReservaAdmin(SoloLecturaAdmin):
+    list_display = ('fecha', 'usuario', 'equipo', 'solicitud', 'motivo')
+    search_fields = ('motivo', 'equipo__codigo_inventario')
+    date_hierarchy = 'fecha'
+
+
 @admin.register(EventoSeguridad)
 class EventoSeguridadAdmin(admin.ModelAdmin):
     list_display = ('fecha', 'tipo', 'identificador', 'ip', 'ruta', 'detalle')
@@ -129,3 +166,10 @@ class EventoSeguridadAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+
+@admin.register(SolicitudDerecho)
+class SolicitudDerechoAdmin(SoloLecturaAdmin):
+    list_display = ('creada', 'identificador', 'tipo', 'estado', 'resuelta_en', 'resuelta_por')
+    list_filter = ('tipo', 'estado')
+    search_fields = ('identificador',)

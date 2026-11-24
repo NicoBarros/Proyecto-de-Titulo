@@ -9,7 +9,7 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument('--directorio', default=settings.RESPALDOS_DIR)
-        parser.add_argument('--conservar', type=int, default=14)
+        parser.add_argument('--conservar', type=int, default=settings.RESPALDO_CONSERVAR)
 
     def handle(self, *args, directorio, conservar, **kwargs):
         origen = descripcion_base()

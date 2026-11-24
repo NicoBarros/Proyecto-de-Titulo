@@ -1,0 +1,18 @@
+<div class="row row-cols-1 row-cols-md-2 {{ columnas }} g-3">
+  {% for k in indicadores %}
+  <div class="col">
+    <div class="kpi-tarjeta h-100 {% if k.cumple %}kpi-ok{% elif k.cumple is False %}kpi-alerta{% elif k.seguimiento %}kpi-seguimiento{% else %}kpi-sin-datos{% endif %}" data-kpi="{{ k.clave }}">
+      <div class="d-flex justify-content-between align-items-start mb-1">
+        <span class="kpi-nombre"><i class="bi {{ k.icono }} me-1"></i>{{ k.nombre }}</span>
+        {% if k.cumple %}<span class="badge bg-success">Cumple</span>
+        {% elif k.cumple is False %}<span class="badge bg-danger">No cumple</span>
+        {% elif k.seguimiento %}<span class="badge bg-info text-dark">Seguimiento</span>
+        {% else %}<span class="badge bg-secondary">Sin datos</span>{% endif %}
+      </div>
+      <div class="kpi-valor">{{ k.texto }}</div>
+      {% if not k.seguimiento %}<div class="kpi-meta">Objetivo {{ k.objetivo }}</div>{% endif %}
+      <div class="kpi-detalle">{{ k.detalle }}</div>
+    </div>
+  </div>
+  {% endfor %}
+</div>

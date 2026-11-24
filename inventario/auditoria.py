@@ -1,3 +1,5 @@
+from datetime import date
+
 from .models import Equipo, HistorialEquipo
 
 CAMPOS_AUDITADOS = {
@@ -8,6 +10,7 @@ CAMPOS_AUDITADOS = {
     'ubicacion': 'Ubicación',
     'estado': 'Estado',
     'valor_adquisicion': 'Valor de adquisición',
+    'fecha_adquisicion': 'Fecha de adquisición',
 }
 
 
@@ -44,4 +47,6 @@ def etiqueta_valor(campo, valor):
         return '—'
     if campo == 'estado':
         return dict(Equipo.Estado.choices).get(valor, valor)
+    if campo == 'fecha_adquisicion':
+        return date.fromisoformat(valor).strftime('%d/%m/%Y')
     return valor

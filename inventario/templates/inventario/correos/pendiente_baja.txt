@@ -1,0 +1,10 @@
+{% autoescape off %}Hola:
+
+{% if equipos|length == 1 %}Un equipo superó los {{ años }} años de antigüedad y quedó marcado como pendiente de baja{% else %}{{ equipos|length }} equipos superaron los {{ años }} años de antigüedad y quedaron marcados como pendientes de baja{% endif %}. Revísalos para validar su baja según la política institucional de renovación de activos.
+
+{% for e in equipos %}- {{ e.codigo_inventario }} · {{ e.nombre }} (adquirido el {{ e.fecha_adquisicion|date:"d/m/Y" }})
+{% endfor %}
+{{ url }}
+
+Laboratorio LEICA · INACAP Sede Valdivia
+{% endautoescape %}

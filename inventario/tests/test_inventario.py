@@ -1,6 +1,7 @@
 """
 CRUD de equipos e insumos (inventario) y exportacion a Excel.
 """
+from datetime import date
 from decimal import Decimal
 from io import BytesIO
 
@@ -118,10 +119,15 @@ class ExportarTests(LeicaTestCase):
         self.assertEqual(self.exportar().sheetnames, ['Resumen', 'Equipos', 'Insumos'])
 
     def test_hoja_equipos(self):
-        self.crear_equipo('EXP-2', 'Switch', valor=Decimal('250000'), estado=Equipo.Estado.PRESTADO)
+        self.crear_equipo('EXP-2', 'Switch', valor=Decimal('250000'), estado=Equipo.Estado.PRESTADO,
+                          fecha_adquisicion=date(2024, 3, 15))
         self.crear_equipo('EXP-1', 'Router', valor=None)
         ws = self.exportar()['Equipos']
-        self.assertEqual([c.value for c in ws[4]], ['Código', 'Nombre', 'Modelo', 'Especificaciones', 'Ubicación', 'Estado', 'Valor de adquisición'])
+        self.assertEqual([c.value for c in ws[4]], [
+            'Código', 'Nombre', 'Modelo', 'Especificaciones', 'Ubicación', 'Estado', 'Valor de adquisición', 'Fecha de adquisición',
+        ])
+        self.assertEqual([ws['H5'].value, ws['H6'].value.date()], [None, date(2024, 3, 15)])
+        self.assertEqual(ws['H6'].number_format, 'DD/MM/YYYY')
         self.assertEqual([ws['A5'].value, ws['F5'].value, ws['G5'].value], ['EXP-1', 'Disponible', None])
         self.assertEqual([ws['A6'].value, ws['F6'].value, ws['G6'].value], ['EXP-2', 'Prestado', 250000])
         self.assertEqual(ws['F5'].fill.fgColor.rgb[-6:], 'E3F6E3')

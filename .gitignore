@@ -1,5 +1,6 @@
 # Entorno y secretos
 .env
+.env.docker
 venv/
 
 # Python
@@ -14,6 +15,7 @@ staticfiles/
 *.log
 
 respaldos/
+modelos/
 
 .coverage
 htmlcov/

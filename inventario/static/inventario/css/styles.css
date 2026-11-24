@@ -595,7 +595,8 @@ body {
   color: #6b21a8 !important;
 }
 
-.badge.bg-devuelta_atraso {
+.badge.bg-devuelta_atraso,
+.badge.bg-pendiente_baja {
   background: #ffedd5 !important;
   color: #9a3412 !important;
 }
@@ -629,7 +630,8 @@ body {
   color: #6b21a8;
 }
 
-.badge.devuelta_atraso {
+.badge.devuelta_atraso,
+.badge.pendiente_baja {
   background: #ffedd5;
   color: #9a3412;
 }
@@ -840,6 +842,7 @@ small.representacion {
 
 .kpi-tarjeta.kpi-ok { border-left-color: #16a34a; }
 .kpi-tarjeta.kpi-alerta { border-left-color: #dc2626; }
+.kpi-tarjeta.kpi-seguimiento { border-left-color: #0284c7; }
 
 .kpi-nombre {
   font-size: 0.82rem;
@@ -856,6 +859,7 @@ small.representacion {
 
 .kpi-ok .kpi-valor { color: #15803d; }
 .kpi-alerta .kpi-valor { color: #b91c1c; }
+.kpi-seguimiento .kpi-valor { color: #075985; }
 .kpi-sin-datos .kpi-valor { color: #9ca3af; font-size: 1.3rem; }
 
 .kpi-meta {
@@ -896,4 +900,77 @@ small.representacion {
 .importar-errores {
   max-height: 20rem;
   overflow-y: auto;
+}
+
+.tabla-scroll {
+  max-height: 28rem;
+  overflow-y: auto;
+}
+
+.tabla-scroll > .table > thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.filtro-grupo .filtro-opciones {
+  max-width: 10rem;
+}
+
+.rag-respuesta {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  padding: 0.9rem 1rem;
+  border-radius: 12px;
+  background: var(--leica-red-light);
+  border-left: 4px solid var(--leica-red);
+  line-height: 1.55;
+}
+
+.rag-icono {
+  color: var(--leica-red);
+  font-size: 1.1rem;
+  margin-top: 0.1rem;
+}
+
+.rag-cita {
+  display: inline-block;
+  min-width: 1.35rem;
+  margin: 0 0.15rem;
+  padding: 0 0.3rem;
+  border-radius: 6px;
+  background: var(--leica-red);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-align: center;
+  text-decoration: none;
+  vertical-align: 0.1rem;
+}
+
+.rag-cita:hover,
+.rag-cita:focus {
+  background: var(--leica-red-dark);
+  color: #fff;
+}
+
+.aviso-privacidad {
+  max-width: 860px;
+  line-height: 1.6;
+}
+
+.badge.derecho-pendiente {
+  background: #FEF3C7;
+  color: #92400E;
+}
+
+.badge.derecho-aceptada {
+  background: #E3F6E3;
+  color: #1E6B1E;
+}
+
+.badge.derecho-rechazada {
+  background: #FEE2E2;
+  color: #B91C1C;
 }

@@ -7,6 +7,7 @@ from django.utils import timezone
 from inventario.models import Solicitud
 
 from .base import LeicaTestCase
+from .test_rag import buscar_y_generar
 
 
 @override_settings(TAREAS_TOKEN='token-de-prueba')
@@ -66,21 +67,21 @@ class PaginacionTests(LeicaTestCase):
 @override_settings(GEMINI_API_KEY='clave-falsa', IA_CONSULTAS_POR_HORA=2)
 class LimiteIATests(LeicaTestCase):
 
+    def respuestas(self, client_cls, veces):
+        self.crear_equipo(nombre='Osciloscopio')
+        client_cls.return_value.models.generate_content.return_value = MagicMock(
+            text='{"respuesta": "Sirve [E1].", "citas": ["E1"]}')
+        return [buscar_y_generar(self.client, 'osciloscopio')['respuesta'] for _ in range(veces)]
+
     @patch('google.genai.Client')
-    def test_supera_el_limite_y_usa_busqueda_local(self, client_cls):
-        equipo = self.crear_equipo(nombre='Osciloscopio')
-        client_cls.return_value.models.generate_content.return_value = MagicMock(text=f'[{equipo.id}]')
+    def test_supera_el_limite_y_muestra_solo_los_resultados(self, client_cls):
         self.client.force_login(self.estudiante)
-        fuentes = [self.client.post('/busqueda/', {'consulta': 'osciloscopio'}).json()['fuente'] for _ in range(3)]
-        self.assertEqual(fuentes, ['ia_gemini', 'ia_gemini', 'palabras_clave_local'])
+        self.assertEqual(self.respuestas(client_cls, 3), ['Sirve [E1].', 'Sirve [E1].', ''])
         self.assertEqual(client_cls.return_value.models.generate_content.call_count, 2)
 
     @patch('google.genai.Client')
     def test_el_limite_es_por_usuario(self, client_cls):
-        equipo = self.crear_equipo(nombre='Osciloscopio')
-        client_cls.return_value.models.generate_content.return_value = MagicMock(text=f'[{equipo.id}]')
         self.client.force_login(self.estudiante)
-        for _ in range(3):
-            self.client.post('/busqueda/', {'consulta': 'osciloscopio'})
+        self.respuestas(client_cls, 3)
         self.client.force_login(self.docente)
-        self.assertEqual(self.client.post('/busqueda/', {'consulta': 'osciloscopio'}).json()['fuente'], 'ia_gemini')
+        self.assertEqual(buscar_y_generar(self.client, 'osciloscopio')['respuesta'], 'Sirve [E1].')

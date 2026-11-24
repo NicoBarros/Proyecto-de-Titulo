@@ -1,11 +1,12 @@
 import re
+from datetime import date
 from zipfile import BadZipFile
 
 from django.db import transaction
 from openpyxl import load_workbook
 from openpyxl.utils.exceptions import InvalidFileException
 
-from . import auditoria, servicios
+from . import auditoria, notificaciones, servicios
 from .forms import EquipoForm, InsumoForm
 from .models import Equipo, HistorialEquipo, Insumo, Migracion
 
@@ -17,6 +18,7 @@ COLUMNAS_EQUIPOS = {
     'ubicación': 'ubicacion',
     'estado': 'estado',
     'valor de adquisición': 'valor_adquisicion',
+    'fecha de adquisición': 'fecha_adquisicion',
 }
 COLUMNAS_INSUMOS = {
     'nombre': 'nombre',
@@ -37,6 +39,8 @@ DETALLE = 'Importación desde Excel'
 def _texto(valor):
     if valor is None:
         return ''
+    if isinstance(valor, date):
+        return valor.strftime('%d/%m/%Y')
     if isinstance(valor, float) and valor.is_integer():
         valor = int(valor)
     return str(valor).strip()
@@ -81,6 +85,8 @@ def _importar_equipo(datos, usuario):
     estado = datos.pop('estado', '').lower()
     if 'valor_adquisicion' in datos:
         datos['valor_adquisicion'] = _monto(datos['valor_adquisicion'])
+    if 'fecha_adquisicion' in datos:
+        datos['fecha_adquisicion'] = re.sub(r'^(\d{1,2})[-.](\d{1,2})[-.](\d{4})$', r'\1/\2/\3', datos['fecha_adquisicion'])
     existente = Equipo.objects.select_for_update().filter(codigo_inventario=datos.get('codigo_inventario', '')).first()
     antes = auditoria.foto(existente) if existente else None
     form = EquipoForm(_datos_con_actuales(datos, existente, EquipoForm.Meta.fields), instance=existente)
@@ -93,7 +99,8 @@ def _importar_equipo(datos, usuario):
             equipo.version += 1
             equipo.save()
             auditoria.registrar(equipo, usuario, HistorialEquipo.Accion.EDITADO, antes, DETALLE)
-        return
+            return equipo if servicios.aplicar_vida_util(equipo, usuario, notificar=False) else None
+        return None
 
     if estado and estado not in ESTADOS_IMPORTABLES:
         raise ValueError(f'Estado: "{estado}" no es válido para un equipo nuevo.')
@@ -101,6 +108,7 @@ def _importar_equipo(datos, usuario):
     equipo.estado = ESTADOS_IMPORTABLES.get(estado, Equipo.Estado.DISPONIBLE)
     equipo.save()
     auditoria.registrar(equipo, usuario, HistorialEquipo.Accion.IMPORTADO, detalle=DETALLE)
+    return equipo if servicios.aplicar_vida_util(equipo, usuario, notificar=False) else None
 
 
 def _importar_insumo(datos, usuario):
@@ -147,17 +155,22 @@ def importar_inventario(archivo, usuario):
 
     totales = importadas = 0
     errores = []
+    pendientes_baja = []
     with transaction.atomic():
         for nombre, columnas, clave, importar_fila in encontradas:
             for numero, datos in _filas(hojas[nombre], columnas, clave):
                 totales += 1
                 try:
                     with transaction.atomic():
-                        importar_fila(datos, usuario)
+                        pendiente = importar_fila(datos, usuario)
                     importadas += 1
+                    if pendiente:
+                        pendientes_baja.append(pendiente)
                 except ValueError as e:
                     errores.append(f'{nombre.capitalize()}, fila {numero}: {e}')
 
+        if pendientes_baja:
+            notificaciones.notificar_pendientes_baja(pendientes_baja)
         migracion = Migracion.objects.create(
             archivo_origen=archivo.name[:255],
             filas_totales=totales,

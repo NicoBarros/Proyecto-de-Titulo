@@ -39,6 +39,11 @@
           <dd class="col-sm-8">{{ equipo.ubicacion|default:"—" }}</dd>
           <dt class="col-sm-4">Especificaciones</dt>
           <dd class="col-sm-8">{{ equipo.especificaciones|default:"—"|linebreaksbr }}</dd>
+          <dt class="col-sm-4">Fecha de adquisición</dt>
+          <dd class="col-sm-8">
+            {% if equipo.fecha_adquisicion %}{{ equipo.fecha_adquisicion|date:"d/m/Y" }}
+            <span class="text-muted">({{ equipo.fecha_adquisicion|timesince }})</span>{% else %}—{% endif %}
+          </dd>
           {% if ve_tecnico %}
           <dt class="col-sm-4">Valor de adquisición</dt>
           <dd class="col-sm-8">{% if equipo.valor_adquisicion %}${{ equipo.valor_adquisicion|floatformat:'0' }}{% else %}—{% endif %}</dd>

@@ -1,28 +1,20 @@
-import json
-import logging
-import re
+import time
+from collections import Counter
+from datetime import timedelta
 
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.core.cache import cache
 from django.http import JsonResponse
-from django.shortcuts import render
+from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
 from django.utils import timezone
+from django.views.decorators.http import require_POST
 
-from ..models import Equipo
+from .. import busqueda_semantica, rag
+from ..models import BusquedaIA, Equipo
 
-logger = logging.getLogger(__name__)
-
-MAX_RESULTADOS = 5
-
-PROMPT = """Eres un asistente que ayuda a un encargado de laboratorio a encontrar equipos.
-Catalogo de equipos disponibles:
-{catalogo}
-
-Necesidad del usuario: "{consulta}"
-
-Responde SOLO con un JSON array de los ids de equipo mas relevantes (maximo {maximo}), ordenados del mas al menos relevante. Ejemplo: [3, 1, 7]"""
+VENTANA_REFORMULACION = timedelta(minutes=5)
 
 
 def _cupo_ia_disponible(usuario):
@@ -31,48 +23,37 @@ def _cupo_ia_disponible(usuario):
     return cache.incr(clave) <= settings.IA_CONSULTAS_POR_HORA
 
 
-def _resultado(equipo):
+def _resultado(equipo, disponibles, busqueda):
     return {
         'nombre': equipo.nombre,
+        'modelo': equipo.modelo or '',
         'codigo_inventario': equipo.codigo_inventario,
         'estado': equipo.get_estado_display(),
-        'url': reverse('ficha_equipo', args=[equipo.id]),
+        'disponibles': disponibles,
+        'url': f"{reverse('ficha_equipo', args=[equipo.id])}?busqueda={busqueda.id}",
     }
 
 
-def _buscar_con_gemini(consulta, disponibles):
-    from google import genai
-    from google.genai.errors import APIError
-
-    client = genai.Client(api_key=settings.GEMINI_API_KEY)
-    catalogo = '\n'.join(f"- id={e.id}: {e.nombre} ({e.modelo or 's/modelo'}) - {e.especificaciones or ''}" for e in disponibles)
-    prompt = PROMPT.format(catalogo=catalogo, consulta=consulta, maximo=MAX_RESULTADOS)
-    try:
-        respuesta = client.models.generate_content(model=settings.GEMINI_MODELO, contents=prompt)
-    except APIError as e:
-        if e.code != 503 and '503' not in str(e):
-            raise
-        respuesta = client.models.generate_content(model=settings.GEMINI_MODELO_RESPALDO, contents=prompt)
-
-    texto = respuesta.text.replace('```json', '').replace('```', '').strip()
-    coincidencia = re.search(r'\[[\d,\s]*\]', texto)
-    ids = json.loads(coincidencia.group(0) if coincidencia else texto)
-    if not isinstance(ids, list):
-        return None
-    por_id = {e.id: e for e in disponibles}
-    return [por_id[i] for i in ids if i in por_id][:MAX_RESULTADOS]
+def _agrupar(encontrados, disponibles, busqueda):
+    cantidades = Counter(busqueda_semantica.clave_grupo(e) for e in disponibles)
+    grupos = {}
+    for equipo in encontrados:
+        grupos.setdefault(busqueda_semantica.clave_grupo(equipo), equipo)
+    return [_resultado(e, cantidades[clave], busqueda) for clave, e in grupos.items()]
 
 
-def _buscar_local(consulta, disponibles):
-    terminos = consulta.lower().split()
-    puntajes = []
-    for equipo in disponibles:
-        texto = f'{equipo.nombre} {equipo.modelo or ""} {equipo.especificaciones or ""}'.lower()
-        puntaje = sum(1 for t in terminos if t in texto)
-        if puntaje:
-            puntajes.append((puntaje, equipo))
-    puntajes.sort(key=lambda par: par[0], reverse=True)
-    return [equipo for _, equipo in puntajes[:MAX_RESULTADOS]]
+def _es_reformulacion(usuario):
+    return BusquedaIA.objects.filter(
+        usuario=usuario, fecha__gte=timezone.now() - VENTANA_REFORMULACION, equipo_elegido__isnull=True,
+    ).exists()
+
+
+def registrar_eleccion(usuario, busqueda_id, equipo):
+    if not str(busqueda_id or '').isdigit():
+        return
+    BusquedaIA.objects.filter(id=busqueda_id, usuario=usuario, equipo_elegido__isnull=True).update(
+        equipo_elegido=equipo, elegida_en=timezone.now(),
+    )
 
 
 @login_required
@@ -80,20 +61,64 @@ def busqueda_view(request):
     if request.method == 'GET':
         return render(request, 'inventario/busqueda.html')
 
-    consulta = request.POST.get('consulta')
+    consulta = (request.POST.get('consulta') or '').strip()[:500]
     if not consulta:
         return JsonResponse({'error': 'Falta consulta'}, status=400)
+    inicio = time.perf_counter()
     disponibles = list(Equipo.objects.filter(estado=Equipo.Estado.DISPONIBLE))
+    contexto, fuente = rag.recuperar(consulta, disponibles)
+    busqueda = BusquedaIA.objects.create(
+        usuario=request.user, consulta=consulta, fuente=fuente, resultados=len(contexto),
+        contexto=[e.id for e in contexto],
+        duracion_ms=round((time.perf_counter() - inicio) * 1000),
+        reformulacion=_es_reformulacion(request.user),
+    )
+    return JsonResponse({
+        'fuente': fuente,
+        'busqueda': busqueda.id,
+        'resultados': _agrupar(contexto, disponibles, busqueda),
+        'generar': reverse('generar_respuesta', args=[busqueda.id]) if contexto and settings.GEMINI_API_KEY else None,
+        'calificar': reverse('calificar_busqueda', args=[busqueda.id]),
+    })
 
-    encontrados, fuente = None, 'palabras_clave_local'
-    if settings.GEMINI_API_KEY and _cupo_ia_disponible(request.user):
-        try:
-            encontrados = _buscar_con_gemini(consulta, disponibles)
-            if encontrados is not None:
-                fuente = 'ia_gemini'
-        except Exception as e:
-            logger.warning('Falló la IA de Gemini (%s). Cayendo a búsqueda local.', e)
 
-    if not encontrados:
-        encontrados = _buscar_local(consulta, disponibles)
-    return JsonResponse({'fuente': fuente, 'resultados': [_resultado(e) for e in encontrados]})
+def _respuesta_visible(busqueda):
+    visible = busqueda.generacion == BusquedaIA.Generacion.GENERADA
+    return JsonResponse({
+        'respuesta': busqueda.respuesta if visible else '',
+        'citas': busqueda.citas if visible else [],
+    })
+
+
+@login_required
+@require_POST
+def generar_respuesta(request, id):
+    busqueda = get_object_or_404(BusquedaIA, id=id, usuario=request.user)
+    if busqueda.generacion != BusquedaIA.Generacion.SIN_GENERACION:
+        return _respuesta_visible(busqueda)
+    if not busqueda.contexto or not settings.GEMINI_API_KEY or not _cupo_ia_disponible(request.user):
+        return _respuesta_visible(busqueda)
+    disponibles = list(Equipo.objects.filter(estado=Equipo.Estado.DISPONIBLE))
+    por_id = {e.id: e for e in Equipo.objects.filter(id__in=busqueda.contexto)}
+    contexto = [por_id[i] for i in busqueda.contexto if i in por_id]
+    inicio = time.perf_counter()
+    generacion = rag.generar(busqueda.consulta, contexto, disponibles)
+    busqueda.generacion = generacion.estado
+    busqueda.respuesta = generacion.respuesta
+    busqueda.citas = generacion.citas
+    busqueda.duracion_generacion_ms = round((time.perf_counter() - inicio) * 1000)
+    busqueda.save(update_fields=['generacion', 'respuesta', 'citas', 'duracion_generacion_ms'])
+    return _respuesta_visible(busqueda)
+
+
+@login_required
+@require_POST
+def calificar_busqueda(request, id):
+    busqueda = get_object_or_404(BusquedaIA, id=id, usuario=request.user)
+    valor = request.POST.get('util')
+    if valor not in ('1', '0'):
+        return JsonResponse({'error': 'Calificación no válida'}, status=400)
+    busqueda.util = valor == '1'
+    busqueda.calificada_en = timezone.now()
+    busqueda.save(update_fields=['util', 'calificada_en'])
+    return JsonResponse({'util': busqueda.util})

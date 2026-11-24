@@ -88,6 +88,7 @@
       return;
     }
     const newRow = plantilla.cloneNode(true);
+    window.limpiarFiltroOpciones(newRow);
     const select = newRow.querySelector('.item-select');
     newRow.querySelector('.cantidad-input').value = 1;
     contenedor.appendChild(newRow);

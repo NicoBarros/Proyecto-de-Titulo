@@ -1,0 +1,10 @@
+{% autoescape off %}Hola:
+
+{% if solicitudes|length == 1 %}Una solicitud lleva{% else %}{{ solicitudes|length }} solicitudes llevan{% endif %} más de {{ horas }} horas pendiente{{ solicitudes|length|pluralize }} de revisión:
+
+{% for s in solicitudes %}- #{{ s.id }} · {{ s.beneficiario.get_full_name|default:s.beneficiario.email }} · creada el {{ s.created_at|date:"d/m/Y H:i" }} · uso desde el {{ s.horario_inicio|date:"d/m/Y H:i" }}
+{% endfor %}
+{{ url }}
+
+Laboratorio LEICA · INACAP Sede Valdivia
+{% endautoescape %}

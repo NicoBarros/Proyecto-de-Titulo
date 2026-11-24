@@ -1,16 +1,23 @@
 import hashlib
+import logging
 import os
 import shutil
 import subprocess
+import time
 from pathlib import Path
 
 from django.conf import settings
+from django.core.cache import cache
 from django.core.management.base import CommandError
 from django.db import connections
 from django.utils import timezone
 
+logger = logging.getLogger(__name__)
+
 PREFIJO = 'leica_'
 EXTENSION = '.dump'
+CLAVE_EN_CURSO = 'respaldo_automatico_en_curso'
+CLAVE_FALLA_AVISADA = 'respaldo_automatico_falla_avisada'
 
 
 def base_postgres():
@@ -99,6 +106,40 @@ def aplicar_retencion(directorio, conservar):
         respaldo.unlink()
         huella(respaldo).unlink(missing_ok=True)
     return eliminados
+
+
+def ultimo_respaldo(directorio):
+    respaldos = list(Path(directorio).glob(f'{PREFIJO}*{EXTENSION}'))
+    return max(respaldos, key=lambda p: p.stat().st_mtime) if respaldos else None
+
+
+def respaldo_vigente(directorio, horas):
+    ultimo = ultimo_respaldo(directorio)
+    return ultimo is not None and time.time() - ultimo.stat().st_mtime < horas * 3600
+
+
+def respaldo_automatico():
+    if not settings.RESPALDO_AUTOMATICO:
+        return None
+    directorio = settings.RESPALDOS_DIR
+    if respaldo_vigente(directorio, settings.RESPALDO_HORAS):
+        return None
+    if not cache.add(CLAVE_EN_CURSO, True, timeout=30 * 60):
+        return None
+    from . import notificaciones
+    try:
+        destino, tablas, digest = crear_respaldo(directorio)
+        aplicar_retencion(directorio, settings.RESPALDO_CONSERVAR)
+    except Exception as error:
+        logger.exception('No se pudo generar el respaldo automático')
+        if cache.add(CLAVE_FALLA_AVISADA, True, timeout=settings.RESPALDO_HORAS * 3600):
+            notificaciones.enviar_falla_respaldo(error)
+        return 'error'
+    finally:
+        cache.delete(CLAVE_EN_CURSO)
+    cache.delete(CLAVE_FALLA_AVISADA)
+    logger.info('Respaldo automático %s (%s tablas, SHA-256 %s)', destino.name, tablas, digest)
+    return destino.name
 
 
 def verificar_integridad(ruta):

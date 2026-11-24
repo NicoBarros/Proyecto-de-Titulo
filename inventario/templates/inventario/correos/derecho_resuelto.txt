@@ -1,0 +1,15 @@
+{% autoescape off %}Hola:
+
+Tu solicitud de {{ solicitud.get_tipo_display|lower }} del {{ solicitud.creada|date:"d/m/Y" }} fue {{ solicitud.get_estado_display|lower }}.
+
+Respuesta:
+{{ solicitud.respuesta }}
+{% if solicitud.tipo == 'supresion' and solicitud.estado == 'aceptada' %}
+Tus datos personales fueron anonimizados y tu cuenta quedó cerrada. Los registros de préstamos se conservan sin datos que te identifiquen.
+{% elif solicitud.tipo == 'bloqueo' and solicitud.estado == 'aceptada' %}
+Tu cuenta quedó suspendida mientras dure el bloqueo del tratamiento.
+{% else %}
+{{ url }}
+{% endif %}
+Laboratorio LEICA · INACAP Sede Valdivia
+{% endautoescape %}

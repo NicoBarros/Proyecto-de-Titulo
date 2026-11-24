@@ -1,10 +1,23 @@
 from dataclasses import dataclass
 from datetime import timedelta
 
-from django.db.models import Avg, Count, DurationField, ExpressionWrapper, F, Q
+from django.conf import settings
+from django.db.models import Avg, Count, DurationField, ExpressionWrapper, F, Max, Q
+from django.db.models.functions import Lower, Trim
 from django.utils import timezone
 
-from .models import Equipo, Insumo, Mantenimiento, Movimiento, Solicitud
+from .models import (
+    Bloqueo,
+    BusquedaIA,
+    ConflictoReserva,
+    Equipo,
+    EvaluacionBusqueda,
+    Insumo,
+    Mantenimiento,
+    Movimiento,
+    Solicitud,
+    Usuario,
+)
 
 PERIODOS = [7, 30, 90, 365]
 
@@ -16,6 +29,16 @@ METAS = {
     'atrasos_activos': 0,
     'stock_critico': 10,
     'reparacion_dias': 7,
+    'busqueda_segundos': 3,
+    'busquedas_primer_intento': 70,
+    'revision_a_tiempo': 90,
+    'pendientes_vencidas': 0,
+    'bajas_sin_validar': 0,
+    'aprobacion_directa': 85,
+    'fidelidad_citas': 95,
+    'respuestas_utiles': 80,
+    'escalado': 20,
+    'adopcion': 60,
 }
 
 
@@ -30,12 +53,17 @@ class Indicador:
     menor_es_mejor: bool
     detalle: str
     texto_valor: str | None = None
+    texto_objetivo: str | None = None
 
     @property
     def cumple(self):
-        if self.valor is None:
+        if self.valor is None or self.meta is None:
             return None
         return self.valor <= self.meta if self.menor_es_mejor else self.valor >= self.meta
+
+    @property
+    def seguimiento(self):
+        return self.valor is not None and self.meta is None
 
     @property
     def texto(self):
@@ -45,6 +73,8 @@ class Indicador:
 
     @property
     def objetivo(self):
+        if self.texto_objetivo:
+            return self.texto_objetivo
         return f"{'≤' if self.menor_es_mejor else '≥'} {_numero(self.meta)}{self.unidad}"
 
 
@@ -72,6 +102,92 @@ def _texto_horas(horas):
     return '< 1 min' if minutos < 1 else f'{round(minutos)} min'
 
 
+def _devoluciones(desde):
+    return Movimiento.objects.filter(tipo=Movimiento.TipoMovimiento.DEVOLUCION, fecha__gte=desde).aggregate(
+        total=Count('id'),
+        a_tiempo=Count('id', filter=Q(solicitud__estado=Solicitud.EstadoSolicitud.DEVUELTA)),
+    )
+
+
+def _texto_segundos(segundos):
+    if segundos is None:
+        return None
+    return f'{round(segundos * 1000)} ms' if segundos < 1 else f'{_numero(segundos)} s'
+
+
+def indicador_evaluacion(evaluacion):
+    if evaluacion is None:
+        return Indicador(
+            'evaluacion_busqueda', 'Precisión de la búsqueda', 'bi-search', None, ' %',
+            EvaluacionBusqueda.META, False, 'Sin evaluaciones',
+        )
+
+    usuario = evaluacion.ejecutada_por
+    origen = (usuario.get_full_name() or usuario.email) if usuario else 'automática'
+    return Indicador(
+        'evaluacion_busqueda', 'Precisión de la búsqueda', 'bi-search', evaluacion.porcentaje, ' %',
+        EvaluacionBusqueda.META, False,
+        f'{evaluacion.aciertos} de {evaluacion.consultas} consultas en el top {EvaluacionBusqueda.TOP} · '
+        f'{timezone.localtime(evaluacion.fecha):%d-%m-%Y} · {origen}',
+    )
+
+
+def calcular_kpis_proyecto(dias=30):
+    desde = timezone.now() - timedelta(days=dias)
+    anterior = desde - timedelta(days=dias)
+
+    devoluciones = _devoluciones(desde)
+    busquedas = BusquedaIA.objects.filter(fecha__gte=desde).aggregate(
+        total=Count('id'),
+        duracion=Avg('duracion_ms'),
+        hasta_eleccion=Avg(_duracion('elegida_en', 'fecha')),
+        primeros=Count('id', filter=Q(reformulacion=False)),
+        resueltos=Count('id', filter=Q(reformulacion=False, equipo_elegido__isnull=False)),
+    )
+    segundos = busquedas['duracion'] / 1000 if busquedas['duracion'] is not None else None
+    eleccion = busquedas['hasta_eleccion'].total_seconds() if busquedas['hasta_eleccion'] is not None else None
+    conflictos = ConflictoReserva.objects.filter(fecha__gte=desde).aggregate(
+        total=Count('id'), equipos=Count('equipo', distinct=True),
+    )
+    bloqueos = Bloqueo.objects.aggregate(
+        actual=Count('id', filter=Q(fecha_inicio__gte=desde)),
+        previo=Count('id', filter=Q(fecha_inicio__gte=anterior, fecha_inicio__lt=desde)),
+        usuarios=Count('usuario', filter=Q(fecha_inicio__gte=desde), distinct=True),
+    )
+
+    detalle_busqueda = _cantidad(busquedas['total'], 'búsqueda', 'búsquedas')
+    if eleccion is not None:
+        detalle_busqueda += f' · {_texto_segundos(eleccion)} hasta elegir un equipo'
+
+    return [
+        Indicador(
+            'devoluciones_a_tiempo', 'Préstamos devueltos dentro del plazo', 'bi-calendar-check',
+            _porcentaje(devoluciones['a_tiempo'], devoluciones['total']), ' %', METAS['devoluciones_a_tiempo'], False,
+            f"{devoluciones['a_tiempo']} de {_cantidad(devoluciones['total'], 'devolución', 'devoluciones')}",
+        ),
+        Indicador(
+            'busqueda_segundos', 'Tiempo promedio de búsqueda', 'bi-stopwatch',
+            segundos, ' s', METAS['busqueda_segundos'], True, detalle_busqueda, _texto_segundos(segundos),
+        ),
+        Indicador(
+            'conflictos_evitados', 'Conflictos de reserva evitados', 'bi-shield-check',
+            conflictos['total'], '', None, True,
+            _cantidad(conflictos['equipos'], 'equipo involucrado', 'equipos involucrados'),
+        ),
+        Indicador(
+            'bloqueos_atraso', 'Cuentas bloqueadas por atraso', 'bi-person-lock',
+            bloqueos['actual'], '', bloqueos['previo'], True,
+            _cantidad(bloqueos['usuarios'], 'cuenta distinta', 'cuentas distintas'),
+            texto_objetivo=f"≤ {bloqueos['previo']} (período anterior)",
+        ),
+        Indicador(
+            'busquedas_primer_intento', 'Búsquedas resueltas al primer intento', 'bi-bullseye',
+            _porcentaje(busquedas['resueltos'], busquedas['primeros']), ' %', METAS['busquedas_primer_intento'], False,
+            f"{busquedas['resueltos']} de {_cantidad(busquedas['primeros'], 'primera consulta', 'primeras consultas')}",
+        ),
+    ]
+
+
 def calcular_kpis(dias=30):
     desde = timezone.now() - timedelta(days=dias)
     Solicitud.marcar_atrasadas()
@@ -81,10 +197,7 @@ def calcular_kpis(dias=30):
     )
     horas_aprobacion = aprobacion['promedio'].total_seconds() / 3600 if aprobacion['promedio'] is not None else None
 
-    devoluciones = Movimiento.objects.filter(tipo=Movimiento.TipoMovimiento.DEVOLUCION, fecha__gte=desde).aggregate(
-        total=Count('id'),
-        a_tiempo=Count('id', filter=Q(solicitud__estado=Solicitud.EstadoSolicitud.DEVUELTA)),
-    )
+    devoluciones = _devoluciones(desde)
 
     operativos = Equipo.objects.exclude(estado=Equipo.Estado.FUERA_SERVICIO)
     inventario = operativos.aggregate(
@@ -143,3 +256,97 @@ def calcular_kpis(dias=30):
             _cantidad(reparacion['total'], 'reparación completada', 'reparaciones completadas'),
         ),
     ]
+
+
+def calcular_sla(dias=30):
+    ahora = timezone.now()
+    desde = ahora - timedelta(days=dias)
+    plazo = timedelta(hours=settings.SLA_REVISION_HORAS)
+    revisiones = Solicitud.objects.filter(revisada_en__gte=desde).aggregate(
+        total=Count('id'),
+        a_tiempo=Count('id', filter=Q(revisada_en__lte=F('created_at') + plazo)),
+        rechazadas=Count('id', filter=Q(estado=Solicitud.EstadoSolicitud.RECHAZADA)),
+    )
+    vencidas = Solicitud.objects.filter(
+        estado=Solicitud.EstadoSolicitud.PENDIENTE, created_at__lt=ahora - plazo,
+    ).count()
+    bajas = Equipo.objects.filter(
+        estado=Equipo.Estado.PENDIENTE_BAJA, updated_at__lt=ahora - timedelta(days=settings.SLA_BAJA_DIAS),
+    ).count()
+    aprobadas = revisiones['total'] - revisiones['rechazadas']
+    return [
+        Indicador(
+            'revision_a_tiempo', f'Solicitudes revisadas en {settings.SLA_REVISION_HORAS} h', 'bi-stopwatch',
+            _porcentaje(revisiones['a_tiempo'], revisiones['total']), ' %', METAS['revision_a_tiempo'], False,
+            f"{revisiones['a_tiempo']} de {_cantidad(revisiones['total'], 'revisión', 'revisiones')}",
+        ),
+        Indicador(
+            'pendientes_vencidas', 'Solicitudes fuera de plazo', 'bi-inbox',
+            vencidas, '', METAS['pendientes_vencidas'], True, 'Pendientes de revisión, estado actual',
+        ),
+        Indicador(
+            'bajas_sin_validar', f'Bajas sin validar en {settings.SLA_BAJA_DIAS} días', 'bi-clipboard-x',
+            bajas, '', METAS['bajas_sin_validar'], True, 'Equipos pendientes de baja, estado actual',
+        ),
+        Indicador(
+            'aprobacion_directa', 'Tasa de aprobación directa', 'bi-check2-circle',
+            _porcentaje(aprobadas, revisiones['total']), ' %', METAS['aprobacion_directa'], False,
+            f"{aprobadas} de {_cantidad(revisiones['total'], 'solicitud revisada', 'solicitudes revisadas')}",
+        ),
+    ]
+
+
+def calcular_calidad_ia(dias=30):
+    desde = timezone.now() - timedelta(days=dias)
+    busquedas = BusquedaIA.objects.filter(fecha__gte=desde).aggregate(
+        total=Count('id'),
+        generadas=Count('id', filter=Q(generacion=BusquedaIA.Generacion.GENERADA)),
+        descartadas=Count('id', filter=Q(generacion=BusquedaIA.Generacion.DESCARTADA)),
+        calificadas=Count('id', filter=Q(util__isnull=False)),
+        utiles=Count('id', filter=Q(util=True)),
+        escaladas=Count('id', filter=Q(resultados=0) | Q(util=False)),
+    )
+    verificadas = busquedas['generadas'] + busquedas['descartadas']
+    usuarios = Usuario.objects.filter(is_active=True, is_superuser=False)
+    activos = usuarios.filter(
+        Q(busquedas__fecha__gte=desde) | Q(solicitudes__created_at__gte=desde)
+    ).distinct().count()
+    total_usuarios = usuarios.count()
+    return [
+        Indicador(
+            'fidelidad_citas', 'Fidelidad de las respuestas', 'bi-patch-check',
+            _porcentaje(busquedas['generadas'], verificadas), ' %', METAS['fidelidad_citas'], False,
+            f"{busquedas['generadas']} de {_cantidad(verificadas, 'respuesta verificada', 'respuestas verificadas')}",
+        ),
+        Indicador(
+            'respuestas_utiles', 'Búsquedas calificadas como útiles', 'bi-hand-thumbs-up',
+            _porcentaje(busquedas['utiles'], busquedas['calificadas']), ' %', METAS['respuestas_utiles'], False,
+            f"{busquedas['utiles']} de {_cantidad(busquedas['calificadas'], 'calificación', 'calificaciones')}",
+        ),
+        Indicador(
+            'escalado', 'Tasa de escalado', 'bi-person-raised-hand',
+            _porcentaje(busquedas['escaladas'], busquedas['total']), ' %', METAS['escalado'], True,
+            f"{busquedas['escaladas']} de {_cantidad(busquedas['total'], 'búsqueda', 'búsquedas')} sin resultado o no útiles",
+        ),
+        Indicador(
+            'adopcion', 'Adopción del sistema', 'bi-people',
+            _porcentaje(activos, total_usuarios), ' %', METAS['adopcion'], False,
+            f"{activos} de {_cantidad(total_usuarios, 'usuario activo', 'usuarios activos')}",
+        ),
+    ]
+
+
+def brechas_busqueda(dias=30, limite=15):
+    desde = timezone.now() - timedelta(days=dias)
+    return list(
+        BusquedaIA.objects.filter(fecha__gte=desde).filter(Q(resultados=0) | Q(util=False))
+        .annotate(texto=Lower(Trim('consulta')))
+        .values('texto')
+        .annotate(
+            veces=Count('id'),
+            sin_resultados=Count('id', filter=Q(resultados=0)),
+            no_utiles=Count('id', filter=Q(util=False)),
+            ultima=Max('fecha'),
+        )
+        .order_by('-veces', '-ultima')[:limite]
+    )

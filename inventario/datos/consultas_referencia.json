@@ -1,0 +1,188 @@
+[
+  {
+    "consulta": "necesito medir voltaje y continuidad en un circuito",
+    "esperado": [
+      "Multímetro"
+    ]
+  },
+  {
+    "consulta": "ver la forma de onda de una señal",
+    "esperado": [
+      "Osciloscopio"
+    ]
+  },
+  {
+    "consulta": "algo para soldar componentes en una placa",
+    "esperado": [
+      "Estación de soldadura",
+      "aire caliente"
+    ]
+  },
+  {
+    "consulta": "placa para programar sensores de temperatura en clase",
+    "esperado": [
+      "Arduino",
+      "ESP32"
+    ]
+  },
+  {
+    "consulta": "microcontrolador con wifi para un proyecto IoT",
+    "esperado": [
+      "ESP32"
+    ]
+  },
+  {
+    "consulta": "computador pequeño para montar un servidor linux",
+    "esperado": [
+      "Raspberry"
+    ]
+  },
+  {
+    "consulta": "equipo para practicar configuración de VLAN",
+    "esperado": [
+      "Switch"
+    ]
+  },
+  {
+    "consulta": "switch que alimente teléfonos por el cable de red",
+    "esperado": [
+      "PoE"
+    ]
+  },
+  {
+    "consulta": "router para el laboratorio de CCNA",
+    "esperado": [
+      "Router Cisco"
+    ]
+  },
+  {
+    "consulta": "router para configurar RouterOS",
+    "esperado": [
+      "MikroTik"
+    ]
+  },
+  {
+    "consulta": "firewall para practicar seguridad perimetral",
+    "esperado": [
+      "Firewall"
+    ]
+  },
+  {
+    "consulta": "dar señal wifi en una sala de clases",
+    "esperado": [
+      "Access Point"
+    ]
+  },
+  {
+    "consulta": "enlace inalámbrico punto a punto entre dos edificios",
+    "esperado": [
+      "LiteBeam"
+    ]
+  },
+  {
+    "consulta": "medir la corriente de un motor sin cortar el cable",
+    "esperado": [
+      "Pinza amperimétrica"
+    ]
+  },
+  {
+    "consulta": "certificar cableado estructurado categoría 6",
+    "esperado": [
+      "Certificador",
+      "MicroScanner"
+    ]
+  },
+  {
+    "consulta": "comprobar si un cable de red quedó bien ponchado",
+    "esperado": [
+      "MicroScanner",
+      "Certificador"
+    ]
+  },
+  {
+    "consulta": "empalmar fibra óptica",
+    "esperado": [
+      "Fusionadora"
+    ]
+  },
+  {
+    "consulta": "encontrar una falla en un tramo largo de fibra",
+    "esperado": [
+      "OTDR",
+      "Localizador visual"
+    ]
+  },
+  {
+    "consulta": "medir la potencia que llega por la fibra",
+    "esperado": [
+      "Medidor de potencia óptica"
+    ]
+  },
+  {
+    "consulta": "herramientas para armar conectores de fibra hasta el hogar",
+    "esperado": [
+      "FTTH"
+    ]
+  },
+  {
+    "consulta": "generar una señal senoidal para probar un filtro",
+    "esperado": [
+      "Generador de funciones"
+    ]
+  },
+  {
+    "consulta": "fuente para alimentar un circuito con 12 volts",
+    "esperado": [
+      "Fuente de poder"
+    ]
+  },
+  {
+    "consulta": "medir inductancia y capacitancia de componentes",
+    "esperado": [
+      "LCR"
+    ]
+  },
+  {
+    "consulta": "analizar el protocolo I2C de un sensor",
+    "esperado": [
+      "Analizador lógico"
+    ]
+  },
+  {
+    "consulta": "ver el espectro de radiofrecuencia",
+    "esperado": [
+      "Analizador de espectro"
+    ]
+  },
+  {
+    "consulta": "medir la ROE de una antena",
+    "esperado": [
+      "antenas"
+    ]
+  },
+  {
+    "consulta": "montar una central de telefonía IP",
+    "esperado": [
+      "Central telefónica",
+      "Teléfono IP"
+    ]
+  },
+  {
+    "consulta": "cámara de vigilancia para monitorear el taller",
+    "esperado": [
+      "Cámara IP"
+    ]
+  },
+  {
+    "consulta": "imprimir una pieza en plástico",
+    "esperado": [
+      "Impresora 3D"
+    ]
+  },
+  {
+    "consulta": "comunicarse por radio durante una salida a terreno",
+    "esperado": [
+      "Radio portátil"
+    ]
+  }
+]

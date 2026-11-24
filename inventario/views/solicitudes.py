@@ -31,6 +31,9 @@ def _crear(request):
             justificacion=request.POST.get('justificacion'),
             representado_id=request.POST.get('en_representacion_de'),
         )
+    except servicios.ConflictoReservaError as e:
+        servicios.registrar_conflicto(request.user, e)
+        messages.error(request, str(e))
     except ValueError as e:
         messages.error(request, str(e))
     else:
@@ -44,6 +47,9 @@ def _accion(request, puede_aprobar):
         return
     try:
         servicios.aplicar_accion_solicitud(request.user, request.POST.get('solicitud_id'), accion, request.POST)
+    except servicios.ConflictoReservaError as e:
+        servicios.registrar_conflicto(request.user, e)
+        messages.error(request, str(e))
     except ValueError as e:
         messages.error(request, str(e))
     else:
