@@ -9,4 +9,4 @@ google-genai==2.28.0
 openpyxl==3.1.5
 qrcode==8.2
 fastembed==0.9.1
-django-axes==8.3.1
+django-axes==9.0.0
